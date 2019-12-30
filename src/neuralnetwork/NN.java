@@ -112,7 +112,7 @@ public class NN {
             }
         }
     }
-    double[][] softmaxActivation(double[][] matrix, boolean derivative){
+    private double[][] softmaxActivation(double[][] matrix, boolean derivative){
         int rows = matrix.length;
         int columns = matrix[0].length;
         double[][] matrixResult = new double[rows][columns];
@@ -131,16 +131,11 @@ public class NN {
             return matrixResult;
         }
         double[][] derivatives = new double[rows][columns];
-//        for(int i = 0; i < rows; i++){
-//            for(int j = 0; j < columns; j++){
-//                derivatives[i][j] = matrixResult[i][j] * (1 - matrixResult[i][j]);
-//            }
-//        }
         double[][] ones = create(rows,columns,1);
         derivatives = multiply(matrixResult,subtract(ones,matrixResult));
         return derivatives;
     }
-    double leakyRelu(double x, boolean derivative){
+    private double leakyRelu(double x, boolean derivative){
         if(derivative == true){
             if(x < 0)
                 return .001;
@@ -154,7 +149,7 @@ public class NN {
                 return x;
         }
     }
-    double[][] leakyReluActivation(double[][] matrix, boolean derivative){
+    private double[][] leakyReluActivation(double[][] matrix, boolean derivative){
         double[][] matrixResult = new double[matrix.length][matrix[0].length];
         int rows = matrixResult.length;
         int columns = matrixResult[0].length;
@@ -163,12 +158,12 @@ public class NN {
                 matrixResult[i][j] = leakyRelu(matrix[i][j], derivative);
         return matrixResult;
     }
-    double sigmoid(double x, boolean derivative){
+    private double sigmoid(double x, boolean derivative){
         if(derivative == true)
             return sigmoid(x, false)*(1 - sigmoid(x, false));//sigmoid'(x)
         return 1/(1+Math.exp(-x));//sigmoid(x)
     }
-    double[][] sigmoidActivation(double[][] matrix, boolean derivative){
+    private double[][] sigmoidActivation(double[][] matrix, boolean derivative){
             double[][] matrixResult = new double[matrix.length][matrix[0].length];
             int rows = matrix.length;
             int columns = matrix[0].length;
@@ -177,12 +172,12 @@ public class NN {
                     matrixResult[i][j] = sigmoid(matrix[i][j], derivative);
             return matrixResult;
     }
-    double tanh(double x, boolean derivative){
+    private double tanh(double x, boolean derivative){
         if(derivative == true)
             return 1 - (Math.pow(tanh(x, false), 2));//tanh'(x)
         return (2/(1 + Math.exp(-2*x)))-1;//tanh(x)
     }
-    double[][] tanhActivation(double[][] matrix, boolean derivative){
+    private double[][] tanhActivation(double[][] matrix, boolean derivative){
             double[][] matrixResult = new double[matrix.length][matrix[0].length];
             int rows = matrix.length;
             int columns = matrix[0].length;

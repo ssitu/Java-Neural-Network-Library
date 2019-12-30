@@ -1,7 +1,7 @@
 package neuralnetwork;
 public class Neuralnetwork {
     public static void main(String[] args) {
-        NN nn = new NN("tanh","softmax",2,4,3,2,1,2,3,4,3);
+        NN nn = new NN("leakyrelu","softmax",2,4,3,2,1,2,3,4,3);
         double[][] inputs = new double[1][2];
         inputs[0][0] = 1;
         inputs[0][1] = -9;
