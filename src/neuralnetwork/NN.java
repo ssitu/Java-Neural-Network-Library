@@ -8,7 +8,17 @@ public class NN {
     final int NETWORKSIZE;
     BiFunction<double[][],Boolean,double[][]> activationHiddens;
     BiFunction<double[][],Boolean,double[][]> activationOutputs;
-    NN(String hiddenActivationFunction, String outputActivationFunction, int ... layerNodes){//Randomize weights and biases
+    public class Layer {
+        double[][] weights;
+        double[][] biases;
+        Layer(int previousNodes,int nodes){
+            weights = create(previousNodes,nodes,0);
+            biases = create(1,nodes,0);
+            weights = scale(randomize(weights,2,-1),Math.sqrt(2.0/previousNodes));
+            biases = randomize(biases,2,-1);
+        }
+    }
+    NN(String hiddenActivationFunction,String outputActivationFunction,int ... layerNodes){//Randomize weights and biases
         if(layerNodes.length < 3){
             throw new IllegalArgumentException("MUST HAVE MORE THAN 2 LAYERS IN THE NEURAL NETWORK");
         }
