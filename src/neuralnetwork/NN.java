@@ -30,6 +30,9 @@ public class NN {
         else if("tanh".equalsIgnoreCase(hiddenActivationFunction)){
             activationHiddens = (x,y) -> tanhActivation(x,y);
         }
+        else if("relu".equalsIgnoreCase(hiddenActivationFunction)){
+            activationHiddens = (x,y) -> reluActivation(x,y);
+        }
         else if("leakyrelu".equalsIgnoreCase(hiddenActivationFunction)){
             activationHiddens = (x,y) -> leakyReluActivation(x,y);
         }
@@ -45,6 +48,9 @@ public class NN {
         }
         else if("softmax".equalsIgnoreCase(outputActivationFunction)){
             activationOutputs = (x,y) -> softmaxActivation(x,y);
+        }
+        else if("linear".equalsIgnoreCase(outputActivationFunction)){
+            activationOutputs = (x,y) -> linearActivation(x,y);
         }
         else{
             throw new IllegalArgumentException("INVALID ACTIVATION FUNCTION FOR THE OUTPUT LAYER");
@@ -122,6 +128,17 @@ public class NN {
             }
         }
     }
+    private double[][] linearActivation(double[][] matrix, boolean derivative){
+        int rows = matrix.length;
+        int columns = matrix[0].length;
+        if(!derivative){
+            return matrix;
+        }
+        else{
+            double[][] matrixResult = NN.create(rows, columns, 1);
+            return matrixResult;
+        }
+    }
     private double[][] softmaxActivation(double[][] matrix, boolean derivative){
         int rows = matrix.length;
         int columns = matrix[0].length;
@@ -144,6 +161,29 @@ public class NN {
         double[][] ones = create(rows,columns,1);
         derivatives = multiply(matrixResult,subtract(ones,matrixResult));
         return derivatives;
+    }
+    private double relu(double x, boolean derivative){
+        if(derivative == true){
+            if(x < 0)
+                return 0;
+            else
+                return 1;
+        }
+        else{
+            if(x < 0)
+                return 0;
+            else
+                return x;
+        }
+    }
+    private double[][] reluActivation(double[][] matrix, boolean derivative){
+        double[][] matrixResult = new double[matrix.length][matrix[0].length];
+        int rows = matrixResult.length;
+        int columns = matrixResult[0].length;
+        for(int i = 0; i < rows; i++)
+            for(int j = 0; j < columns; j++)
+                matrixResult[i][j] = relu(matrix[i][j], derivative);
+        return matrixResult;
     }
     private double leakyRelu(double x, boolean derivative){
         if(derivative == true){
