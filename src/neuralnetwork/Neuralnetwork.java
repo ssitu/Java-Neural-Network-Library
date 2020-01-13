@@ -1,8 +1,6 @@
 package neuralnetwork;
 
 import java.util.ArrayList;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 public class Neuralnetwork {
     public static void main(String[] args) {
@@ -18,7 +16,7 @@ public class Neuralnetwork {
                 this.targets[0] = targets;
             }
         }
-        NNest.NN nn = new NNest().new NN(.05,"leakyrelu","sigmoid","quadratic",2,81,81,81,81,1);
+        NNest.NN nn = new NNest().new NN(1,"leakyrelu","sigmoid","quadratic",2,81,1);
         ArrayList<Data> data = new ArrayList<>();
         data.add(new Data());
         data.add(new Data());
@@ -33,10 +31,10 @@ public class Neuralnetwork {
         data.get(3).addInputs(0,0);
         data.get(3).addTargets(0);
         Thread t = new Thread(() ->{
-            for(int i = 0; i < 250000; i++){
+            for(int i = 0; i < 250000; i--){
                 int random = (int)(Math.random()*4);
-                nn.print(data.get(random).inputs, "inputs");
-                nn.print(nn.feedforward(data.get(random).inputs), "feedforward");
+//                nn.print(data.get(random).inputs, "inputs");
+//                nn.print(nn.feedforward(data.get(random).inputs), "feedforward");
                 nn.backpropagation(data.get(random).inputs, data.get(random).targets);
             }
             Thread.currentThread().interrupt();

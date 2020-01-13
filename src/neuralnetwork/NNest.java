@@ -3,10 +3,11 @@ import java.io.Serializable;
 import java.util.*;
 import java.util.function.*;
 import javafx.application.*;
+import static javafx.application.Application.launch;
 import javafx.scene.Scene;
 import javafx.scene.chart.*;
 import javafx.stage.Stage;
-public class NNest extends Application{
+public class NNest extends Application implements Serializable{
     volatile static double globalCost;
     public class NN implements Serializable{
         private class Layer implements Serializable{
@@ -22,7 +23,7 @@ public class NNest extends Application{
         ArrayList<Layer> network = new ArrayList<>();
         double lr;
         double cost;
-        final int NETWORKSIZE;
+        final int NETWORKSIZE;//Total layers not including the input layer
         transient BiFunction<double[][],Boolean,double[][]> activationHiddens;
         transient BiFunction<double[][],Boolean,double[][]> activationOutputs;
         transient BiFunction<double[][], double[][], Function<Boolean, double[][]>> costFunction;
@@ -79,6 +80,7 @@ public class NNest extends Application{
                 network.add(layer);
             }
             NETWORKSIZE = network.size();
+            System.out.println(NETWORKSIZE);
         }
         double[][] feedforward(double[][] inputs){
             double[][] outputs = inputs;
@@ -143,8 +145,14 @@ public class NNest extends Application{
                 costFunction.apply(copy(A.get(NETWORKSIZE)), targets).apply(false);//Update the cost to anneal the learning rate
                 globalCost = cost;
                 //Square Root Annealing
-                bGradients = scale(lr*Math.sqrt(cost),dC_dZ);
-                wGradients = scale(lr*Math.sqrt(cost),dC_dW);
+//                bGradients = scale(lr*Math.sqrt(cost)*Math.pow(10, -Math.pow(NETWORKSIZE,1/NETWORKSIZE)),dC_dZ);
+//                wGradients = scale(lr*Math.sqrt(cost)*Math.pow(10, -Math.pow(NETWORKSIZE,1/NETWORKSIZE)),dC_dW);
+//                double stabilizer = lr*Math.sqrt(cost)*Math.pow(10, -Math.pow(NETWORKSIZE, .8*Math.pow(NETWORKSIZE, -1)));
+//                double stabilizer = lr*Math.sqrt(cost) * Math.pow(10, -NETWORKSIZE);
+//                double stabilizer = lr*Math.sqrt(cost)* Math.pow(10, -NETWORKSIZE+2+(NETWORKSIZE*Math.E*(.02209*NETWORKSIZE-.0182)));
+                double stabilizer = lr*Math.sqrt(cost)* Math.pow(10, -NETWORKSIZE+2+(NETWORKSIZE*Math.E*(.02209*NETWORKSIZE-.02)));
+                bGradients = scale(stabilizer,dC_dZ);
+                wGradients = scale(stabilizer,dC_dW);
 //                bGradients = scale(lr*cost,dC_dZ);
 //                wGradients = scale(lr*cost,dC_dW);
                 network.get(i-1).biases = subtract(network.get(i-1).biases,bGradients);
@@ -503,7 +511,7 @@ public class NNest extends Application{
         Thread updateThread = new Thread(() -> {
             while(true){
                 try{
-                    Thread.sleep(10);
+                    Thread.sleep(250);
                     Platform.runLater(() -> series.getData().add(new XYChart.Data<>(increment, globalCost)));
                 } 
                 catch(InterruptedException e){
