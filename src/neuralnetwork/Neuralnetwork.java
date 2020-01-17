@@ -16,7 +16,9 @@ public class Neuralnetwork {
                 this.targets[0] = targets;
             }
         }
-        NNest.NN nn = new NNest().new NN(1,"leakyrelu","sigmoid","quadratic",2,81,1);
+        NNest.NN nn = new NNest().new NN(1,"leakyrelu","sigmoid","quadratic",2,81,81,81,81,81,1);
+        System.out.println(nn.NETWORKSIZE);
+        System.out.println(nn.getNetworkSize());
         ArrayList<Data> data = new ArrayList<>();
         data.add(new Data());
         data.add(new Data());
