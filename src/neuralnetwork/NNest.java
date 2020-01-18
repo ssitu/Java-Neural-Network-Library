@@ -7,6 +7,7 @@ import static javafx.application.Application.launch;
 import javafx.scene.Scene;
 import javafx.scene.chart.*;
 import javafx.stage.Stage;
+import java.io.*;
 public class NNest extends Application implements Serializable{
     volatile static double globalCost;
     volatile static int increment = 0;
@@ -90,6 +91,26 @@ public class NNest extends Application implements Serializable{
             networkLayers += network.get(NETWORKSIZE-1).weights[0].length;
             return networkLayers;
         }
+        public void save(){
+        try{
+            FileOutputStream fileOut = new FileOutputStream(System.getProperty("user.dir") + "/neuralnetwork(" + this.getNetworkSize() + ").ser");
+            ObjectOutputStream out = new ObjectOutputStream(fileOut);
+            out.writeObject(this.network);
+        }
+        catch(IOException e){
+            e.printStackTrace();
+        }
+    }
+    public void load(){
+        try{
+            FileInputStream fileIn = new FileInputStream(System.getProperty("user.dir") + "/neuralnetwork(" + this.getNetworkSize() + ").ser");
+            ObjectInputStream in = new ObjectInputStream(fileIn);
+            this.network = (ArrayList)in.readObject();
+        }
+        catch (IOException | ClassNotFoundException e) {
+            System.out.println("Could not load network settings");
+        }
+    }
         public double[][] feedforward(double[][] inputs){
             double[][] outputs = inputs;
             for(int i = 0; i < NETWORKSIZE-1; i++){//Feed the inputs through the hidden layers
