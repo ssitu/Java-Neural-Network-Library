@@ -32,16 +32,13 @@ public class Neuralnetwork {
         data.get(2).addTargets(1);
         data.get(3).addInputs(0,0);
         data.get(3).addTargets(0);
-        Thread t = new Thread(() ->{
-            for(int i = 0; i < 250000; i--){
-                int random = (int)(Math.random()*4);
+        NNest.startGraph();
+        for(int i = 0; i < 250000; i--){
+            int random = (int)(Math.random()*4);
 //                nn.print(data.get(random).inputs, "inputs");
 //                nn.print(nn.feedforward(data.get(random).inputs), "feedforward");
-                nn.backpropagation(data.get(random).inputs, data.get(random).targets);
-            }
-            Thread.currentThread().interrupt();
-        });
-        t.start();
-        NNest.launch(NNest.class);
+            nn.backpropagation(data.get(random).inputs, data.get(random).targets);
+        }
+        
     }
 }

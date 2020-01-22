@@ -1,5 +1,4 @@
 package neuralnetwork;
-import java.io.Serializable;
 import java.util.*;
 import java.util.function.*;
 import javafx.application.*;
@@ -100,17 +99,17 @@ public class NNest extends Application implements Serializable{
         catch(IOException e){
             e.printStackTrace();
         }
-    }
-    public void load(){
-        try{
-            FileInputStream fileIn = new FileInputStream(System.getProperty("user.dir") + "/neuralnetwork(" + this.getNetworkSize() + ").ser");
-            ObjectInputStream in = new ObjectInputStream(fileIn);
-            this.network = (ArrayList)in.readObject();
         }
-        catch (IOException | ClassNotFoundException e) {
-            System.out.println("Could not load network settings");
+        public void load(){
+            try{
+                FileInputStream fileIn = new FileInputStream(System.getProperty("user.dir") + "/neuralnetwork(" + this.getNetworkSize() + ").ser");
+                ObjectInputStream in = new ObjectInputStream(fileIn);
+                this.network = (ArrayList)in.readObject();
+            }
+            catch (IOException | ClassNotFoundException e) {
+                System.out.println("Could not load network settings");
+            }
         }
-    }
         public double[][] feedforward(double[][] inputs){
             double[][] outputs = inputs;
             for(int i = 0; i < NETWORKSIZE-1; i++){//Feed the inputs through the hidden layers
@@ -551,6 +550,11 @@ public class NNest extends Application implements Serializable{
         });
         updateThread.setDaemon(true);
         updateThread.start();
+    }
+    public static void startGraph(){
+        new Thread(() -> {
+            NNest.launch(NNest.class);
+        }).start();
     }
     public static void main(String[] args){
         launch(args);
