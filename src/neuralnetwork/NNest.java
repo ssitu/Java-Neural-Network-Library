@@ -12,12 +12,12 @@ public class NNest extends Application implements Serializable{
     volatile static int increment = 0;
     public class NN implements Serializable{
         private class Layer implements Serializable{
-            double[][] weights;
-            double[][] biases;
+            float[][] weights;
+            float[][] biases;
             Layer(int previousNodes,int nodes){
                 weights = create(previousNodes,nodes,0);
                 biases = create(1,nodes,0);
-                weights = scale(randomize(weights,2,-1),Math.sqrt(2.0/previousNodes));
+                weights = scale(randomize(weights,2f,-1f),(float)Math.sqrt(2.0/previousNodes));
                 biases = randomize(biases,2,-1);
             }
         }
@@ -25,56 +25,42 @@ public class NNest extends Application implements Serializable{
         double lr;
         double cost;
         final int NETWORKSIZE;//Total layers not including the input layer
-        transient BiFunction<double[][],Boolean,double[][]> activationHiddens;
-        transient BiFunction<double[][],Boolean,double[][]> activationOutputs;
-        transient BiFunction<double[][], double[][], Function<Boolean, double[][]>> costFunction;
+        transient BiFunction<float[][],Boolean,float[][]> activationHiddens;
+        transient BiFunction<float[][],Boolean,float[][]> activationOutputs;
+        transient BiFunction<float[][], float[][], Function<Boolean, float[][]>> costFunction;
         NN(double learningRate, String hiddenActivationFunction, String outputActivationFunction, String costFunction, int ... layerNodes){
             lr = learningRate;
-            if(layerNodes.length < 3){
+            if(layerNodes.length < 3)
                 throw new IllegalArgumentException("MUST HAVE MORE THAN 2 LAYERS IN THE NEURAL NETWORK");
-            }
             //Activation functions for the hidden layers
-            if("sigmoid".equalsIgnoreCase(hiddenActivationFunction)){
+            if("sigmoid".equalsIgnoreCase(hiddenActivationFunction))
                 activationHiddens = (x,y) -> sigmoidActivation(x,y);
-            }
-            else if("tanh".equalsIgnoreCase(hiddenActivationFunction)){
+            else if("tanh".equalsIgnoreCase(hiddenActivationFunction))
                 activationHiddens = (x,y) -> tanhActivation(x,y);
-            }
-            else if("relu".equalsIgnoreCase(hiddenActivationFunction)){
+            else if("relu".equalsIgnoreCase(hiddenActivationFunction))
                 activationHiddens = (x,y) -> reluActivation(x,y);
-            }
-            else if("leakyrelu".equalsIgnoreCase(hiddenActivationFunction)){
+            else if("leakyrelu".equalsIgnoreCase(hiddenActivationFunction))
                 activationHiddens = (x,y) -> leakyReluActivation(x,y);
-            }
-            else{
+            else
                 throw new IllegalArgumentException("INVALID ACTIVATION FUNCTION FOR THE HIDDEN LAYERS");
-            }
             //Activation functions for the output layer
-            if("sigmoid".equalsIgnoreCase(outputActivationFunction)){
+            if("sigmoid".equalsIgnoreCase(outputActivationFunction))
                 activationOutputs = (x,y) -> sigmoidActivation(x,y);
-            }
-            else if("tanh".equalsIgnoreCase(outputActivationFunction)){
+            else if("tanh".equalsIgnoreCase(outputActivationFunction))
                 activationOutputs = (x,y) -> tanhActivation(x,y);
-            }
-            else if("softmax".equalsIgnoreCase(outputActivationFunction)){
+            else if("softmax".equalsIgnoreCase(outputActivationFunction))
                 activationOutputs = (x,y) -> softmaxActivation(x,y);
-            }
-            else if("linear".equalsIgnoreCase(outputActivationFunction)){
+            else if("linear".equalsIgnoreCase(outputActivationFunction))
                 activationOutputs = (x,y) -> linearActivation(x,y);
-            }
-            else{
+            else
                 throw new IllegalArgumentException("INVALID ACTIVATION FUNCTION FOR THE OUTPUT LAYER");
-            }
             //Cost functions for the backpropagation
-            if("quadratic".equalsIgnoreCase(costFunction)){
+            if("quadratic".equalsIgnoreCase(costFunction))
                 this.costFunction = (x,y) -> (z) -> quadraticLoss(x,y,z);
-            }
-            else if("log".equalsIgnoreCase(costFunction)){//The target should be passed as making the correct classification as the highest value
+            else if("log".equalsIgnoreCase(costFunction))//The target should be passed as making the correct classification as the highest value
                 this.costFunction = (x,y) -> (z) -> logLoss(x,y,z);
-            }
-            else{
+            else
                 throw new IllegalArgumentException("INVALID COST FUNCTION");
-            }
             //Adding each layer
             for(int i = 1; i < layerNodes.length; i++){
                 Layer layer = new Layer(layerNodes[i-1],layerNodes[i]);
@@ -82,27 +68,26 @@ public class NNest extends Application implements Serializable{
             }
             NETWORKSIZE = network.size();
         }
-        public String getNetworkSize(){
+        public String getNetworkLayers(){
             String networkLayers = "";
-            for(Layer layer : network){
+            for(Layer layer : network)
                 networkLayers += layer.weights.length + ",";
-            }
             networkLayers += network.get(NETWORKSIZE-1).weights[0].length;
             return networkLayers;
         }
         public void save(){
-        try{
-            FileOutputStream fileOut = new FileOutputStream(System.getProperty("user.dir") + "/neuralnetwork(" + this.getNetworkSize() + ").ser");
-            ObjectOutputStream out = new ObjectOutputStream(fileOut);
-            out.writeObject(this.network);
-        }
-        catch(IOException e){
-            e.printStackTrace();
-        }
+            try{
+                FileOutputStream fileOut = new FileOutputStream(System.getProperty("user.dir") + "/neuralnetwork(" + this.getNetworkLayers() + ").ser");
+                ObjectOutputStream out = new ObjectOutputStream(fileOut);
+                out.writeObject(this.network);
+            }
+            catch(IOException e){
+                e.printStackTrace();
+            }
         }
         public void load(){
             try{
-                FileInputStream fileIn = new FileInputStream(System.getProperty("user.dir") + "/neuralnetwork(" + this.getNetworkSize() + ").ser");
+                FileInputStream fileIn = new FileInputStream(System.getProperty("user.dir") + "/neuralnetwork(" + this.getNetworkLayers() + ").ser");
                 ObjectInputStream in = new ObjectInputStream(fileIn);
                 this.network = (ArrayList)in.readObject();
             }
@@ -110,31 +95,30 @@ public class NNest extends Application implements Serializable{
                 System.out.println("Could not load network settings");
             }
         }
-        public double[][] feedforward(double[][] inputs){
-            double[][] outputs = inputs;
-            for(int i = 0; i < NETWORKSIZE-1; i++){//Feed the inputs through the hidden layers
+        public float[][] feedforward(float[][] inputs){
+            float[][] outputs = inputs;
+            for(int i = 0; i < NETWORKSIZE-1; i++)//Feed the inputs through the hidden layers
                 outputs = activationHiddens.apply(add(dot(outputs,network.get(i).weights),network.get(i).biases),false);
-            }
             //Feed the output from the hidden layers to the output layers with its (different) activation function
             outputs = activationOutputs.apply(add(dot(outputs,network.get(NETWORKSIZE-1).weights),network.get(NETWORKSIZE-1).biases),false);
             return outputs;
         }
-        public void backpropagation(double[][] inputs, double[][] targets){//Using notation from neuralnetworksanddeeplearning.com
+        public void backpropagation(float[][] inputs, float[][] targets){//Using notation from neuralnetworksanddeeplearning.com
             if(targets[0].length != network.get(NETWORKSIZE-1).biases[0].length){
                 throw new IllegalArgumentException("TARGETS ARRAY DO NOT MATCH THE SIZE OF THE OUTPUT LAYER");
             }
-            double[][] outputs = inputs;
+            float[][] outputs = inputs;
             //Each partial derivative is used in this order
-            double[][] dC_dA;
-            double[][] dA_dZ;
-            double[][] dZ_dW;
-            double[][] dC_dZ = create(0,0,0);
-            double[][] dC_dW;
-            double[][] bGradients;
-            double[][] wGradients;
-            double[][] dZ_dA = create(0,0,0);
-            ArrayList<double[][]> Z = new ArrayList<>();//"Z" = the unactivated inputs from the weights and biases
-            ArrayList<double[][]> A = new ArrayList<>();//"A" = the activated "Z"s
+            float[][] dC_dA;
+            float[][] dA_dZ;
+            float[][] dZ_dW;
+            float[][] dC_dZ = create(0,0,0);
+            float[][] dC_dW;
+            float[][] bGradients;
+            float[][] wGradients;
+            float[][] dZ_dA = create(0,0,0);
+            ArrayList<float[][]> Z = new ArrayList<>();//"Z" = the unactivated inputs from the weights and biases
+            ArrayList<float[][]> A = new ArrayList<>();//"A" = the activated "Z"s
             A.add(outputs);
             for(int i = 0; i < NETWORKSIZE-1; i++){
                 outputs = add(dot(outputs,network.get(i).weights),network.get(i).biases);//Computing "Z"
@@ -173,11 +157,11 @@ public class NNest extends Application implements Serializable{
                 //Square Root Annealing
 //                bGradients = scale(lr*Math.sqrt(cost)*Math.pow(10, -Math.pow(NETWORKSIZE,1/NETWORKSIZE)),dC_dZ);
 //                wGradients = scale(lr*Math.sqrt(cost)*Math.pow(10, -Math.pow(NETWORKSIZE,1/NETWORKSIZE)),dC_dW);
-//                double stabilizer = lr*Math.sqrt(cost)*Math.pow(10, -Math.pow(NETWORKSIZE, .8*Math.pow(NETWORKSIZE, -1)));
-//                double stabilizer = lr*Math.sqrt(cost) * Math.pow(10, -NETWORKSIZE);
-//                double stabilizer = lr*Math.sqrt(cost)* Math.pow(10, -NETWORKSIZE+2+(NETWORKSIZE*Math.E*(.02209*NETWORKSIZE-.0182)));
-//                double stabilizer = lr*Math.sqrt(cost)* Math.pow(10, -NETWORKSIZE+2+(NETWORKSIZE*Math.E*(.02209*NETWORKSIZE-.02)));
-                double stabilizer = lr*Math.sqrt(cost)* Math.pow(10, -NETWORKSIZE+2+(NETWORKSIZE*Math.E*((.02+.0002*NETWORKSIZE)*NETWORKSIZE-(.02+.0002*NETWORKSIZE))));
+//                float stabilizer = lr*Math.sqrt(cost)*Math.pow(10, -Math.pow(NETWORKSIZE, .8*Math.pow(NETWORKSIZE, -1)));
+//                float stabilizer = lr*Math.sqrt(cost) * Math.pow(10, -NETWORKSIZE);
+//                float stabilizer = lr*Math.sqrt(cost)* Math.pow(10, -NETWORKSIZE+2+(NETWORKSIZE*Math.E*(.02209*NETWORKSIZE-.0182)));
+//                float stabilizer = lr*Math.sqrt(cost)* Math.pow(10, -NETWORKSIZE+2+(NETWORKSIZE*Math.E*(.02209*NETWORKSIZE-.02)));
+                float stabilizer = (float)(lr*Math.sqrt(cost)* Math.pow(10, -NETWORKSIZE+2+(NETWORKSIZE*Math.E*((.02+.0002*NETWORKSIZE)*NETWORKSIZE-(.02+.0002*NETWORKSIZE)))));
                 bGradients = scale(stabilizer,dC_dZ);
                 wGradients = scale(stabilizer,dC_dW);
 //                bGradients = scale(lr*cost,dC_dZ);
@@ -191,40 +175,34 @@ public class NNest extends Application implements Serializable{
             increment++;
             globalCost = cost;
         }
-        private double[][] linearActivation(double[][] matrix, boolean derivative){
+        private float[][] linearActivation(float[][] matrix, boolean derivative){
             int rows = matrix.length;
             int columns = matrix[0].length;
-            if(!derivative){
+            if(!derivative)
                 return matrix;
-            }
             else{
-                double[][] matrixResult = create(rows, columns, 1);
+                float[][] matrixResult = create(rows, columns, 1);
                 return matrixResult;
             }
         }
-        private double[][] softmaxActivation(double[][] matrix, boolean derivative){
+        private float[][] softmaxActivation(float[][] matrix, boolean derivative){
             int rows = matrix.length;
             int columns = matrix[0].length;
-            double[][] matrixResult = new double[rows][columns];
-            double sum = 0;
-            for(int i = 0; i < rows; i++){
-                for(int j = 0; j < columns; j++){
+            float[][] matrixResult = new float[rows][columns];
+            float sum = 0;
+            for(int i = 0; i < rows; i++)
+                for(int j = 0; j < columns; j++)
                     sum += Math.exp(matrix[i][j]);
-                }
-            }
-            for(int i = 0; i < rows; i++){
-                for(int j = 0; j < columns; j++){
-                    matrixResult[i][j] = Math.exp(matrix[i][j])/sum;
-                }
-            }
-            if(!derivative){
+            for(int i = 0; i < rows; i++)
+                for(int j = 0; j < columns; j++)
+                    matrixResult[i][j] = (float)Math.exp(matrix[i][j])/sum;
+            if(!derivative)
                 return matrixResult;
-            }
-            double[][] ones = create(rows,columns,1);
-            double[][] derivatives = multiply(matrixResult,subtract(ones,matrixResult));
+            float[][] ones = create(rows,columns,1);
+            float[][] derivatives = multiply(matrixResult,subtract(ones,matrixResult));
             return derivatives;
         }
-        private double relu(double x, boolean derivative){
+        private float relu(float x, boolean derivative){
             if(derivative == true){
                 if(x < 0)
                     return 0;
@@ -238,97 +216,92 @@ public class NNest extends Application implements Serializable{
                     return x;
             }
         }
-        private double[][] reluActivation(double[][] matrix, boolean derivative){
-            double[][] matrixResult = new double[matrix.length][matrix[0].length];
-            int rows = matrixResult.length;
-            int columns = matrixResult[0].length;
+        private float[][] reluActivation(float[][] matrix, boolean derivative){
+            int rows = matrix.length;
+            int columns = matrix[0].length;
+            float[][] matrixResult = new float[rows][columns];
             for(int i = 0; i < rows; i++)
                 for(int j = 0; j < columns; j++)
                     matrixResult[i][j] = relu(matrix[i][j], derivative);
             return matrixResult;
         }
-        private double leakyRelu(double x, boolean derivative){
+        private float leakyRelu(float x, boolean derivative){
             if(derivative == true){
                 if(x < 0)
-                    return .001;
+                    return .001f;
                 else
                     return 1;
             }
             else{
                 if(x < 0)
-                    return .001*x;
+                    return .001f*x;
                 else
                     return x;
             }
         }
-        private double[][] leakyReluActivation(double[][] matrix, boolean derivative){
-            double[][] matrixResult = new double[matrix.length][matrix[0].length];
-            int rows = matrixResult.length;
-            int columns = matrixResult[0].length;
+        private float[][] leakyReluActivation(float[][] matrix, boolean derivative){
+            int rows = matrix.length;
+            int columns = matrix[0].length;
+            float[][] matrixResult = new float[rows][columns];
             for(int i = 0; i < rows; i++)
                 for(int j = 0; j < columns; j++)
                     matrixResult[i][j] = leakyRelu(matrix[i][j], derivative);
             return matrixResult;
         }
-        private double sigmoid(double x, boolean derivative){
+        private float sigmoid(float x, boolean derivative){
             if(derivative == true)
                 return sigmoid(x, false)*(1 - sigmoid(x, false));//sigmoid'(x)
-            return 1/(1+Math.exp(-x));//sigmoid(x)
+            return 1/(1+(float)Math.exp(-x));//sigmoid(x)
         }
-        private double[][] sigmoidActivation(double[][] matrix, boolean derivative){
-                double[][] matrixResult = new double[matrix.length][matrix[0].length];
+        private float[][] sigmoidActivation(float[][] matrix, boolean derivative){
                 int rows = matrix.length;
                 int columns = matrix[0].length;
+                float[][] matrixResult = new float[rows][columns];
                 for(int i = 0; i < rows; i++)
                     for(int j = 0; j < columns; j++)
                         matrixResult[i][j] = sigmoid(matrix[i][j], derivative);
                 return matrixResult;
         }
-        private double tanh(double x, boolean derivative){
+        private float tanh(float x, boolean derivative){
             if(derivative == true)
-                return 1 - (Math.pow(tanh(x, false), 2));//tanh'(x)
-            return (2/(1 + Math.exp(-2*x)))-1;//tanh(x)
+                return 1 - ((float)Math.pow(tanh(x, false), 2));//tanh'(x)
+            return (2/(1 + (float)Math.exp(-2*x)))-1;//tanh(x)
         }
-        private double[][] tanhActivation(double[][] matrix, boolean derivative){
-                double[][] matrixResult = new double[matrix.length][matrix[0].length];
+        private float[][] tanhActivation(float[][] matrix, boolean derivative){
                 int rows = matrix.length;
                 int columns = matrix[0].length;
+                float[][] matrixResult = new float[rows][columns];
                 for(int i = 0; i < rows; i++)
                     for(int j = 0; j < columns; j++)
                         matrixResult[i][j] = tanh(matrix[i][j], derivative);
                 return matrixResult;
         }
-        private double[][] quadraticLoss(double[][] outputs, double[][] targets, boolean derivative){
-            if(derivative){
+        private float[][] quadraticLoss(float[][] outputs, float[][] targets, boolean derivative){
+            if(derivative)
                 return subtract(outputs, targets);
-            }
-            else{
-                double[][] loss = scale(power(subtract(outputs, targets), 2), .5);
-                int rows = loss.length;
-                int columns = loss[0].length;
-                double total = 0;
-                for(int i = 0; i < rows; i++)
-                    for(int j = 0; j < columns; j++){
-                        total += loss[i][j];
-                    }
-                cost = total/columns;
-                return null;
-            }
+            float[][] loss = scale(power(subtract(outputs, targets), 2), .5f);
+            int rows = loss.length;
+            int columns = loss[0].length;
+            double total = 0;
+            for(int i = 0; i < rows; i++)
+                for(int j = 0; j < columns; j++)
+                    total += loss[i][j];
+            cost = total/columns;
+            return null;
         }
-        private double[][] logLoss(double[][] outputs, double[][] targets, boolean derivative){
+        private float[][] logLoss(float[][] outputs, float[][] targets, boolean derivative){
             int columns = targets[0].length;//Should be the same as outputs[0].length
-            double[] temp;
+            float[] temp;
             temp = targets[0].clone();
             Arrays.sort(temp);
             try{
-                if(temp[columns-1] == temp[columns-2]){
+                if(temp[columns-1] == temp[columns-2])
                     throw new IllegalArgumentException("INDICATE CORRECT CLASSIFICATION WITH A HIGHEST VALUE IN THE TARGET ARRAY");
-                }
             }
             catch(java.lang.ArrayIndexOutOfBoundsException e){
                 throw new IllegalArgumentException("AT LEAST TWO TARGETS NEEDED FOR LOG LOSS");
             }
-            double max = Double.NEGATIVE_INFINITY;
+            float max = Float.NEGATIVE_INFINITY;
             int correctClass = 0;
             for(int i = 0; i < columns; i++){
                 if(targets[0][i] > max){
@@ -337,33 +310,42 @@ public class NNest extends Application implements Serializable{
                 }
             }//Found the correct classification index
             if(derivative){
-                for(int i = 0; i < columns; i++){
-                    if(i == correctClass){
+                for(int i = 0; i < columns; i++)
+                    if(i == correctClass)
                         outputs[0][i] -= 1;//The derivative of the -log of the correct classification is the predicted probability - 1
-                    }
-                }
                 return outputs;//Otherwise the derivatives of the wrong classifications are the outputs
             }
-            else{
-                cost = -Math.log(outputs[0][correctClass]);
-                return null;
-            }
+            cost = -Math.log(outputs[0][correctClass]);
+            return null;
         }
-
-
-
-
 
         private void sizeException(double[][] matrix){
-            for(double[] matrixRow : matrix) 
-                if(matrixRow.length != matrix[0].length) 
+            int rows = matrix.length;
+            int columns = matrix[0].length;
+            for(int i = 0; i < rows; i++) 
+                if(matrix[i].length != columns) 
                     throw new IllegalArgumentException("Inconsistent Matrix Size");  
         }
-        private void multiplicationDimensionMismatch(double[][] matrixA, double[][] matrixB){
+        private void sizeException(float[][] matrix){
+            int rows = matrix.length;
+            int columns = matrix[0].length;
+            for(int i = 0; i < rows; i++)
+                if(matrix[i].length != columns)
+                    throw new IllegalArgumentException("Inconsistent Matrix Size");  
+        }
+        private void dotDimensionMismatch(double[][] matrixA, double[][] matrixB){
+            if(matrixA[0].length != matrixB.length)//A columns must equal B rows
+                throw new IllegalArgumentException("Matrices Dimension Mismatch");
+        }
+        private void dotDimensionMismatch(float[][] matrixA, float[][] matrixB){
             if(matrixA[0].length != matrixB.length)//A columns must equal B rows
                 throw new IllegalArgumentException("Matrices Dimension Mismatch");
         }
         private void dimensionMismatch(double[][] matrixA, double[][] matrixB){
+            if(matrixA.length != matrixB.length || matrixA[0].length != matrixB[0].length)
+                throw new IllegalArgumentException("Matrices Dimension Mismatch");
+        }
+        private void dimensionMismatch(float[][] matrixA, float[][] matrixB){
             if(matrixA.length != matrixB.length || matrixA[0].length != matrixB[0].length)
                 throw new IllegalArgumentException("Matrices Dimension Mismatch");
         }
@@ -377,14 +359,40 @@ public class NNest extends Application implements Serializable{
                 System.out.println("");
             }
         }
-        public void resetDouble(double[][] matrix){
+        public void print(float[][] matrix, String nameOfMatrix){
+            System.out.println(nameOfMatrix + ": ");
+            int rows = matrix.length;
+            int columns = matrix[0].length;
+            for(int i = 0; i < rows; i++){
+                for(int j = 0; j < columns; j++)
+                    System.out.print("[" + matrix[i][j] + "] ");
+                System.out.println("");
+            }
+        }
+        public float[][] doubleToFloat(double[][] matrix){
+            int rows = matrix.length;
+            int columns = matrix[0].length;
+            float[][] matrixResult = new float[rows][columns];
+            for(int i = 0; i < rows; i++)
+                for(int j = 0; j < columns; j++)
+                    matrixResult[i][j] = (float)(matrix[i][j]);
+            return matrixResult;
+        }
+        public void setZeroes(double[][] matrix){
             int rows = matrix.length;
             int columns = matrix[0].length;
             for(int i = 0; i < rows; i++)
                 for(int j = 0; j < columns; j++)
                     matrix[i][j] = 0;
         }
-        public void resetInt(int[][] matrix){
+        public void setZeroes(int[][] matrix){
+            int rows = matrix.length;
+            int columns = matrix[0].length;
+            for(int i = 0; i < rows; i++)
+                for(int j = 0; j < columns; j++)
+                    matrix[i][j] = 0;
+        }
+        public void setZeroes(float[][] matrix){
             int rows = matrix.length;
             int columns = matrix[0].length;
             for(int i = 0; i < rows; i++)
@@ -394,9 +402,15 @@ public class NNest extends Application implements Serializable{
         public double[][] create(int rows, int columns, double valueToAllElements){
             double[][] matrixResult = new double[rows][columns];
             for(int i = 0; i < rows; i++)
-                for(int j = 0; j < columns; j++){
+                for(int j = 0; j < columns; j++)
                     matrixResult[i][j] = valueToAllElements;
-                }
+            return matrixResult;
+        }
+        public float[][] create(int rows, int columns, float valueToAllElements){
+            float[][] matrixResult = new float[rows][columns];
+            for(int i = 0; i < rows; i++)
+                for(int j = 0; j < columns; j++)
+                    matrixResult[i][j] = valueToAllElements;
             return matrixResult;
         }
         public double[][] randomize(double[][] matrix, double range, double minimum){
@@ -409,6 +423,16 @@ public class NNest extends Application implements Serializable{
                     matrixResult[i][j] = Math.random() * range + minimum;
             return matrixResult;
         }
+        public float[][] randomize(float[][] matrix, float range, float minimum){
+            sizeException(matrix);
+            float[][] matrixResult = matrix;
+            int rows = matrixResult.length;
+            int columns = matrixResult[0].length;
+            for(int i = 0; i < rows; i++)
+                for(int j = 0; j < columns; j++)
+                    matrixResult[i][j] = (float)Math.random() * range + minimum;
+            return matrixResult;
+        }
         public double[][] transpose(double[][] matrix){
             sizeException(matrix);
             double[][] matrixResult = new double[matrix[0].length][matrix.length];
@@ -419,11 +443,31 @@ public class NNest extends Application implements Serializable{
                     matrixResult[j][i] = matrix[i][j];
             return matrixResult;
         }
+        public float[][] transpose(float[][] matrix){
+            sizeException(matrix);
+            float[][] matrixResult = new float[matrix[0].length][matrix.length];
+            int rows = matrix.length;
+            int columns = matrix[0].length;
+            for(int i = 0; i < rows; i++)
+                for(int j = 0; j < columns; j++)
+                    matrixResult[j][i] = matrix[i][j];
+            return matrixResult;
+        }
         public double[][] scale(double[][] matrix, double factor){
             sizeException(matrix);
-            double[][] matrixResult = new double[matrix.length][matrix[0].length];
-            int rows = matrixResult.length;
-            int columns = matrixResult[0].length;
+            int rows = matrix.length;
+            int columns = matrix[0].length;
+            double[][] matrixResult = new double[rows][columns];
+            for(int i = 0; i < rows; i++)
+                for(int j = 0; j < columns; j++)
+                    matrixResult[i][j] = factor * matrix[i][j];
+            return matrixResult;   
+        }
+        public float[][] scale(float[][] matrix, float factor){
+            sizeException(matrix);
+            int rows = matrix.length;
+            int columns = matrix[0].length;
+            float[][] matrixResult = new float[rows][columns];
             for(int i = 0; i < rows; i++)
                 for(int j = 0; j < columns; j++)
                     matrixResult[i][j] = factor * matrix[i][j];
@@ -431,9 +475,19 @@ public class NNest extends Application implements Serializable{
         }
         public double[][] scale(double factor, double[][] matrix){
             sizeException(matrix);
-            double[][] matrixResult = new double[matrix.length][matrix[0].length];
-            int rows = matrixResult.length;
-            int columns = matrixResult[0].length;
+            int rows = matrix.length;
+            int columns = matrix[0].length;
+            double[][] matrixResult = new double[rows][columns];
+            for(int i = 0; i < rows; i++)
+                for(int j = 0; j < columns; j++)
+                    matrixResult[i][j] = factor * matrix[i][j];
+            return matrixResult;   
+        }
+        public float[][] scale(float factor, float[][] matrix){
+            sizeException(matrix);
+            int rows = matrix.length;
+            int columns = matrix[0].length;
+            float[][] matrixResult = new float[rows][columns];
             for(int i = 0; i < rows; i++)
                 for(int j = 0; j < columns; j++)
                     matrixResult[i][j] = factor * matrix[i][j];
@@ -443,9 +497,21 @@ public class NNest extends Application implements Serializable{
             sizeException(matrixA);
             sizeException(matrixB);
             dimensionMismatch(matrixA, matrixB);
-            double[][] matrixResult = new double[matrixA.length][matrixA[0].length];
-            int rows = matrixResult.length;
-            int columns = matrixResult[0].length;
+            int rows = matrixA.length;
+            int columns = matrixA[0].length;
+            double[][] matrixResult = new double[rows][columns];
+            for(int i = 0; i < rows; i++)
+                for(int j = 0; j < columns; j++)
+                    matrixResult[i][j] = matrixA[i][j] + matrixB[i][j];
+            return matrixResult;
+        }
+        public float[][] add(float[][] matrixA, float[][] matrixB){
+            sizeException(matrixA);
+            sizeException(matrixB);
+            dimensionMismatch(matrixA, matrixB);
+            int rows = matrixA.length;
+            int columns = matrixA[0].length;
+            float[][] matrixResult = new float[rows][columns];
             for(int i = 0; i < rows; i++)
                 for(int j = 0; j < columns; j++)
                     matrixResult[i][j] = matrixA[i][j] + matrixB[i][j];
@@ -455,9 +521,21 @@ public class NNest extends Application implements Serializable{
             sizeException(matrixA);
             sizeException(matrixB);
             dimensionMismatch(matrixA, matrixB);
-            double[][] matrixResult = new double[matrixA.length][matrixA[0].length];
-            int rows = matrixResult.length;
-            int columns = matrixResult[0].length;
+            int rows = matrixA.length;
+            int columns = matrixA[0].length;
+            double[][] matrixResult = new double[rows][columns];
+            for(int i = 0; i < rows; i++)
+                for(int j = 0; j < columns; j++)
+                    matrixResult[i][j] = matrixA[i][j] - matrixB[i][j];
+            return matrixResult;
+        }
+        public float[][] subtract(float[][] matrixA, float[][] matrixB){
+            sizeException(matrixA);
+            sizeException(matrixB);
+            dimensionMismatch(matrixA, matrixB);
+            int rows = matrixA.length;
+            int columns = matrixA[0].length;
+            float[][] matrixResult = new float[rows][columns];
             for(int i = 0; i < rows; i++)
                 for(int j = 0; j < columns; j++)
                     matrixResult[i][j] = matrixA[i][j] - matrixB[i][j];
@@ -467,9 +545,21 @@ public class NNest extends Application implements Serializable{
             sizeException(matrixA);
             sizeException(matrixB);
             dimensionMismatch(matrixA, matrixB);
-            double[][] matrixResult = new double[matrixA.length][matrixA[0].length];
-            int rows = matrixResult.length;
-            int columns = matrixResult[0].length;
+            int rows = matrixA.length;
+            int columns = matrixA[0].length;
+            double[][] matrixResult = new double[rows][columns];
+            for(int i = 0; i < rows; i++)
+                for(int j = 0; j < columns; j++)
+                    matrixResult[i][j] = matrixA[i][j] * matrixB[i][j];
+            return matrixResult;
+        }
+        public float[][] multiply(float[][] matrixA, float[][] matrixB){
+            sizeException(matrixA);
+            sizeException(matrixB);
+            dimensionMismatch(matrixA, matrixB);
+            int rows = matrixA.length;
+            int columns = matrixA[0].length;
+            float[][] matrixResult = new float[rows][columns];
             for(int i = 0; i < rows; i++)
                 for(int j = 0; j < columns; j++)
                     matrixResult[i][j] = matrixA[i][j] * matrixB[i][j];
@@ -479,10 +569,25 @@ public class NNest extends Application implements Serializable{
             //make sure lengths of rows are the same for each matrix
             sizeException(matrixA);
             sizeException(matrixB);
-            multiplicationDimensionMismatch(matrixA, matrixB);
-            double[][] matrixResult = new double[matrixA.length][matrixB[0].length];//result matrix
-            int rows = matrixResult.length;
-            int columns = matrixResult[0].length;
+            dotDimensionMismatch(matrixA, matrixB);
+            int rows = matrixA.length;
+            int columns = matrixB[0].length;
+            double[][] matrixResult = new double[rows][columns];//result matrix
+            //multiply A row elements by B column elements = 1 element in result matrix
+            for(int i = 0; i < rows; i++)//A rows or B columns or Result rows
+                for(int j = 0; j < columns; j++)//A rows or B columns or Result columns
+                    for(int k = 0; k < matrixA[0].length; k++)//A columns or B rows
+                        matrixResult[i][j] += matrixA[i][k] * matrixB[k][j];
+            return matrixResult;
+        }
+        public float[][] dot(float[][] matrixA, float[][] matrixB){
+            //make sure lengths of rows are the same for each matrix
+            sizeException(matrixA);
+            sizeException(matrixB);
+            dotDimensionMismatch(matrixA, matrixB);
+            int rows = matrixA.length;
+            int columns = matrixB[0].length;
+            float[][] matrixResult = new float[rows][columns];//result matrix
             //multiply A row elements by B column elements = 1 element in result matrix
             for(int i = 0; i < rows; i++)//A rows or B columns or Result rows
                 for(int j = 0; j < columns; j++)//A rows or B columns or Result columns
@@ -491,15 +596,33 @@ public class NNest extends Application implements Serializable{
             return matrixResult;
         }
         public double[][] power(double[][] matrix, double power){
-            double[][] matrixResult = new double[matrix.length][matrix[0].length];
-            int rows = matrixResult.length;
-            int columns = matrixResult[0].length;
+            int rows = matrix.length;
+            int columns = matrix[0].length;
+            double[][] matrixResult = new double[rows][columns];
             for(int i = 0; i < rows; i++)
                 for(int j = 0; j < columns; j++)
                     matrixResult[i][j] = Math.pow(matrix[i][j], power);
             return matrixResult;
         }
+        public float[][] power(float[][] matrix, double power){
+            int rows = matrix.length;
+            int columns = matrix[0].length;
+            float[][] matrixResult = new float[rows][columns];
+            for(int i = 0; i < rows; i++)
+                for(int j = 0; j < columns; j++)
+                    matrixResult[i][j] = (float)Math.pow(matrix[i][j], power);
+            return matrixResult;
+        }
         public double sum(double[][] matrix){
+            double sum = 0;
+            int rows = matrix.length;
+            int columns = matrix[0].length;
+            for(int i = 0; i < rows; i++)
+                for(int j = 0; j < columns; j++)
+                    sum += matrix[i][j];
+            return sum;
+        }
+        public double sum(float[][] matrix){
             double sum = 0;
             int rows = matrix.length;
             int columns = matrix[0].length;
@@ -512,11 +635,18 @@ public class NNest extends Application implements Serializable{
             int rows = matrix.length;
             int columns = matrix[0].length;
             double[][] matrixResult = new double[rows][columns];
-            for(int i = 0; i < rows; i++){
-                for(int j = 0; j < columns; j++){
+            for(int i = 0; i < rows; i++)
+                for(int j = 0; j < columns; j++)
                     matrixResult[i][j] = matrix[i][j];
-                }
-            }
+            return matrixResult;
+        }
+        public float[][] copy(float[][] matrix){
+            int rows = matrix.length;
+            int columns = matrix[0].length;
+            float[][] matrixResult = new float[rows][columns];
+            for(int i = 0; i < rows; i++)
+                for(int j = 0; j < columns; j++)
+                    matrixResult[i][j] = matrix[i][j];
             return matrixResult;
         }
     }

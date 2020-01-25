@@ -5,20 +5,20 @@ import java.util.ArrayList;
 public class Neuralnetwork {
     public static void main(String[] args) {
         class Data{
-            double[][] inputs;
-            double[][] targets;
-            void addInputs(double ... inputs){
-                this.inputs = new double[1][inputs.length];
+            float[][] inputs;
+            float[][] targets;
+            void addInputs(float ... inputs){
+                this.inputs = new float[1][inputs.length];
                 this.inputs[0] = inputs;
             }
-            void addTargets(double ... targets){
-                this.targets = new double[1][targets.length];
+            void addTargets(float ... targets){
+                this.targets = new float[1][targets.length];
                 this.targets[0] = targets;
             }
         }
         NNest.NN nn = new NNest().new NN(1,"leakyrelu","sigmoid","quadratic",2,81,81,81,81,81,1);
         System.out.println(nn.NETWORKSIZE);
-        System.out.println(nn.getNetworkSize());
+        System.out.println(nn.getNetworkLayers());
         ArrayList<Data> data = new ArrayList<>();
         data.add(new Data());
         data.add(new Data());
