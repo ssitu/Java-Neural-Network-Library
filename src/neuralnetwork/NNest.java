@@ -17,7 +17,7 @@ public class NNest extends Application implements Serializable{
             Layer(int previousNodes,int nodes){
                 weights = create(previousNodes,nodes,0);
                 biases = create(1,nodes,0);
-                weights = scale(randomize(weights,2f,-1f),(float)Math.sqrt(2.0/previousNodes));
+                weights = scale(randomize(weights,2,-1),(float)Math.sqrt(2.0/previousNodes));
                 biases = randomize(biases,2,-1);
             }
         }
