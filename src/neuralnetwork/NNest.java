@@ -9,16 +9,19 @@ import javafx.stage.Stage;
 import java.io.*;
 public class NNest extends Application implements Serializable{
     volatile static double globalCost;
-    volatile static int increment = 0;
+    private volatile static int increment = 0;
+    private static boolean graphMeasuresAccuracy;
     public class NN implements Serializable{
         private class Layer implements Serializable{
             float[][] weights;
             float[][] biases;
+            float[][] previousGradients;
             Layer(int previousNodes,int nodes){
                 weights = create(previousNodes,nodes,0);
                 biases = create(1,nodes,0);
                 weights = scale(randomize(weights,2,-1),(float)Math.sqrt(2.0/previousNodes));
                 biases = randomize(biases,2,-1);
+                previousGradients = create(previousNodes,nodes,0);
             }
         }
         ArrayList<Layer> network = new ArrayList<>();
@@ -27,9 +30,11 @@ public class NNest extends Application implements Serializable{
         final int NETWORKSIZE;//Total layers not including the input layer
         transient BiFunction<float[][],Boolean,float[][]> activationHiddens;
         transient BiFunction<float[][],Boolean,float[][]> activationOutputs;
-        transient BiFunction<float[][], float[][], Function<Boolean, float[][]>> costFunction;
-        NN(double learningRate, String hiddenActivationFunction, String outputActivationFunction, String costFunction, int ... layerNodes){
+        transient BiFunction<float[][],float[][],Function<Boolean,float[][]>> costFunction;
+        transient Function<float[][],float[][]> updater;
+        NN(double learningRate, String hiddenActivationFunction, String outputActivationFunction, String costFunction, String optimizer, boolean graphMeasuresAccuracy, int ... layerNodes){
             lr = learningRate;
+            NNest.graphMeasuresAccuracy = graphMeasuresAccuracy;
             if(layerNodes.length < 3)
                 throw new IllegalArgumentException("MUST HAVE MORE THAN 2 LAYERS IN THE NEURAL NETWORK");
             //Activation functions for the hidden layers
@@ -61,6 +66,12 @@ public class NNest extends Application implements Serializable{
                 this.costFunction = (x,y) -> (z) -> logLoss(x,y,z);
             else
                 throw new IllegalArgumentException("INVALID COST FUNCTION");
+            if("".equals(optimizer) || "none".equalsIgnoreCase(optimizer) || "stochastic".equalsIgnoreCase(optimizer))
+                this.updater = (x) -> {return create(x.length,x[0].length,0);};
+            else if("momentum".equalsIgnoreCase(optimizer))
+                this.updater = (x) -> momentum(x);
+            else
+                throw new IllegalArgumentException("INVALID OPTIMIZER");
             //Adding each layer
             for(int i = 1; i < layerNodes.length; i++){
                 Layer layer = new Layer(layerNodes[i-1],layerNodes[i]);
@@ -104,9 +115,8 @@ public class NNest extends Application implements Serializable{
             return outputs;
         }
         public void backpropagation(float[][] inputs, float[][] targets){//Using notation from neuralnetworksanddeeplearning.com
-            if(targets[0].length != network.get(NETWORKSIZE-1).biases[0].length){
+            if(targets[0].length != network.get(NETWORKSIZE-1).biases[0].length)
                 throw new IllegalArgumentException("TARGETS ARRAY DO NOT MATCH THE SIZE OF THE OUTPUT LAYER");
-            }
             float[][] outputs = inputs;
             //Each partial derivative is used in this order
             float[][] dC_dA;
@@ -133,25 +143,19 @@ public class NNest extends Application implements Serializable{
             dC_dA = costFunction.apply(copy(A.get(NETWORKSIZE)), targets).apply(true);
             boolean outputLayer = true;
             for(int i = NETWORKSIZE; i > 0; i--){
-                if(!outputLayer){
+                if(!outputLayer)
                     dZ_dA = network.get(i).weights;
-                }
-                if(outputLayer){
+                if(outputLayer)
                     dA_dZ = activationOutputs.apply(Z.get(i-1),true);
-                }
-                else{
+                else
                     dA_dZ = activationHiddens.apply(Z.get(i-1),true);
-                }
                 dZ_dW = A.get(i-1);
-                if(!outputLayer){
+                if(!outputLayer)
                     dC_dA = dot(dC_dZ,transpose(dZ_dA));
-                }
-                if(outputLayer){
+                if(outputLayer)
                     dC_dZ = multiply(dA_dZ,dC_dA);
-                }
-                else{
+                else
                     dC_dZ = multiply(dC_dA,dA_dZ);
-                }
                 dC_dW = dot(transpose(dZ_dW),dC_dZ);
                 costFunction.apply(copy(A.get(NETWORKSIZE)), targets).apply(false);//Update the cost to anneal the learning rate
                 //Square Root Annealing
@@ -161,19 +165,24 @@ public class NNest extends Application implements Serializable{
 //                float stabilizer = lr*Math.sqrt(cost) * Math.pow(10, -NETWORKSIZE);
 //                float stabilizer = lr*Math.sqrt(cost)* Math.pow(10, -NETWORKSIZE+2+(NETWORKSIZE*Math.E*(.02209*NETWORKSIZE-.0182)));
 //                float stabilizer = lr*Math.sqrt(cost)* Math.pow(10, -NETWORKSIZE+2+(NETWORKSIZE*Math.E*(.02209*NETWORKSIZE-.02)));
-                float stabilizer = (float)(lr*Math.sqrt(cost)* Math.pow(10, -NETWORKSIZE+2+(NETWORKSIZE*Math.E*((.02+.0002*NETWORKSIZE)*NETWORKSIZE-(.02+.0002*NETWORKSIZE)))));
-                bGradients = scale(stabilizer,dC_dZ);
-                wGradients = scale(stabilizer,dC_dW);
+//                float stabilizer = (float)(lr*Math.sqrt(cost)* Math.pow(10, -NETWORKSIZE+2+(NETWORKSIZE*Math.E*((.02+.0002*NETWORKSIZE)*NETWORKSIZE-(.02+.0002*NETWORKSIZE)))));
+                bGradients = scale((float)lr,dC_dZ);
+                wGradients = add(scale((float)lr,dC_dW),updater.apply(network.get(i-1).previousGradients));
 //                bGradients = scale(lr*cost,dC_dZ);
 //                wGradients = scale(lr*cost,dC_dW);
                 network.get(i-1).biases = subtract(network.get(i-1).biases,bGradients);
                 network.get(i-1).weights = subtract(network.get(i-1).weights,wGradients);
+                network.get(i-1).previousGradients = wGradients;
                 if(outputLayer){
                     outputLayer = false;
                 }
             }
             increment++;
             globalCost = cost;
+        }
+        private float[][] momentum(float[][] previousGradients){
+            float beta = .9f;
+            return scale(beta,previousGradients);
         }
         private float[][] linearActivation(float[][] matrix, boolean derivative){
             int rows = matrix.length;
@@ -652,7 +661,7 @@ public class NNest extends Application implements Serializable{
     }
     @Override
     public void start(Stage stage){
-        boolean costVSAccuracy = false; //Cost = true, Accuracy = false
+        boolean costVSAccuracy = graphMeasuresAccuracy; //Cost = false, Accuracy = true
         final NumberAxis xAxis = new NumberAxis();
         final NumberAxis yAxis = new NumberAxis();
         xAxis.setAnimated(false);
@@ -671,7 +680,7 @@ public class NNest extends Application implements Serializable{
             while(true){
                 try{
                     Thread.sleep(50);
-                    Platform.runLater(() -> series.getData().add(new XYChart.Data<>(increment, costVSAccuracy ? globalCost : 1/Math.pow(10, globalCost))));
+                    Platform.runLater(() -> series.getData().add(new XYChart.Data<>(increment, !costVSAccuracy ? globalCost : 1/Math.pow(10, globalCost))));
                 } 
                 catch(InterruptedException e){
                     throw new RuntimeException(e);
