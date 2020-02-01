@@ -114,14 +114,15 @@ public class NNest extends Application implements Serializable{
                 this.network = (ArrayList)in.readObject();
             }
             catch (IOException | ClassNotFoundException e) {
-                System.out.println("Could not load network settings");
+                System.out.println("Could not load network settings.");
+                e.printStackTrace();
             }
         }
         public float[][] feedforward(float[][] inputs){
             float[][] outputs = inputs;
             for(int i = 0; i < NETWORKSIZE-1; i++)//Feed the inputs through the hidden layers
                 outputs = activationHiddens.apply(add(dot(outputs,network.get(i).weights),network.get(i).biases),false);
-            //Feed the output from the hidden layers to the output layers with its (different) activation function
+            //Feed the output from the hidden layers to the output layers with its activation function
             outputs = activationOutputs.apply(add(dot(outputs,network.get(NETWORKSIZE-1).weights),network.get(NETWORKSIZE-1).biases),false);
             return outputs;
         }
