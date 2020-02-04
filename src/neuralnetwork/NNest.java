@@ -34,6 +34,16 @@ public class NNest extends Application implements Serializable{
         transient BiFunction<float[][],Boolean,float[][]> activationOutputs;
         transient BiFunction<float[][],float[][],Function<Boolean,float[][]>> costFunction;
         transient Function<float[][],float[][]> updater;
+        /**
+         * 
+         * @param learningRate Learning rate for the gradient descent
+         * @param hiddenActivationFunction Activation function for the hidden layers (sigmoid, tanh, relu, leakyrelu).
+         * @param outputActivationFunction Activation function for the output layer (regression: sigmoid, tanh, linear; classification: softmax).
+         * @param costFunction Cost function to measure error (regression: quadratic; classification: log).
+         * @param optimizer Optimizer for the stochastic gradient descent(momentum).
+         * @param graphMeasuresAccuracy NNest.startGraph() will measure accuracy if true, cost if false.
+         * @param layerNodes amount of numbers specifies the amount of layers while the value of the numbers specifies the amount of neurons for that layer. Must have more than two numbers (input layer, hidden layers, output layer).
+         */
         NN(double learningRate, String hiddenActivationFunction, String outputActivationFunction, String costFunction, String optimizer, boolean graphMeasuresAccuracy, int ... layerNodes){
             lr = learningRate;
             NNest.graphMeasuresAccuracy = graphMeasuresAccuracy;
