@@ -30,6 +30,12 @@ public class NNest extends Application implements Serializable{
         double lr;
         double cost;
         final int NETWORKSIZE;//Total layers not including the input layer
+        String hiddenActivationFunctionName;
+        String outputActivationFunctionName;
+        String costFunctionName;
+        String optimizerName;
+        boolean graphMeasuresAccuracy;
+        int[] layerNodes;
         transient BiFunction<float[][],Boolean,float[][]> activationHiddens;
         transient BiFunction<float[][],Boolean,float[][]> activationOutputs;
         transient BiFunction<float[][],float[][],Function<Boolean,float[][]>> costFunction;
@@ -42,10 +48,16 @@ public class NNest extends Application implements Serializable{
          * @param costFunction Cost function to measure error (regression: quadratic; classification: log).
          * @param optimizer Optimizer for the stochastic gradient descent(momentum).
          * @param graphMeasuresAccuracy NNest.startGraph() will measure accuracy if true, cost if false.
-         * @param layerNodes amount of numbers specifies the amount of layers while the value of the numbers specifies the amount of neurons for that layer. Must have more than two numbers (input layer, hidden layers, output layer).
+         * @param layerNodes Amount of numbers specifies the amount of layers while the value of the numbers specifies the amount of neurons for that layer. Must have more than two numbers (input layer, hidden layers, output layer).
          */
         NN(double learningRate, String hiddenActivationFunction, String outputActivationFunction, String costFunction, String optimizer, boolean graphMeasuresAccuracy, int ... layerNodes){
             lr = learningRate;
+            hiddenActivationFunctionName = hiddenActivationFunction;
+            outputActivationFunctionName = outputActivationFunction;
+            costFunctionName = costFunction;
+            optimizerName = optimizer;
+            this.graphMeasuresAccuracy = graphMeasuresAccuracy;
+            this.layerNodes = layerNodes;
             NNest.graphMeasuresAccuracy = graphMeasuresAccuracy;
             if(layerNodes.length < 3)
                 throw new IllegalArgumentException("MUST HAVE MORE THAN 2 LAYERS IN THE NEURAL NETWORK");
@@ -91,14 +103,16 @@ public class NNest extends Application implements Serializable{
             }
             NETWORKSIZE = network.size();
         }
-        public String getNetworkLayers(){
+        
+        @Override
+        public String toString(){
             String networkLayers = "";
             for(Layer layer : network)
                 networkLayers += layer.weights.length + ",";
             networkLayers += network.get(NETWORKSIZE-1).weights[0].length;
             return networkLayers;
         }
-        public Layer getNetworkLayer(int layerIndex){//Layer 0 is the first hidden layer
+        public Layer getNetworkLayer(int layerIndex){//Layer 0 is the layer after the inputs (first hidden layer)
             try{
                 return network.get(layerIndex);
             }
@@ -107,9 +121,20 @@ public class NNest extends Application implements Serializable{
             }
             return null;
         }
+        public int getNetworkSize(){
+            return network.size();
+        }
+        public NN copy(){
+            NN nnCopy = new NN(lr,hiddenActivationFunctionName,outputActivationFunctionName,costFunctionName,optimizerName,graphMeasuresAccuracy,layerNodes);
+            for(int i = 0; i < getNetworkSize(); i++){
+                nnCopy.getNetworkLayer(i).weights = copy(getNetworkLayer(i).weights);
+                nnCopy.getNetworkLayer(i).biases = copy(getNetworkLayer(i).biases);
+            }
+            return nnCopy;
+        }
         public void save(){
             try{
-                FileOutputStream fileOut = new FileOutputStream(System.getProperty("user.dir") + "/neuralnetwork(" + this.getNetworkLayers() + ").ser");
+                FileOutputStream fileOut = new FileOutputStream(System.getProperty("user.dir") + "/neuralnetwork(" + this.toString() + ").ser");
                 ObjectOutputStream out = new ObjectOutputStream(fileOut);
                 out.writeObject(this.network);
             }
@@ -119,7 +144,7 @@ public class NNest extends Application implements Serializable{
         }
         public void load(){
             try{
-                FileInputStream fileIn = new FileInputStream(System.getProperty("user.dir") + "/neuralnetwork(" + this.getNetworkLayers() + ").ser");
+                FileInputStream fileIn = new FileInputStream(System.getProperty("user.dir") + "/neuralnetwork(" + this.toString() + ").ser");
                 ObjectInputStream in = new ObjectInputStream(fileIn);
                 this.network = (ArrayList)in.readObject();
             }
