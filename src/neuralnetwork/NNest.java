@@ -153,6 +153,24 @@ public class NNest extends Application implements Serializable{
                 e.printStackTrace();
             }
         }
+        public void mutate(double mutateRate){
+            for (int i = 0; i < getNetworkSize(); i++) {
+                for (int j = 0; j < getNetworkLayer(i).weights.length; j++) {
+                    for (int k = 0; k < getNetworkLayer(i).weights[0].length; k++) {
+                        if (Math.random() < mutateRate) {
+                            getNetworkLayer(i).weights[j][k] = (float) (Math.random() * 2 - 1);
+                        }
+                    }
+                }
+                for (int j = 0; j < getNetworkLayer(i).biases.length; j++) {
+                    for (int k = 0; k < getNetworkLayer(i).biases[0].length; k++) {
+                        if (Math.random() < mutateRate) {
+                            getNetworkLayer(i).biases[j][k] = (float) (Math.random() * 2 - 1);
+                        }
+                    }
+                }
+            }
+        }
         public float[][] feedforward(float[][] inputs){
             float[][] outputs = inputs;
             for(int i = 0; i < NETWORKSIZE-1; i++)//Feed the inputs through the hidden layers
@@ -368,7 +386,7 @@ public class NNest extends Application implements Serializable{
             cost = -Math.log(outputs[0][correctClass]);
             return null;
         }
-
+        
         private void sizeException(double[][] matrix){
             int rows = matrix.length;
             int columns = matrix[0].length;
