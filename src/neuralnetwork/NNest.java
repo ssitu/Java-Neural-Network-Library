@@ -142,37 +142,71 @@ public class NNest extends Application implements Serializable{
                 e.printStackTrace();
             }
         }
-        public void load(){
+        public boolean load(){
             try{
                 FileInputStream fileIn = new FileInputStream(System.getProperty("user.dir") + "/neuralnetwork(" + this.toString() + ").ser");
                 ObjectInputStream in = new ObjectInputStream(fileIn);
                 this.network = (ArrayList)in.readObject();
+                return true;
             }
             catch (IOException | ClassNotFoundException e) {
                 System.out.println("Could not load network settings.");
                 e.printStackTrace();
+                return false;
             }
         }
-        public void mutate(double mutateRate){
+        public void mutateAdditive(double mutateRate, double range){
             for (int i = 0; i < getNetworkSize(); i++) {
                 for (int j = 0; j < getNetworkLayer(i).weights.length; j++) {
                     for (int k = 0; k < getNetworkLayer(i).weights[0].length; k++) {
                         if (Math.random() < mutateRate) {
-                            getNetworkLayer(i).weights[j][k] = (float) (Math.random() * 2 - 1);
+                            getNetworkLayer(i).weights[j][k] += ((float) (Math.random() * range - (range/2)));
                         }
                     }
                 }
                 for (int j = 0; j < getNetworkLayer(i).biases.length; j++) {
                     for (int k = 0; k < getNetworkLayer(i).biases[0].length; k++) {
                         if (Math.random() < mutateRate) {
-                            getNetworkLayer(i).biases[j][k] = (float) (Math.random() * 2 - 1);
+                            getNetworkLayer(i).biases[j][k] += ((float) (Math.random() * range - (range/2)));
                         }
                     }
                 }
             }
         }
+        public void mutateNewValues(double mutateRate, double range){
+            for (int i = 0; i < getNetworkSize(); i++) {
+                for (int j = 0; j < getNetworkLayer(i).weights.length; j++) {
+                    for (int k = 0; k < getNetworkLayer(i).weights[0].length; k++) {
+                        if (Math.random() < mutateRate) {
+                            getNetworkLayer(i).weights[j][k] = ((float) (Math.random() * range - (range/2)));
+                        }
+                    }
+                }
+                for (int j = 0; j < getNetworkLayer(i).biases.length; j++) {
+                    for (int k = 0; k < getNetworkLayer(i).biases[0].length; k++) {
+                        if (Math.random() < mutateRate) {
+                            getNetworkLayer(i).biases[j][k] = ((float) (Math.random() * range - (range/2)));
+                        }
+                    }
+                }
+            }
+        }
+        public void randomizeNetwork(double range){
+            for (int i = 0; i < getNetworkSize(); i++) {
+                for (int j = 0; j < getNetworkLayer(i).weights.length; j++) {
+                    for (int k = 0; k < getNetworkLayer(i).weights[0].length; k++) {
+                        getNetworkLayer(i).weights[j][k] = (float) (Math.random() * range - (range/2));
+                    }
+                }
+                for (int j = 0; j < getNetworkLayer(i).biases.length; j++) {
+                    for (int k = 0; k < getNetworkLayer(i).biases[0].length; k++) {
+                        getNetworkLayer(i).biases[j][k] = (float) (Math.random() * range - (range/2));
+                    }
+                }
+            }
+        }
         public float[][] feedforward(float[][] inputs){
-            float[][] outputs = inputs;
+            float[][] outputs = normalize(inputs);
             for(int i = 0; i < NETWORKSIZE-1; i++)//Feed the inputs through the hidden layers
                 outputs = activationHiddens.apply(add(dot(outputs,network.get(i).weights),network.get(i).biases),false);
             //Feed the output from the hidden layers to the output layers with its activation function
@@ -182,7 +216,7 @@ public class NNest extends Application implements Serializable{
         public void backpropagation(float[][] inputs, float[][] targets){//Using notation from neuralnetworksanddeeplearning.com
             if(targets[0].length != network.get(NETWORKSIZE-1).biases[0].length)
                 throw new IllegalArgumentException("TARGETS ARRAY DO NOT MATCH THE SIZE OF THE OUTPUT LAYER");
-            float[][] outputs = inputs;
+            float[][] outputs = normalize(inputs);
             //Each partial derivative is used in this order
             float[][] dC_dA;
             float[][] dA_dZ;
@@ -386,7 +420,16 @@ public class NNest extends Application implements Serializable{
             cost = -Math.log(outputs[0][correctClass]);
             return null;
         }
-        
+        public float[][] normalize(float[][] inputs){
+            int inputLength = inputs[0].length;
+            float[][] result = new float[1][inputLength];
+            float mean = sum(inputs)/inputLength;
+            float deviation = (float)Math.sqrt(sum(power(subtract(inputs, create(1,inputLength,mean)),2))/mean);
+            for(int i = 0; i < inputs[0].length; i++){
+                result[0][i] = (float)(.5*(tanh((float)(.01*((inputs[0][i]-mean)/deviation)),false)+1));//tanh estimator normalization
+            }
+            return result;
+        }
         private void sizeException(double[][] matrix){
             int rows = matrix.length;
             int columns = matrix[0].length;
@@ -690,8 +733,8 @@ public class NNest extends Application implements Serializable{
                     sum += matrix[i][j];
             return sum;
         }
-        public double sum(float[][] matrix){
-            double sum = 0;
+        public float sum(float[][] matrix){
+            float sum = 0;
             int rows = matrix.length;
             int columns = matrix[0].length;
             for(int i = 0; i < rows; i++)
