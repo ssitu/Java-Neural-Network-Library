@@ -9,7 +9,7 @@ import javafx.stage.Stage;
 import java.io.*;
 public class NNest extends Application implements Serializable{
     volatile static double globalCost;
-    private volatile static int increment = 0;
+    volatile static int increment = 0;
     private static boolean graphMeasuresAccuracy;
     public class NN implements Serializable{
         public class Layer implements Serializable{
@@ -206,7 +206,7 @@ public class NNest extends Application implements Serializable{
             }
         }
         public float[][] feedforward(float[][] inputs){
-            float[][] outputs = normalize(inputs);
+            float[][] outputs = inputs;
             for(int i = 0; i < NETWORKSIZE-1; i++)//Feed the inputs through the hidden layers
                 outputs = activationHiddens.apply(add(dot(outputs,network.get(i).weights),network.get(i).biases),false);
             //Feed the output from the hidden layers to the output layers with its activation function
@@ -216,7 +216,7 @@ public class NNest extends Application implements Serializable{
         public void backpropagation(float[][] inputs, float[][] targets){//Using notation from neuralnetworksanddeeplearning.com
             if(targets[0].length != network.get(NETWORKSIZE-1).biases[0].length)
                 throw new IllegalArgumentException("TARGETS ARRAY DO NOT MATCH THE SIZE OF THE OUTPUT LAYER");
-            float[][] outputs = normalize(inputs);
+            float[][] outputs = inputs;
             //Each partial derivative is used in this order
             float[][] dC_dA;
             float[][] dA_dZ;
@@ -420,13 +420,13 @@ public class NNest extends Application implements Serializable{
             cost = -Math.log(outputs[0][correctClass]);
             return null;
         }
-        public float[][] normalize(float[][] inputs){
+        public float[][] normalizeTanhEstimator(float[][] inputs){
             int inputLength = inputs[0].length;
             float[][] result = new float[1][inputLength];
             float mean = sum(inputs)/inputLength;
-            float deviation = (float)Math.sqrt(sum(power(subtract(inputs, create(1,inputLength,mean)),2))/mean);
+            float deviation = (float)(Math.sqrt(sum(power(subtract(inputs, create(1,inputLength,mean)),2))/(mean)));
             for(int i = 0; i < inputs[0].length; i++){
-                result[0][i] = (float)(.5*(tanh((float)(.01*((inputs[0][i]-mean)/deviation)),false)+1));//tanh estimator normalization
+                result[0][i] = (float)(.5*(tanh((float)(.01*((inputs[0][i]-mean)/(deviation))),false)+1));//tanh estimator normalization
             }
             return result;
         }
