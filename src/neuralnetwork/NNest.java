@@ -124,7 +124,7 @@ public class NNest extends Application implements Serializable{
         public int getNetworkSize(){
             return network.size();
         }
-        public NN copy(){
+        public NN clone(){
             NN nnCopy = new NN(lr,hiddenActivationFunctionName,outputActivationFunctionName,costFunctionName,optimizerName,graphMeasuresAccuracy,layerNodes);
             for(int i = 0; i < getNetworkSize(); i++){
                 nnCopy.getNetworkLayer(i).weights = copy(getNetworkLayer(i).weights);
@@ -760,6 +760,28 @@ public class NNest extends Application implements Serializable{
                     matrixResult[i][j] = matrix[i][j];
             return matrixResult;
         }
+        public int indexMax(float[][] oneRowMatrix){
+            float max = Float.NEGATIVE_INFINITY;
+            int index = 0;
+            for(int i = 0; i < oneRowMatrix[0].length; i++)
+                if(max < oneRowMatrix[0][i]){
+                    max = oneRowMatrix[0][i];
+                    index = i;
+                }
+            return index;
+        }
+        public float[][] append(float[][] oneRow1, float[][] oneRow2){
+            int length1 = oneRow1[0].length;
+            int length2 = oneRow2[0].length;
+            float[][] result = new float[1][length1 + length2];
+            for(int i = 0; i < length1; i++){
+                result[0][i] = oneRow1[0][i];
+            }
+            for(int i = 0; i < length2; i++){
+                result[0][i+length1] = oneRow2[0][i];
+            }
+            return result;
+        }
     }
     @Override
     public void start(Stage stage){
@@ -792,7 +814,42 @@ public class NNest extends Application implements Serializable{
         updateThread.setDaemon(true);
         updateThread.start();
     }
-    public static void startGraph(){
+    public static void graphJFX(){
+        try{
+            Stage stage1 = new Stage();
+            boolean costVSAccuracy = graphMeasuresAccuracy; //Cost = false, Accuracy = true
+            final NumberAxis xAxis = new NumberAxis();
+            final NumberAxis yAxis = new NumberAxis();
+            xAxis.setAnimated(false);
+            xAxis.setLabel("Training Sessions");
+            yAxis.setAnimated(false);
+            yAxis.setLabel(costVSAccuracy ? "Accuracy" : "Cost"); 
+            XYChart.Series<Number, Number> series = new XYChart.Series<>();
+            series.setName(yAxis.getLabel() + " over " + xAxis.getLabel());
+            ScatterChart<Number, Number> chart = new ScatterChart<>(xAxis, yAxis);
+            chart.setAnimated(false);
+            chart.getData().add(series);
+            Scene scene = new Scene(chart, 600, 300);
+            stage1.setScene(scene);
+            stage1.show();
+            Thread updateThread = new Thread(() -> {
+                while(true){
+                    try{
+                        Thread.sleep(50);
+                        Platform.runLater(() -> series.getData().add(new XYChart.Data<>(increment, !costVSAccuracy ? globalCost : 1/Math.pow(10, globalCost))));
+                    } 
+                    catch(InterruptedException e){
+                        throw new RuntimeException(e);
+                    }
+                }
+            });
+            updateThread.setDaemon(true);
+            updateThread.start();
+        }
+        catch(ExceptionInInitializerError e){
+        }
+    }
+    public static void graph(){
         new Thread(() -> {
             NNest.launch(NNest.class);
         }).start();
