@@ -9,7 +9,7 @@ import javafx.stage.Stage;
 import java.io.*;
 public class NNest extends Application implements Serializable{
     volatile static double globalCost;
-    volatile static int increment = 0;
+    volatile static int sessions = 0;
     private static boolean graphMeasuresAccuracy;
     public class NN implements Serializable{
         public class Layer implements Serializable{
@@ -27,36 +27,36 @@ public class NNest extends Application implements Serializable{
             }
         }
         ArrayList<Layer> network = new ArrayList<>();
+        Random random = new Random();
+        long seed;
         double lr;
         double cost;
         final int NETWORKSIZE;//Total layers not including the input layer
-        String hiddenActivationFunctionName;
-        String outputActivationFunctionName;
-        String costFunctionName;
-        String optimizerName;
-        boolean graphMeasuresAccuracy;
+        String hiddenActivationFunction;
+        String outputActivationFunction;
+        String costFunction;
+        String optimizer;
         int[] layerNodes;
         transient BiFunction<float[][],Boolean,float[][]> activationHiddens;
         transient BiFunction<float[][],Boolean,float[][]> activationOutputs;
-        transient BiFunction<float[][],float[][],Function<Boolean,float[][]>> costFunction;
-        transient Function<float[][],float[][]> updater;
+        transient BiFunction<float[][],float[][],Function<Boolean,float[][]>> lossFunction;
+        transient Function<float[][],float[][]> updater = (x) -> {return create(x.length,x[0].length,0);};
         /**
          * 
-         * @param learningRate Learning rate for the gradient descent
+         * @param learningRate Learning rate for the gradient descent.
+         * @param seed Seed for reproducible random values.
          * @param hiddenActivationFunction Activation function for the hidden layers (sigmoid, tanh, relu, leakyrelu).
          * @param outputActivationFunction Activation function for the output layer (regression: sigmoid, tanh, linear; classification: softmax).
          * @param costFunction Cost function to measure error (regression: quadratic; classification: log).
-         * @param optimizer Optimizer for the stochastic gradient descent(momentum).
-         * @param graphMeasuresAccuracy NNest.startGraph() will measure accuracy if true, cost if false.
          * @param layerNodes Amount of numbers specifies the amount of layers while the value of the numbers specifies the amount of neurons for that layer. Must have more than two numbers (input layer, hidden layers, output layer).
          */
-        NN(double learningRate, String hiddenActivationFunction, String outputActivationFunction, String costFunction, String optimizer, boolean graphMeasuresAccuracy, int ... layerNodes){
+        NN(double learningRate, long seed, String hiddenActivationFunction, String outputActivationFunction, String costFunction, int ... layerNodes){
             lr = learningRate;
-            hiddenActivationFunctionName = hiddenActivationFunction;
-            outputActivationFunctionName = outputActivationFunction;
-            costFunctionName = costFunction;
-            optimizerName = optimizer;
-            this.graphMeasuresAccuracy = graphMeasuresAccuracy;
+            random.setSeed(seed);
+            this.hiddenActivationFunction = hiddenActivationFunction;
+            this.outputActivationFunction = outputActivationFunction;
+            this.costFunction = costFunction;
+            optimizer = "";
             this.layerNodes = layerNodes;
             NNest.graphMeasuresAccuracy = graphMeasuresAccuracy;
             if(layerNodes.length < 3)
@@ -85,17 +85,11 @@ public class NNest extends Application implements Serializable{
                 throw new IllegalArgumentException("INVALID ACTIVATION FUNCTION FOR THE OUTPUT LAYER");
             //Cost functions for the backpropagation
             if("quadratic".equalsIgnoreCase(costFunction))
-                this.costFunction = (x,y) -> (z) -> quadraticLoss(x,y,z);
+                this.lossFunction = (x,y) -> (z) -> quadraticLoss(x,y,z);
             else if("log".equalsIgnoreCase(costFunction))//The target should be passed as making the correct classification as the highest value
-                this.costFunction = (x,y) -> (z) -> logLoss(x,y,z);
+                this.lossFunction = (x,y) -> (z) -> logLoss(x,y,z);
             else
                 throw new IllegalArgumentException("INVALID COST FUNCTION");
-            if("".equals(optimizer) || "none".equalsIgnoreCase(optimizer) || "stochastic".equalsIgnoreCase(optimizer))
-                this.updater = (x) -> {return create(x.length,x[0].length,0);};
-            else if("momentum".equalsIgnoreCase(optimizer))
-                this.updater = (x) -> momentum(x);
-            else
-                throw new IllegalArgumentException("INVALID OPTIMIZER");
             //Adding each layer
             for(int i = 1; i < layerNodes.length; i++){
                 Layer layer = new Layer(layerNodes[i-1],layerNodes[i]);
@@ -125,7 +119,7 @@ public class NNest extends Application implements Serializable{
             return network.size();
         }
         public NN clone(){
-            NN nnCopy = new NN(lr,hiddenActivationFunctionName,outputActivationFunctionName,costFunctionName,optimizerName,graphMeasuresAccuracy,layerNodes);
+            NN nnCopy = new NN(lr,seed,hiddenActivationFunction,outputActivationFunction,costFunction,layerNodes);
             for(int i = 0; i < getNetworkSize(); i++){
                 nnCopy.getNetworkLayer(i).weights = copy(getNetworkLayer(i).weights);
                 nnCopy.getNetworkLayer(i).biases = copy(getNetworkLayer(i).biases);
@@ -134,9 +128,9 @@ public class NNest extends Application implements Serializable{
         }
         public void save(){
             try{
-                FileOutputStream fileOut = new FileOutputStream(System.getProperty("user.dir") + "/neuralnetwork(" + this.toString() + ").ser");
+                FileOutputStream fileOut = new FileOutputStream(System.getProperty("user.dir") + "/neuralnetwork(" + toString() + ").ser");
                 ObjectOutputStream out = new ObjectOutputStream(fileOut);
-                out.writeObject(this.network);
+                out.writeObject(this);
             }
             catch(IOException e){
                 e.printStackTrace();
@@ -144,9 +138,10 @@ public class NNest extends Application implements Serializable{
         }
         public boolean load(){
             try{
-                FileInputStream fileIn = new FileInputStream(System.getProperty("user.dir") + "/neuralnetwork(" + this.toString() + ").ser");
+                FileInputStream fileIn = new FileInputStream(System.getProperty("user.dir") + "/neuralnetwork(" + toString() + ").ser");
                 ObjectInputStream in = new ObjectInputStream(fileIn);
-                this.network = (ArrayList)in.readObject();
+                network = ((NN)in.readObject()).network;
+                random = ((NN)in.readObject()).random;
                 return true;
             }
             catch (IOException | ClassNotFoundException e) {
@@ -159,15 +154,15 @@ public class NNest extends Application implements Serializable{
             for (int i = 0; i < getNetworkSize(); i++) {
                 for (int j = 0; j < getNetworkLayer(i).weights.length; j++) {
                     for (int k = 0; k < getNetworkLayer(i).weights[0].length; k++) {
-                        if (Math.random() < mutateRate) {
-                            getNetworkLayer(i).weights[j][k] += ((float) (Math.random() * range - (range/2)));
+                        if (random.nextFloat() < mutateRate) {
+                            getNetworkLayer(i).weights[j][k] += (float)(random.nextFloat() * range - (range/2));
                         }
                     }
                 }
                 for (int j = 0; j < getNetworkLayer(i).biases.length; j++) {
                     for (int k = 0; k < getNetworkLayer(i).biases[0].length; k++) {
-                        if (Math.random() < mutateRate) {
-                            getNetworkLayer(i).biases[j][k] += ((float) (Math.random() * range - (range/2)));
+                        if (random.nextFloat() < mutateRate) {
+                            getNetworkLayer(i).biases[j][k] += (float)(random.nextFloat() * range - (range/2));
                         }
                     }
                 }
@@ -177,15 +172,15 @@ public class NNest extends Application implements Serializable{
             for (int i = 0; i < getNetworkSize(); i++) {
                 for (int j = 0; j < getNetworkLayer(i).weights.length; j++) {
                     for (int k = 0; k < getNetworkLayer(i).weights[0].length; k++) {
-                        if (Math.random() < mutateRate) {
-                            getNetworkLayer(i).weights[j][k] = ((float) (Math.random() * range - (range/2)));
+                        if (random.nextFloat() < mutateRate) {
+                            getNetworkLayer(i).weights[j][k] = (float) (random.nextFloat() * range - (range/2));
                         }
                     }
                 }
                 for (int j = 0; j < getNetworkLayer(i).biases.length; j++) {
                     for (int k = 0; k < getNetworkLayer(i).biases[0].length; k++) {
-                        if (Math.random() < mutateRate) {
-                            getNetworkLayer(i).biases[j][k] = ((float) (Math.random() * range - (range/2)));
+                        if (random.nextFloat() < mutateRate) {
+                            getNetworkLayer(i).biases[j][k] = (float) (random.nextFloat() * range - (range/2));
                         }
                     }
                 }
@@ -195,12 +190,12 @@ public class NNest extends Application implements Serializable{
             for (int i = 0; i < getNetworkSize(); i++) {
                 for (int j = 0; j < getNetworkLayer(i).weights.length; j++) {
                     for (int k = 0; k < getNetworkLayer(i).weights[0].length; k++) {
-                        getNetworkLayer(i).weights[j][k] = (float) (Math.random() * range - (range/2));
+                        getNetworkLayer(i).weights[j][k] = (float) (random.nextFloat() * range - (range/2));
                     }
                 }
                 for (int j = 0; j < getNetworkLayer(i).biases.length; j++) {
                     for (int k = 0; k < getNetworkLayer(i).biases[0].length; k++) {
-                        getNetworkLayer(i).biases[j][k] = (float) (Math.random() * range - (range/2));
+                        getNetworkLayer(i).biases[j][k] = (float) (random.nextFloat() * range - (range/2));
                     }
                 }
             }
@@ -239,7 +234,7 @@ public class NNest extends Application implements Serializable{
             Z.add(outputs);
             outputs = activationOutputs.apply(outputs, false);
             A.add(outputs);
-            dC_dA = costFunction.apply(copy(A.get(NETWORKSIZE)), targets).apply(true);
+            dC_dA = lossFunction.apply(copy(A.get(NETWORKSIZE)), targets).apply(true);
             boolean outputLayer = true;
             for(int i = NETWORKSIZE; i > 0; i--){
                 if(!outputLayer)
@@ -256,7 +251,7 @@ public class NNest extends Application implements Serializable{
                 else
                     dC_dZ = multiply(dC_dA,dA_dZ);
                 dC_dW = dot(transpose(dZ_dW),dC_dZ);
-                costFunction.apply(copy(A.get(NETWORKSIZE)), targets).apply(false);//Update the cost to track progress
+                lossFunction.apply(copy(A.get(NETWORKSIZE)), targets).apply(false);//Update the cost to track progress
                 //Optimizer or updater
                 bGradients = add(scale((float)lr,dC_dZ),updater.apply(network.get(i-1).previousGradientsB));
                 wGradients = add(scale((float)lr,dC_dW),updater.apply(network.get(i-1).previousGradientsW));
@@ -270,8 +265,24 @@ public class NNest extends Application implements Serializable{
                     outputLayer = false;
                 }
             }
-            increment++;
+            sessions++;
             globalCost = cost;
+        }
+        public void setSeed(long seed){
+            this.seed = seed;
+            random.setSeed(seed);
+        }
+        /**
+         * 
+         * @param optimizer Optimizer for the stochastic gradient descent(momentum).
+         */
+        public void setOptimizer(String optimizer){
+            if("".equals(optimizer))
+                this.updater = (x) -> {return create(x.length,x[0].length,0);};
+            else if("momentum".equalsIgnoreCase(optimizer))
+                this.updater = (x) -> momentum(x);
+            else
+                throw new IllegalArgumentException("INVALID OPTIMIZER");
         }
         private float[][] momentum(float[][] previousGradients){
             float beta = .9f;
@@ -489,27 +500,6 @@ public class NNest extends Application implements Serializable{
                     matrixResult[i][j] = (float)(matrix[i][j]);
             return matrixResult;
         }
-        public void setZeroes(double[][] matrix){
-            int rows = matrix.length;
-            int columns = matrix[0].length;
-            for(int i = 0; i < rows; i++)
-                for(int j = 0; j < columns; j++)
-                    matrix[i][j] = 0;
-        }
-        public void setZeroes(int[][] matrix){
-            int rows = matrix.length;
-            int columns = matrix[0].length;
-            for(int i = 0; i < rows; i++)
-                for(int j = 0; j < columns; j++)
-                    matrix[i][j] = 0;
-        }
-        public void setZeroes(float[][] matrix){
-            int rows = matrix.length;
-            int columns = matrix[0].length;
-            for(int i = 0; i < rows; i++)
-                for(int j = 0; j < columns; j++)
-                    matrix[i][j] = 0;
-        }
         public double[][] create(int rows, int columns, double valueToAllElements){
             double[][] matrixResult = new double[rows][columns];
             for(int i = 0; i < rows; i++)
@@ -531,7 +521,7 @@ public class NNest extends Application implements Serializable{
             int columns = matrixResult[0].length;
             for(int i = 0; i < rows; i++)
                 for(int j = 0; j < columns; j++)
-                    matrixResult[i][j] = Math.random() * range + minimum;
+                    matrixResult[i][j] = random.nextDouble() * range + minimum;
             return matrixResult;
         }
         public float[][] randomize(float[][] matrix, float range, float minimum){
@@ -541,7 +531,7 @@ public class NNest extends Application implements Serializable{
             int columns = matrixResult[0].length;
             for(int i = 0; i < rows; i++)
                 for(int j = 0; j < columns; j++)
-                    matrixResult[i][j] = (float)Math.random() * range + minimum;
+                    matrixResult[i][j] = random.nextFloat() * range + minimum;
             return matrixResult;
         }
         public double[][] transpose(double[][] matrix){
@@ -783,15 +773,18 @@ public class NNest extends Application implements Serializable{
             return result;
         }
     }
-    @Override
-    public void start(Stage stage){
-        boolean costVSAccuracy = graphMeasuresAccuracy; //Cost = false, Accuracy = true
+    private static void initGraph(Stage stage){
         final NumberAxis xAxis = new NumberAxis();
         final NumberAxis yAxis = new NumberAxis();
         xAxis.setAnimated(false);
         xAxis.setLabel("Training Sessions");
         yAxis.setAnimated(false);
-        yAxis.setLabel(costVSAccuracy ? "Accuracy" : "Cost"); 
+        yAxis.setLabel(graphMeasuresAccuracy ? "Accuracy" : "Cost");
+        if(graphMeasuresAccuracy){
+            yAxis.setAutoRanging(false);
+            yAxis.setUpperBound(1);
+            yAxis.setTickUnit(.05);
+        }
         XYChart.Series<Number, Number> series = new XYChart.Series<>();
         series.setName(yAxis.getLabel() + " over " + xAxis.getLabel());
         ScatterChart<Number, Number> chart = new ScatterChart<>(xAxis, yAxis);
@@ -804,7 +797,7 @@ public class NNest extends Application implements Serializable{
             while(true){
                 try{
                     Thread.sleep(50);
-                    Platform.runLater(() -> series.getData().add(new XYChart.Data<>(increment, !costVSAccuracy ? globalCost : 1/Math.pow(10, globalCost))));
+                    Platform.runLater(() -> series.getData().add(new XYChart.Data<>(sessions, !graphMeasuresAccuracy ? globalCost : 1/Math.pow(10, globalCost))));
                 } 
                 catch(InterruptedException e){
                     throw new RuntimeException(e);
@@ -814,45 +807,19 @@ public class NNest extends Application implements Serializable{
         updateThread.setDaemon(true);
         updateThread.start();
     }
-    public static void graphJFX(){
-        try{
-            Stage stage1 = new Stage();
-            boolean costVSAccuracy = graphMeasuresAccuracy; //Cost = false, Accuracy = true
-            final NumberAxis xAxis = new NumberAxis();
-            final NumberAxis yAxis = new NumberAxis();
-            xAxis.setAnimated(false);
-            xAxis.setLabel("Training Sessions");
-            yAxis.setAnimated(false);
-            yAxis.setLabel(costVSAccuracy ? "Accuracy" : "Cost"); 
-            XYChart.Series<Number, Number> series = new XYChart.Series<>();
-            series.setName(yAxis.getLabel() + " over " + xAxis.getLabel());
-            ScatterChart<Number, Number> chart = new ScatterChart<>(xAxis, yAxis);
-            chart.setAnimated(false);
-            chart.getData().add(series);
-            Scene scene = new Scene(chart, 600, 300);
-            stage1.setScene(scene);
-            stage1.show();
-            Thread updateThread = new Thread(() -> {
-                while(true){
-                    try{
-                        Thread.sleep(50);
-                        Platform.runLater(() -> series.getData().add(new XYChart.Data<>(increment, !costVSAccuracy ? globalCost : 1/Math.pow(10, globalCost))));
-                    } 
-                    catch(InterruptedException e){
-                        throw new RuntimeException(e);
-                    }
-                }
-            });
-            updateThread.setDaemon(true);
-            updateThread.start();
-        }
-        catch(ExceptionInInitializerError e){
-        }
+    public static void graphJFX(boolean graphMeasuresAccuracy){//Cost = false, Accuracy = true
+        Stage stage = new Stage();
+        initGraph(stage);
     }
-    public static void graph(){
+    public static void graph(boolean graphMeasuresAccuracy){
+        NNest.graphMeasuresAccuracy = graphMeasuresAccuracy;
         new Thread(() -> {
             NNest.launch(NNest.class);
         }).start();
+    }
+    @Override
+    public void start(Stage stage){
+        initGraph(stage);
     }
     public static void main(String[] args){
         launch(args);
