@@ -15,15 +15,11 @@ public class NNest extends Application implements Serializable{
         public class Layer implements Serializable{
             float[][] weights;
             float[][] biases;
-            float[][] previousGradientsW;
-            float[][] previousGradientsB;
             Layer(int previousNodes,int nodes){
                 weights = create(previousNodes,nodes,0);
                 biases = create(1,nodes,0);
                 weights = scale(randomize(weights,2,-1),(float)Math.sqrt(2.0/previousNodes));
                 biases = randomize(biases,2,-1);
-                previousGradientsW = create(previousNodes,nodes,0);
-                previousGradientsB = create(1,nodes,0);
             }
         }
         Layer[] network;
@@ -37,10 +33,12 @@ public class NNest extends Application implements Serializable{
         String costFunction;
         String optimizer;
         int[] layerNodes;
+        float[][][][] previousMomentsW;
+        float[][][][] previousMomentsB;
         transient BiFunction<float[][],Boolean,float[][]> activationHiddens;
         transient BiFunction<float[][],Boolean,float[][]> activationOutputs;
         transient BiFunction<float[][],float[][],Function<Boolean,float[][]>> lossFunction;
-        transient BiFunction<Float,float[][],Function<float[][],float[][]>> updater;
+        transient BiFunction<Float,float[][],BiFunction<float[][],float[][],float[][][]>> updater;
         /**
          * 
          * @param learningRate Learning rate for the gradient descent.
@@ -96,11 +94,19 @@ public class NNest extends Application implements Serializable{
             //Adding each layer
             for(int i = 1; i < layerNodes.length; i++){
                 Layer layer = new Layer(layerNodes[i-1],layerNodes[i]);
-//                network.add(layer);
                 network[i-1] = layer;
             }
-//            NETWORKSIZE = network.size();
             NETWORKSIZE = network.length;
+            previousMomentsW = new float[2][NETWORKSIZE][][];
+            previousMomentsB = new float[2][NETWORKSIZE][][];
+            for(int i = 0; i < layerNodes.length-1; i++){
+                int rows = network[i].weights.length;
+                int columns = network[i].weights[0].length;
+                previousMomentsW[0][i] = create(rows,columns,0);
+                previousMomentsB[0][i] = create(1,columns,0);
+                previousMomentsW[1][i] = create(rows,columns,0);
+                previousMomentsB[1][i] = create(1,columns,0);
+            }
         }
         
         @Override
@@ -108,13 +114,11 @@ public class NNest extends Application implements Serializable{
             String networkLayers = "";
             for(Layer layer : network)
                 networkLayers += layer.weights.length + ",";
-//            networkLayers += network.get(NETWORKSIZE-1).weights[0].length;
             networkLayers += network[NETWORKSIZE-1].weights[0].length;
             return networkLayers;
         }
         public Layer getNetworkLayer(int layerIndex){//Layer 0 is the layer after the inputs (first hidden layer)
             try{
-//                return network.get(layerIndex);
                 return network[layerIndex];
             }
             catch(Exception e){
@@ -123,7 +127,6 @@ public class NNest extends Application implements Serializable{
             return null;
         }
         public int getNetworkSize(){
-//            return network.size();
             return network.length;
         }
         public NN clone(){
@@ -211,18 +214,15 @@ public class NNest extends Application implements Serializable{
         public float[][] feedforward(float[][] inputs){
             float[][] outputs = inputs;
             for(int i = 0; i < NETWORKSIZE-1; i++){//Feed the inputs through the hidden layers
-//                Layer currentLayer = network.get(i);
                 Layer currentLayer = network[i];
                 outputs = activationHiddens.apply(add(dot(outputs,currentLayer.weights),currentLayer.biases),false);
             }
             //Feed the output from the hidden layers to the output layers with its activation function
-//            Layer lastLayer = network.get(NETWORKSIZE-1);
             Layer lastLayer = network[NETWORKSIZE-1];
             outputs = activationOutputs.apply(add(dot(outputs,lastLayer.weights),lastLayer.biases),false);
             return outputs;
         }
         public void backpropagation(float[][] inputs, float[][] targets){//Using notation from neuralnetworksanddeeplearning.com
-//            Layer lastLayer = network.get(NETWORKSIZE-1);
             Layer lastLayer = network[NETWORKSIZE-1];
             if(targets[0].length != lastLayer.biases[0].length)
                 throw new IllegalArgumentException("TARGETS ARRAY DO NOT MATCH THE SIZE OF THE OUTPUT LAYER");
@@ -231,40 +231,37 @@ public class NNest extends Application implements Serializable{
             float[][] dC_dA;
             float[][] dA_dZ;
             float[][] dZ_dW;
-            float[][] dC_dZ = create(0,0,0);
+            float[][] dC_dZ = {{}};
             float[][] dC_dW;
             float[][] bGradients;
             float[][] wGradients;
-            float[][] dZ_dA = create(0,0,0);
-            ArrayList<float[][]> Z = new ArrayList<>();//"Z" = the unactivated inputs from the weights and biases
-            ArrayList<float[][]> A = new ArrayList<>();//"A" = the activated "Z"s
-            A.add(outputs);
+            float[][] dZ_dA = {{}};
+            float[][][] Z = new float[NETWORKSIZE][][];//"Z" = the unactivated inputs from the weights and biases
+            float[][][] A = new float[NETWORKSIZE+1][][];//"A" = the activated "Z"s
+            A[0] = outputs;
             for(int i = 0; i < NETWORKSIZE-1; i++){
-//                Layer currentLayer = network.get(i);//Increase performance by reducing amount of pointers
                 Layer currentLayer = network[i];//Increase performance by reducing amount of pointers
                 outputs = add(dot(outputs,currentLayer.weights),currentLayer.biases);//Computing "Z"
-                Z.add(outputs);
+                Z[i] = outputs;
                 outputs = activationHiddens.apply(outputs, false);//Computing "A"
-                A.add(outputs);
+                A[i+1] = outputs;
             }
             outputs = add(dot(outputs,lastLayer.weights),lastLayer.biases);
-            Z.add(outputs);
+            Z[NETWORKSIZE-1] = outputs;
             outputs = activationOutputs.apply(outputs, false);
-            A.add(outputs);
-            dC_dA = lossFunction.apply(copy(A.get(NETWORKSIZE)), targets).apply(true);
+            A[NETWORKSIZE] = outputs;
+            dC_dA = lossFunction.apply(A[NETWORKSIZE], targets).apply(true);
             boolean outputLayer = true;
             for(int i = 0; i < NETWORKSIZE; i++){
                 int currentIndex = NETWORKSIZE-1-i;//Increase performance by reducing amount of pointers
-//                Layer currentLayer = network.get(currentIndex);//Increase performance by reducing amount of pointers
                 Layer currentLayer = network[currentIndex];//Increase performance by reducing amount of pointers
                 if(!outputLayer)
-//                    dZ_dA = network.get(currentIndex+1).weights;
                     dZ_dA = network[currentIndex+1].weights;
                 if(outputLayer)
-                    dA_dZ = activationOutputs.apply(Z.get(currentIndex),true);
+                    dA_dZ = activationOutputs.apply(Z[currentIndex],true);
                 else
-                    dA_dZ = activationHiddens.apply(Z.get(currentIndex),true);
-                dZ_dW = A.get(currentIndex);
+                    dA_dZ = activationHiddens.apply(Z[currentIndex],true);
+                dZ_dW = A[currentIndex];
                 if(!outputLayer)
                     dC_dA = dot(dC_dZ,transpose(dZ_dA));
                 if(outputLayer)
@@ -272,18 +269,20 @@ public class NNest extends Application implements Serializable{
                 else
                     dC_dZ = multiply(dC_dA,dA_dZ);
                 dC_dW = dot(transpose(dZ_dW),dC_dZ);
-                lossFunction.apply(copy(A.get(NETWORKSIZE)), targets).apply(false);//Update the cost to track progress
+                lossFunction.apply(A[NETWORKSIZE], targets).apply(false);//Update the cost to track progress
                 //Add optimizer or updater to gradients
-//                bGradients = add(scale(lr,dC_dZ),updater.apply(currentLayer.previousGradientsB));
-//                wGradients = add(scale(lr,dC_dW),updater.apply(currentLayer.previousGradientsW));
-                bGradients = updater.apply(lr,dC_dZ).apply(currentLayer.previousGradientsB);
-                wGradients = updater.apply(lr,dC_dW).apply(currentLayer.previousGradientsW);
+                float[][][] updateB = updater.apply(lr,dC_dZ).apply(previousMomentsB[0][currentIndex],previousMomentsB[1][currentIndex]);
+                float[][][] updateW = updater.apply(lr,dC_dW).apply(previousMomentsW[0][currentIndex],previousMomentsW[1][currentIndex]);
+                bGradients = updateB[0];
+                wGradients = updateW[0];
                 //Update weights and biases
                 currentLayer.biases = subtract(currentLayer.biases,bGradients);
                 currentLayer.weights = subtract(currentLayer.weights,wGradients);
                 //Save old gradients
-                currentLayer.previousGradientsW = wGradients;
-                currentLayer.previousGradientsB = bGradients;
+                previousMomentsW[0][currentIndex] = updateW[1];
+                previousMomentsB[0][currentIndex] = updateB[1];
+                previousMomentsW[1][currentIndex] = updateW[2];
+                previousMomentsB[1][currentIndex] = updateB[2];
                 if(outputLayer)
                     outputLayer = false;
             }
@@ -300,27 +299,29 @@ public class NNest extends Application implements Serializable{
          */
         public void setOptimizer(String optimizer){
             if("".equals(optimizer))
-                this.updater = (a,b) -> (c) -> {return scale(lr,b);};
+                this.updater = (a,b) -> (c,d) -> {return new float[][][]{scale(a,b)};};
             else if("momentum".equalsIgnoreCase(optimizer))
-                this.updater = (a,b) -> (c) -> momentum(a,b,c);
+                this.updater = (a,b) -> (c,d) -> momentum(a,b,c);
             else if("adam".equalsIgnoreCase(optimizer))
-                this.updater = (a,b) -> (c) -> adam(a,b,c);
+                this.updater = (a,b) -> (c,d) -> adam(a,b,c,d);
             else
                 throw new IllegalArgumentException("INVALID OPTIMIZER");
         }
-        private float[][] momentum(float lr, float[][] gradients, float[][] prevUpdate){
+        private float[][][] momentum(float lr, float[][] gradients, float[][] prevUpdate){
             float beta = .9f;
-            return add(scale(beta,prevUpdate),scale(lr,gradients));
+            float[][] update = add(scale(beta,prevUpdate),scale(lr,gradients));
+            return new float[][][]{update,update,null};
         }
-        private float[][] adam(float lr, float[][] gradients, float[][] prevUpdate){
+        private float[][][] adam(float lr, float[][] gradients, float[][] moment1, float[][] moment2){
             float b1 = .9f;
             float b2 = .99f;
             float e = .00000001f;
-            int rows = prevUpdate.length;
-            int columns = prevUpdate[0].length;
-            float[][] m = scale((1-b1),gradients);
-            float[][] v = scale((1-b2),power(gradients,2));
-            return v;
+            float[][] m = add(scale((1-b1),gradients),scale(b1,moment1));
+            float[][] v = add(scale((1-b2),power(gradients,2)),scale(b2,moment2));
+            float[][] m_ = scale(1/(1-b1),m);
+            float[][] v_ = scale(1/(1-b2),v);
+            float[][] update = divide(scale(lr,m_),add(sqrt(v_),create(v_.length,v_[0].length,e)));
+            return new float[][][]{update,m,v};
         }
         private float[][] linearActivation(float[][] matrix, boolean derivative){
             int rows = matrix.length;
