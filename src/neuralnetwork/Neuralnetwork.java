@@ -16,8 +16,7 @@ public class Neuralnetwork {
                 this.targets[0] = targets;
             }
         }
-        NNest.NN nn = new NNest().new NN(.001,7777,"sigmoid","sigmoid","quadratic",2,2,1);
-        nn.setOptimizer("momentum");
+        NNest.NN nn = new NNest().new NN(.0001,7777,"sigmoid","sigmoid","quadratic","momentum",2,2,1);
         System.out.println(nn.NETWORKSIZE);
         System.out.println(nn.toString());
         ArrayList<Data> data = new ArrayList<>();
@@ -34,12 +33,12 @@ public class Neuralnetwork {
         data.get(3).addInputs(0,0);
         data.get(3).addTargets(0);
         NNest.graph(false);
-        for(int i = 0; i < 250000; i--){
+        for(int i = 0; i < 100000000; i++){
             int random = (int)(Math.random()*4);
 //                nn.print(data.get(random).inputs, "inputs");
 //                nn.print(nn.feedforward(data.get(random).inputs), "feedforward");
             nn.backpropagation(data.get(random).inputs, data.get(random).targets);
         }
-        
+        System.exit(0);
     }
 }
