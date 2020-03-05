@@ -12,7 +12,7 @@ public class NNest extends Application implements Serializable{
     volatile static int sessions = 0;
     private static boolean graphMeasuresAccuracy;
     public class NN implements Serializable{
-        public class Layer implements Serializable{
+        private class Layer implements Serializable{
             float[][] weights;
             float[][] biases;
             Layer(int previousNodes,int nodes){
@@ -22,23 +22,23 @@ public class NNest extends Application implements Serializable{
                 biases = randomize(biases,2,-1);
             }
         }
-        Layer[] network;
-        Random random = new Random();
-        long seed;
-        float lr;
-        double cost;
+        private Layer[] network;
+        private Random random = new Random();
+        private long seed;
+        private float lr;
+        private double cost;
         final int NETWORKSIZE;//Total layers not including the input layer
-        String hiddenActivationFunction;
-        String outputActivationFunction;
-        String costFunction;
-        String optimizer;
-        int[] layerNodes;
-        float[][][][] previousMomentsW;
-        float[][][][] previousMomentsB;
-        transient BiFunction<float[][],Boolean,float[][]> activationHiddens;
-        transient BiFunction<float[][],Boolean,float[][]> activationOutputs;
-        transient BiFunction<float[][],float[][],Function<Boolean,float[][]>> lossFunction;
-        transient BiFunction<Float,float[][],BiFunction<float[][],float[][],float[][][]>> updater;
+        private String hiddenActivationFunction;
+        private String outputActivationFunction;
+        private String costFunction;
+        private String optimizer;
+        private int[] layerNodes;
+        private float[][][][] previousMomentsW;
+        private float[][][][] previousMomentsB;
+        private transient BiFunction<float[][],Boolean,float[][]> activationHiddens;
+        private transient BiFunction<float[][],Boolean,float[][]> activationOutputs;
+        private transient BiFunction<float[][],float[][],Function<Boolean,float[][]>> lossFunction;
+        private transient BiFunction<Float,float[][],BiFunction<float[][],float[][],float[][][]>> updater;
         /**
          * 
          * @param learningRate Learning rate for the gradient descent.
@@ -139,7 +139,7 @@ public class NNest extends Application implements Serializable{
         }
         public void save(){
             try{
-                FileOutputStream fileOut = new FileOutputStream(System.getProperty("user.dir") + "/neuralnetwork(" + toString() + ").ser");
+                FileOutputStream fileOut = new FileOutputStream(System.getProperty("user.dir") + "/neuralnetwork(" + toString() + ")");
                 ObjectOutputStream out = new ObjectOutputStream(fileOut);
                 out.writeObject(this);
             }
@@ -149,7 +149,7 @@ public class NNest extends Application implements Serializable{
         }
         public boolean load(){
             try{
-                FileInputStream fileIn = new FileInputStream(System.getProperty("user.dir") + "/neuralnetwork(" + toString() + ").ser");
+                FileInputStream fileIn = new FileInputStream(System.getProperty("user.dir") + "/neuralnetwork(" + toString() + ")");
                 ObjectInputStream in = new ObjectInputStream(fileIn);
                 network = ((NN)in.readObject()).network;
                 random = ((NN)in.readObject()).random;
