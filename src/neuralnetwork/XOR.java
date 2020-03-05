@@ -2,7 +2,7 @@ package neuralnetwork;
 
 import java.util.ArrayList;
 
-public class Neuralnetwork {
+public class XOR {
     public static void main(String[] args) {
         class Data{
             float[][] inputs;

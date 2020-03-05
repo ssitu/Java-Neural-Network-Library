@@ -46,7 +46,7 @@ public class NNest extends Application implements Serializable{
          * @param hiddenActivationFunction Activation function for the hidden layers (sigmoid, tanh, relu, leakyrelu).
          * @param outputActivationFunction Activation function for the output layer (regression: sigmoid, tanh, linear; classification: softmax).
          * @param costFunction Cost function to measure error (regression: quadratic; classification: log).
-         * @param optimizer Gradient updater for stochastic gradient descent, leave blank for none (momentum). 
+         * @param optimizer Gradient updater for stochastic gradient descent, leave blank for none (momentum, adam). 
          * @param layerNodes Amount of numbers specifies the amount of layers while the value of the numbers specifies the amount of neurons for that layer. Must have more than two numbers (input layer, hidden layers, output layer).
          */
         NN(double learningRate, long seed, String hiddenActivationFunction, String outputActivationFunction, String costFunction, String optimizer, int ... layerNodes){
