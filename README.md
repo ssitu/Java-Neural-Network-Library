@@ -1,5 +1,5 @@
 # NeuralNetwork
-An adjustable neural network class
+An adjustable neural network class, with an example of solving the XOR problem is included.
 
 Thought it would be easier to have the necessities of neural networks in one class.
 
