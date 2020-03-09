@@ -16,7 +16,8 @@ public class XOR {
                 this.targets[0] = targets;
             }
         }
-        NNest.NN nn = new NNest().new NN(.0001,7777,"sigmoid","sigmoid","quadratic","momentum",2,2,1);
+        NNest.NN nn = new NNest().new NN(.0001,7777,"sigmoid","sigmoid","quadratic","momentum",2,20,20,1);
+        nn.setThreads(2);//12 threads work the best personally
         System.out.println(nn.NETWORKSIZE);
         System.out.println(nn.toString());
         ArrayList<Data> data = new ArrayList<>();
@@ -33,7 +34,7 @@ public class XOR {
         data.get(3).addInputs(0,0);
         data.get(3).addTargets(0);
         NNest.graph(false);
-        for(int i = 0; i < 100000000; i++){
+        for(int i = 0; i < 10000000; i++){
             int random = (int)(Math.random()*4);
 //                nn.print(data.get(random).inputs, "inputs");
 //                nn.print(nn.feedforward(data.get(random).inputs), "feedforward");

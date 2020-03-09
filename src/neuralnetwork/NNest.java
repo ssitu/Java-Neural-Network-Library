@@ -22,6 +22,7 @@ public class NNest extends Application implements Serializable{
                 biases = randomize(biases,2,-1);
             }
         }
+        private int threads;
         private Layer[] network;
         private Random random = new Random();
         private long seed;
@@ -39,6 +40,7 @@ public class NNest extends Application implements Serializable{
         private transient BiFunction<float[][],Boolean,float[][]> activationOutputs;
         private transient BiFunction<float[][],float[][],Function<Boolean,float[][]>> lossFunction;
         private transient BiFunction<Float,float[][],BiFunction<float[][],float[][],float[][][]>> updater;
+        private transient BiFunction<float[][],float[][],float[][]> dotProduct = (a,b) -> dot(a,b);
         /**
          * 
          * @param learningRate Learning rate for the gradient descent.
@@ -215,11 +217,11 @@ public class NNest extends Application implements Serializable{
             float[][] outputs = inputs;
             for(int i = 0; i < NETWORKSIZE-1; i++){//Feed the inputs through the hidden layers
                 Layer currentLayer = network[i];
-                outputs = activationHiddens.apply(add(dot(outputs,currentLayer.weights),currentLayer.biases),false);
+                outputs = activationHiddens.apply(add(dotProduct.apply(outputs,currentLayer.weights),currentLayer.biases),false);
             }
             //Feed the output from the hidden layers to the output layers with its activation function
             Layer lastLayer = network[NETWORKSIZE-1];
-            outputs = activationOutputs.apply(add(dot(outputs,lastLayer.weights),lastLayer.biases),false);
+            outputs = activationOutputs.apply(add(dotProduct.apply(outputs,lastLayer.weights),lastLayer.biases),false);
             return outputs;
         }
         public void backpropagation(float[][] inputs, float[][] targets){//Using notation from neuralnetworksanddeeplearning.com
@@ -241,12 +243,12 @@ public class NNest extends Application implements Serializable{
             A[0] = outputs;
             for(int i = 0; i < NETWORKSIZE-1; i++){
                 Layer currentLayer = network[i];//Increase performance by reducing amount of pointers
-                outputs = add(dot(outputs,currentLayer.weights),currentLayer.biases);//Computing "Z"
+                outputs = add(dotProduct.apply(outputs,currentLayer.weights),currentLayer.biases);//Computing "Z"
                 Z[i] = outputs;
                 outputs = activationHiddens.apply(outputs, false);//Computing "A"
                 A[i+1] = outputs;
             }
-            outputs = add(dot(outputs,lastLayer.weights),lastLayer.biases);
+            outputs = add(dotProduct.apply(outputs,lastLayer.weights),lastLayer.biases);
             Z[NETWORKSIZE-1] = outputs;
             outputs = activationOutputs.apply(outputs, false);
             A[NETWORKSIZE] = outputs;
@@ -263,12 +265,12 @@ public class NNest extends Application implements Serializable{
                     dA_dZ = activationHiddens.apply(Z[currentIndex],true);
                 dZ_dW = A[currentIndex];
                 if(!outputLayer)
-                    dC_dA = dot(dC_dZ,transpose(dZ_dA));
+                    dC_dA = dotProduct.apply(dC_dZ,transpose(dZ_dA));
                 if(outputLayer)
                     dC_dZ = multiply(dA_dZ,dC_dA);
                 else
                     dC_dZ = multiply(dC_dA,dA_dZ);
-                dC_dW = dot(transpose(dZ_dW),dC_dZ);
+                dC_dW = dotProduct.apply(transpose(dZ_dW),dC_dZ);
                 lossFunction.apply(A[NETWORKSIZE], targets).apply(false);//Update the cost to track progress
                 //Add optimizer or updater to gradients
                 float[][][] updateB = updater.apply(lr,dC_dZ).apply(previousMomentsB[0][currentIndex],previousMomentsB[1][currentIndex]);
@@ -737,13 +739,75 @@ public class NNest extends Application implements Serializable{
             dotDimensionMismatch(matrixA, matrixB);
             int rows = matrixA.length;
             int columns = matrixB[0].length;
+            int columns2 = matrixA[0].length;
             float[][] matrixResult = new float[rows][columns];//result matrix
             //multiply A row elements by B column elements = 1 element in result matrix
             for(int i = 0; i < rows; i++)//A rows or B columns or Result rows
                 for(int j = 0; j < columns; j++)//A rows or B columns or Result columns
-                    for(int k = 0; k < matrixA[0].length; k++)//A columns or B rows
+                    for(int k = 0; k < columns2; k++)//A columns or B rows
                         matrixResult[i][j] += matrixA[i][k] * matrixB[k][j];
             return matrixResult;
+        }
+        private class MatrixThread extends Thread {
+            int num;
+            int threadNum;
+            int rows;
+            int columns;
+            int columns2;
+            float[][] m1;
+            float[][] m2;
+            float[][] result;
+            MatrixThread(int num, int threadNum, int rows, int columns, int columns2, float[][] m1, float[][] m2, float[][] result) {
+                this.num = num;
+                this.threadNum = threadNum;
+                this.rows = rows;
+                this.columns = columns;
+                this.columns2 = columns2;
+                this.m1 = m1;
+                this.m2 = m2;
+                this.result = result;
+            }
+            @Override
+            public void run() {
+                for (int i = num * rows / threadNum; i < (num + 1) * rows / threadNum; i++) {
+                    for (int j = 0; j < columns; j++) {
+                        for (int k = 0; k < columns2; k++) {
+                            result[i][j] += m1[i][k] * m1[k][j];
+                        }
+                    }
+                }
+            }
+        }
+        public void setThreads(int numberOfThreads){
+            if(numberOfThreads <= 1){
+                dotProduct = (a,b) -> dot(a,b);
+            }
+            else{
+                threads = numberOfThreads;
+                dotProduct = (a,b) -> dotThreads(a,b);
+            }
+        }
+        public float[][] dotThreads(float[][] m1, float[][] m2){
+            sizeException(m1);
+            sizeException(m2);
+            dotDimensionMismatch(m1, m2);
+            MatrixThread[] threadArray = new MatrixThread[threads];
+            int rows = m1.length;
+            int columns = m2[0].length;
+            int columns2 = m1[0].length;
+            float[][] result = new float[rows][columns];
+            for (int t = 0; t < threads; t++) {
+                threadArray[t] = new MatrixThread(t, threads, rows, columns, columns2, m1, m2, result);
+                threadArray[t].start();
+            }
+            for (int i = 0; i < threads; i++) {
+                try {
+                    threadArray[i].join();
+                } catch (Exception e) {
+
+                }
+            }
+            return result;
         }
         public double[][] power(double[][] matrix, double power){
             int rows = matrix.length;
