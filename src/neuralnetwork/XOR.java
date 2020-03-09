@@ -16,8 +16,8 @@ public class XOR {
                 this.targets[0] = targets;
             }
         }
-        NNest.NN nn = new NNest().new NN(.0001,7777,"sigmoid","sigmoid","quadratic","momentum",2,20,20,1);
-        nn.setThreads(2);//12 threads work the best personally
+        NNest.NN nn = new NNest().new NN(.0001,7777,"sigmoid","sigmoid","quadratic","momentum",2,64,64,1);
+        nn.setThreads(12);//12 threads work the best personally
         System.out.println(nn.NETWORKSIZE);
         System.out.println(nn.toString());
         ArrayList<Data> data = new ArrayList<>();

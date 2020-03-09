@@ -772,7 +772,7 @@ public class NNest extends Application implements Serializable{
                 for (int i = num * rows / threadNum; i < (num + 1) * rows / threadNum; i++) {
                     for (int j = 0; j < columns; j++) {
                         for (int k = 0; k < columns2; k++) {
-                            result[i][j] += m1[i][k] * m1[k][j];
+                            result[i][j] += m1[i][k] * m2[k][j];
                         }
                     }
                 }
