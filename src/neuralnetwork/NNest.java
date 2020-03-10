@@ -480,13 +480,6 @@ public class NNest extends Application implements Serializable{
                 result[0][i] = (float)(.5*(tanh((float)(.01*((inputs[0][i]-mean)/(deviation))),false)+1));//tanh estimator normalization
             return result;
         }
-        private void sizeException(double[][] matrix){
-            int rows = matrix.length;
-            int columns = matrix[0].length;
-            for(int i = 0; i < rows; i++) 
-                if(matrix[i].length != columns) 
-                    throw new IllegalArgumentException("Inconsistent Matrix Size");  
-        }
         private void sizeException(float[][] matrix){
             int rows = matrix.length;
             int columns = matrix[0].length;
@@ -494,31 +487,13 @@ public class NNest extends Application implements Serializable{
                 if(matrix[i].length != columns)
                     throw new IllegalArgumentException("Inconsistent Matrix Size");  
         }
-        private void dotDimensionMismatch(double[][] matrixA, double[][] matrixB){
-            if(matrixA[0].length != matrixB.length)//A columns must equal B rows
-                throw new IllegalArgumentException("Matrices Dimension Mismatch");
-        }
         private void dotDimensionMismatch(float[][] matrixA, float[][] matrixB){
             if(matrixA[0].length != matrixB.length)//A columns must equal B rows
-                throw new IllegalArgumentException("Matrices Dimension Mismatch");
-        }
-        private void dimensionMismatch(double[][] matrixA, double[][] matrixB){
-            if(matrixA.length != matrixB.length || matrixA[0].length != matrixB[0].length)
                 throw new IllegalArgumentException("Matrices Dimension Mismatch");
         }
         private void dimensionMismatch(float[][] matrixA, float[][] matrixB){
             if(matrixA.length != matrixB.length || matrixA[0].length != matrixB[0].length)
                 throw new IllegalArgumentException("Matrices Dimension Mismatch");
-        }
-        public void print(double[][] matrix, String nameOfMatrix){
-            System.out.println(nameOfMatrix + ": ");
-            int rows = matrix.length;
-            int columns = matrix[0].length;
-            for(int i = 0; i < rows; i++){
-                for(int j = 0; j < columns; j++)
-                    System.out.print("[" + matrix[i][j] + "] ");
-                System.out.println("");
-            }
         }
         public void print(float[][] matrix, String nameOfMatrix){
             System.out.println(nameOfMatrix + ": ");
@@ -539,28 +514,11 @@ public class NNest extends Application implements Serializable{
                     matrixResult[i][j] = (float)(matrix[i][j]);
             return matrixResult;
         }
-        public double[][] create(int rows, int columns, double valueToAllElements){
-            double[][] matrixResult = new double[rows][columns];
-            for(int i = 0; i < rows; i++)
-                for(int j = 0; j < columns; j++)
-                    matrixResult[i][j] = valueToAllElements;
-            return matrixResult;
-        }
         public float[][] create(int rows, int columns, float valueToAllElements){
             float[][] matrixResult = new float[rows][columns];
             for(int i = 0; i < rows; i++)
                 for(int j = 0; j < columns; j++)
                     matrixResult[i][j] = valueToAllElements;
-            return matrixResult;
-        }
-        public double[][] randomize(double[][] matrix, double range, double minimum){
-            sizeException(matrix);
-            double[][] matrixResult = matrix;
-            int rows = matrixResult.length;
-            int columns = matrixResult[0].length;
-            for(int i = 0; i < rows; i++)
-                for(int j = 0; j < columns; j++)
-                    matrixResult[i][j] = random.nextDouble() * range + minimum;
             return matrixResult;
         }
         public float[][] randomize(float[][] matrix, float range, float minimum){
@@ -573,16 +531,6 @@ public class NNest extends Application implements Serializable{
                     matrixResult[i][j] = random.nextFloat() * range + minimum;
             return matrixResult;
         }
-        public double[][] transpose(double[][] matrix){
-            sizeException(matrix);
-            double[][] matrixResult = new double[matrix[0].length][matrix.length];
-            int rows = matrix.length;
-            int columns = matrix[0].length;
-            for(int i = 0; i < rows; i++)
-                for(int j = 0; j < columns; j++)
-                    matrixResult[j][i] = matrix[i][j];
-            return matrixResult;
-        }
         public float[][] transpose(float[][] matrix){
             sizeException(matrix);
             float[][] matrixResult = new float[matrix[0].length][matrix.length];
@@ -593,31 +541,11 @@ public class NNest extends Application implements Serializable{
                     matrixResult[j][i] = matrix[i][j];
             return matrixResult;
         }
-        public double[][] scale(double[][] matrix, double factor){
-            sizeException(matrix);
-            int rows = matrix.length;
-            int columns = matrix[0].length;
-            double[][] matrixResult = new double[rows][columns];
-            for(int i = 0; i < rows; i++)
-                for(int j = 0; j < columns; j++)
-                    matrixResult[i][j] = factor * matrix[i][j];
-            return matrixResult;   
-        }
         public float[][] scale(float[][] matrix, float factor){
             sizeException(matrix);
             int rows = matrix.length;
             int columns = matrix[0].length;
             float[][] matrixResult = new float[rows][columns];
-            for(int i = 0; i < rows; i++)
-                for(int j = 0; j < columns; j++)
-                    matrixResult[i][j] = factor * matrix[i][j];
-            return matrixResult;   
-        }
-        public double[][] scale(double factor, double[][] matrix){
-            sizeException(matrix);
-            int rows = matrix.length;
-            int columns = matrix[0].length;
-            double[][] matrixResult = new double[rows][columns];
             for(int i = 0; i < rows; i++)
                 for(int j = 0; j < columns; j++)
                     matrixResult[i][j] = factor * matrix[i][j];
@@ -633,18 +561,6 @@ public class NNest extends Application implements Serializable{
                     matrixResult[i][j] = factor * matrix[i][j];
             return matrixResult;   
         }
-        public double[][] add(double[][] matrixA, double[][] matrixB){
-            sizeException(matrixA);
-            sizeException(matrixB);
-            dimensionMismatch(matrixA, matrixB);
-            int rows = matrixA.length;
-            int columns = matrixA[0].length;
-            double[][] matrixResult = new double[rows][columns];
-            for(int i = 0; i < rows; i++)
-                for(int j = 0; j < columns; j++)
-                    matrixResult[i][j] = matrixA[i][j] + matrixB[i][j];
-            return matrixResult;
-        }
         public float[][] add(float[][] matrixA, float[][] matrixB){
             sizeException(matrixA);
             sizeException(matrixB);
@@ -657,18 +573,6 @@ public class NNest extends Application implements Serializable{
                     matrixResult[i][j] = matrixA[i][j] + matrixB[i][j];
             return matrixResult;
         }
-        public double[][] subtract(double[][] matrixA, double[][] matrixB){
-            sizeException(matrixA);
-            sizeException(matrixB);
-            dimensionMismatch(matrixA, matrixB);
-            int rows = matrixA.length;
-            int columns = matrixA[0].length;
-            double[][] matrixResult = new double[rows][columns];
-            for(int i = 0; i < rows; i++)
-                for(int j = 0; j < columns; j++)
-                    matrixResult[i][j] = matrixA[i][j] - matrixB[i][j];
-            return matrixResult;
-        }
         public float[][] subtract(float[][] matrixA, float[][] matrixB){
             sizeException(matrixA);
             sizeException(matrixB);
@@ -679,18 +583,6 @@ public class NNest extends Application implements Serializable{
             for(int i = 0; i < rows; i++)
                 for(int j = 0; j < columns; j++)
                     matrixResult[i][j] = matrixA[i][j] - matrixB[i][j];
-            return matrixResult;
-        }
-        public double[][] multiply(double[][] matrixA, double[][] matrixB){
-            sizeException(matrixA);
-            sizeException(matrixB);
-            dimensionMismatch(matrixA, matrixB);
-            int rows = matrixA.length;
-            int columns = matrixA[0].length;
-            double[][] matrixResult = new double[rows][columns];
-            for(int i = 0; i < rows; i++)
-                for(int j = 0; j < columns; j++)
-                    matrixResult[i][j] = matrixA[i][j] * matrixB[i][j];
             return matrixResult;
         }
         public float[][] multiply(float[][] matrixA, float[][] matrixB){
@@ -717,35 +609,20 @@ public class NNest extends Application implements Serializable{
                     matrixResult[i][j] = matrixA[i][j] / matrixB[i][j];
             return matrixResult;
         }
-        public double[][] dot(double[][] matrixA, double[][] matrixB){
+        public float[][] dot(float[][] m1, float[][] m2){
             //make sure lengths of rows are the same for each matrix
-            sizeException(matrixA);
-            sizeException(matrixB);
-            dotDimensionMismatch(matrixA, matrixB);
-            int rows = matrixA.length;
-            int columns = matrixB[0].length;
-            double[][] matrixResult = new double[rows][columns];//result matrix
-            //multiply A row elements by B column elements = 1 element in result matrix
-            for(int i = 0; i < rows; i++)//A rows or B columns or Result rows
-                for(int j = 0; j < columns; j++)//A rows or B columns or Result columns
-                    for(int k = 0; k < matrixA[0].length; k++)//A columns or B rows
-                        matrixResult[i][j] += matrixA[i][k] * matrixB[k][j];
-            return matrixResult;
-        }
-        public float[][] dot(float[][] matrixA, float[][] matrixB){
-            //make sure lengths of rows are the same for each matrix
-            sizeException(matrixA);
-            sizeException(matrixB);
-            dotDimensionMismatch(matrixA, matrixB);
-            int rows = matrixA.length;
-            int columns = matrixB[0].length;
-            int columns2 = matrixA[0].length;
+            sizeException(m1);
+            sizeException(m2);
+            dotDimensionMismatch(m1, m2);
+            int rows = m1.length;
+            int columns = m2[0].length;
+            int columns2 = m1[0].length;
             float[][] matrixResult = new float[rows][columns];//result matrix
             //multiply A row elements by B column elements = 1 element in result matrix
             for(int i = 0; i < rows; i++)//A rows or B columns or Result rows
-                for(int j = 0; j < columns; j++)//A rows or B columns or Result columns
-                    for(int k = 0; k < columns2; k++)//A columns or B rows
-                        matrixResult[i][j] += matrixA[i][k] * matrixB[k][j];
+                for(int k = 0; k < columns2; k++)//A rows or B columns or Result columns
+                    for(int j = 0; j < columns; j++)//A columns or B rows
+                        matrixResult[i][j] += m1[i][k] * m2[k][j];//Making the j loop the inner most loop improves performance than if k or i is the inner most loop
             return matrixResult;
         }
         private class MatrixThread extends Thread {
@@ -770,8 +647,8 @@ public class NNest extends Application implements Serializable{
             @Override
             public void run() {
                 for (int i = num * rows / threadNum; i < (num + 1) * rows / threadNum; i++) {
-                    for (int j = 0; j < columns; j++) {
-                        for (int k = 0; k < columns2; k++) {
+                    for (int k = 0; k < columns2; k++) {
+                        for (int j = 0; j < columns; j++) {
                             result[i][j] += m1[i][k] * m2[k][j];
                         }
                     }
@@ -809,15 +686,6 @@ public class NNest extends Application implements Serializable{
             }
             return result;
         }
-        public double[][] power(double[][] matrix, double power){
-            int rows = matrix.length;
-            int columns = matrix[0].length;
-            double[][] matrixResult = new double[rows][columns];
-            for(int i = 0; i < rows; i++)
-                for(int j = 0; j < columns; j++)
-                    matrixResult[i][j] = Math.pow(matrix[i][j], power);
-            return matrixResult;
-        }
         public float[][] power(float[][] matrix, double power){
             int rows = matrix.length;
             int columns = matrix[0].length;
@@ -836,15 +704,6 @@ public class NNest extends Application implements Serializable{
                     matrixResult[i][j] = (float)Math.sqrt(matrix[i][j]);
             return matrixResult;
         }
-        public double sum(double[][] matrix){
-            double sum = 0;
-            int rows = matrix.length;
-            int columns = matrix[0].length;
-            for(int i = 0; i < rows; i++)
-                for(int j = 0; j < columns; j++)
-                    sum += matrix[i][j];
-            return sum;
-        }
         public float sum(float[][] matrix){
             float sum = 0;
             int rows = matrix.length;
@@ -853,15 +712,6 @@ public class NNest extends Application implements Serializable{
                 for(int j = 0; j < columns; j++)
                     sum += matrix[i][j];
             return sum;
-        }
-        public double[][] copy(double[][] matrix){
-            int rows = matrix.length;
-            int columns = matrix[0].length;
-            double[][] matrixResult = new double[rows][columns];
-            for(int i = 0; i < rows; i++)
-                for(int j = 0; j < columns; j++)
-                    matrixResult[i][j] = matrix[i][j];
-            return matrixResult;
         }
         public float[][] copy(float[][] matrix){
             int rows = matrix.length;
