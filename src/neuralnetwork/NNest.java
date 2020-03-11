@@ -167,15 +167,15 @@ public class NNest extends Application implements Serializable{
             for (int i = 0; i < getNetworkSize(); i++) {
                 for (int j = 0; j < getNetworkLayer(i).weights.length; j++) {
                     for (int k = 0; k < getNetworkLayer(i).weights[0].length; k++) {
-                        if (random.nextFloat() < mutateRate) {
-                            getNetworkLayer(i).weights[j][k] += (float)(random.nextFloat() * range - (range/2));
+                        if (Math.random() < mutateRate) {
+                            getNetworkLayer(i).weights[j][k] += (float)(Math.random() * range - (range/2));
                         }
                     }
                 }
                 for (int j = 0; j < getNetworkLayer(i).biases.length; j++) {
                     for (int k = 0; k < getNetworkLayer(i).biases[0].length; k++) {
-                        if (random.nextFloat() < mutateRate) {
-                            getNetworkLayer(i).biases[j][k] += (float)(random.nextFloat() * range - (range/2));
+                        if (Math.random() < mutateRate) {
+                            getNetworkLayer(i).biases[j][k] += (float)(Math.random() * range - (range/2));
                         }
                     }
                 }
@@ -185,14 +185,14 @@ public class NNest extends Application implements Serializable{
             for (int i = 0; i < getNetworkSize(); i++) {
                 for (int j = 0; j < getNetworkLayer(i).weights.length; j++) {
                     for (int k = 0; k < getNetworkLayer(i).weights[0].length; k++) {
-                        if (random.nextFloat() < mutateRate) {
-                            getNetworkLayer(i).weights[j][k] = (float) (random.nextFloat() * range - (range/2));
+                        if (Math.random() < mutateRate) {
+                            getNetworkLayer(i).weights[j][k] = (float) (Math.random() * range - (range/2));
                         }
                     }
                 }
                 for (int j = 0; j < getNetworkLayer(i).biases.length; j++) {
                     for (int k = 0; k < getNetworkLayer(i).biases[0].length; k++) {
-                        if (random.nextFloat() < mutateRate) {
+                        if (Math.random() < mutateRate) {
                             getNetworkLayer(i).biases[j][k] = (float) (random.nextFloat() * range - (range/2));
                         }
                     }
