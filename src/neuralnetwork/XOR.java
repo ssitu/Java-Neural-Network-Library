@@ -16,7 +16,7 @@ public class XOR {
                 this.targets[0] = targets;
             }
         }
-        NNest.NN nn = new NNest().new NN(.0001,7777,"sigmoid","sigmoid","quadratic","adam",2,64,64,1);
+        NNest.NN nn = new NNest().new NN("xor",.001,7777,"sigmoid","sigmoid","quadratic","nadam",2,2,1);
         System.out.println(nn.NETWORKSIZE);
         System.out.println(nn.toString());
         ArrayList<Data> data = new ArrayList<>();
@@ -35,8 +35,9 @@ public class XOR {
         NNest.graph(false);
         for(int i = 0; i < 10000000; i++){
             int random = (int)(Math.random()*4);
-//                nn.print(data.get(random).inputs, "inputs");
-//                nn.print(nn.feedforward(data.get(random).inputs), "feedforward");
+                nn.print(data.get(random).inputs, "inputs");
+                nn.print(nn.feedforward(data.get(random).inputs), "feedforward");
+                System.out.println("");
             nn.backpropagation(data.get(random).inputs, data.get(random).targets);
         }
         System.exit(0);
