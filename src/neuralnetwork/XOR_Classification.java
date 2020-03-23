@@ -24,11 +24,11 @@ public class XOR_Classification {
         data.add(new Data(new float[]{0, 1}, new float[]{1, 0}));
         data.add(new Data(new float[]{1, 0}, new float[]{1, 0}));
         data.add(new Data(new float[]{0, 0}, new float[]{0, 1}));
-        NNest.graph(false);
+        NNest.graph(false, nn);
         for (int i = 0; i < 10000000; i++) {
             int random = (int) (Math.random() * 4);
-                nn.print(data.get(random).inputs, "inputs");
-                nn.print(nn.feedforward(data.get(random).inputs), "feedforward");
+            nn.print(data.get(random).inputs, "inputs");
+            nn.print(nn.feedforward(data.get(random).inputs), "feedforward");
             nn.backpropagation(data.get(random).inputs, data.get(random).targets);
         }
         System.exit(0);
