@@ -1,5 +1,5 @@
 # NeuralNetwork
-An adjustable neural network class, with an example of solving the XOR problem is included.
+An adjustable neural network class, with an example of solving the XOR problem is included along with a classification variation.
 
 Thought it would be easier to have the necessities of neural networks in one class.
 
@@ -10,7 +10,7 @@ NNest.NN neuralnetwork = new NNest().new NN(double learningRate, long seed, Stri
 I could not think of another way to display a graph in JavaFX of the progress of the network, so I settled on a outer class that nests the neural network class inside.
 
 Example 1: NNest.NN nn = new NNest().new NN(.001, 7777, "sigmoid", "sigmoid", "quadratic", "adam", 2, 2, 1);
-This will make a neural network with 2 input nodes, 2 hidden nodes, and 1 output nodes.
+This will make a neural network with 2 input nodes, 2 hidden nodes, and 1 output node.
 The seed is set for repeatability.
 
 Example 2: NNest.NN nn = new NNest().new NN(.001, 7777, "relu", "softmax", "log", "adam", 794, 512, 256, 128, 10); 
