@@ -1,7 +1,7 @@
 # NeuralNetwork
 An adjustable neural network class, with an example of solving the XOR problem is included along with a classification variation.
 
-Thought it would be easier to have the necessities of neural networks in one class.
+Thought it would be easier to have the necessities of neural networks in one class. I add features when I need to use them in my other projects.
 
 An instance of the neural network class can be instantiated like this:
 
