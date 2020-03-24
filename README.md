@@ -1,6 +1,6 @@
-# Neural Network Class For Java
+# Neural Network Class/Library For Java
 
-An adjustable neural network class, with an example of solving the XOR problem along with a classification variation.
+An adjustable neural network class or library, with an example of solving the XOR problem along with a classification variation.
 
 Thought it would be easier to have the necessities of neural networks in one class. I add features when I need to use them in my other projects.
 
