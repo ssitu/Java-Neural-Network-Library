@@ -26,4 +26,4 @@ Names of available activation functions for the output layer: regression: "sigmo
 
 Names of available cost/loss/error functions: regression: "quadratic"; classification: "log"/"crossentropy"
 
-Names of available optimizers/updaters: "" for vanilla stochastic gradient descent, "momentum", "adam", "nadam"
+Names of available optimizers/updaters: "" (for vanilla stochastic gradient descent), "momentum", "adam", "nadam"
