@@ -79,7 +79,7 @@ public class NNLib extends Application implements Serializable {
         private int threads;
         private final String NAME;
         private Layer[] network;
-        private final Random R = new Random();
+        private final Random RANDOM = new Random();
         private long seed;
         private final float lr;
         private double cost;
@@ -100,7 +100,7 @@ public class NNLib extends Application implements Serializable {
 
         NN(String name, long seed, double learningRate, Initializer weightInitializer, ActivationFunction hiddenActivationFunction, ActivationFunction outputActivationFunction, LossFunction lossFunction, Optimizer optimizer, int... layerNodes) {
             NAME = name;
-            R.setSeed(seed);
+            RANDOM.setSeed(seed);
             lr = (float) learningRate;
             INITIALIZER = weightInitializer;
             HIDDENACTIVATIONFUNCTION = hiddenActivationFunction;
@@ -157,7 +157,12 @@ public class NNLib extends Application implements Serializable {
         public int getNetworkSize() {
             return network.length;
         }
+        
+        public Random getNetworkRandom(){
+            return RANDOM;
+        }
 
+        @Override
         public NN clone() {
             NN nnCopy = new NN(NAME, seed, lr, INITIALIZER, HIDDENACTIVATIONFUNCTION, OUTPUTACTIVATIONFUNCTION, LOSSFUNCTION, OPTIMIZER, LAYERNODES);
             for (int i = 0; i < getNetworkSize(); i++) {
@@ -222,7 +227,7 @@ public class NNLib extends Application implements Serializable {
                 for (int j = 0; j < getNetworkLayer(i).biases.length; j++) {
                     for (int k = 0; k < getNetworkLayer(i).biases[0].length; k++) {
                         if (Math.random() < mutateRate) {
-                            getNetworkLayer(i).biases[j][k] = (float) (R.nextFloat() * range - (range / 2));
+                            getNetworkLayer(i).biases[j][k] = (float) (RANDOM.nextFloat() * range - (range / 2));
                         }
                     }
                 }
@@ -233,12 +238,12 @@ public class NNLib extends Application implements Serializable {
             for (int i = 0; i < getNetworkSize(); i++) {
                 for (int j = 0; j < getNetworkLayer(i).weights.length; j++) {
                     for (int k = 0; k < getNetworkLayer(i).weights[0].length; k++) {
-                        getNetworkLayer(i).weights[j][k] = (float) (R.nextFloat() * range - (range / 2));
+                        getNetworkLayer(i).weights[j][k] = (float) (RANDOM.nextFloat() * range - (range / 2));
                     }
                 }
                 for (int j = 0; j < getNetworkLayer(i).biases.length; j++) {
                     for (int k = 0; k < getNetworkLayer(i).biases[0].length; k++) {
-                        getNetworkLayer(i).biases[j][k] = (float) (R.nextFloat() * range - (range / 2));
+                        getNetworkLayer(i).biases[j][k] = (float) (RANDOM.nextFloat() * range - (range / 2));
                     }
                 }
             }
@@ -331,7 +336,7 @@ public class NNLib extends Application implements Serializable {
 
         public void setSeed(long seed) {
             this.seed = seed;
-            R.setSeed(seed);
+            RANDOM.setSeed(seed);
         }
 
         public void setActivationFunctionHiddens(ActivationFunction hiddenActivationFunction) {
@@ -662,7 +667,7 @@ public class NNLib extends Application implements Serializable {
             int columns = matrixResult[0].length;
             for (int i = 0; i < rows; i++) {
                 for (int j = 0; j < columns; j++) {
-                    matrixResult[i][j] = R.nextFloat() * range + minimum;
+                    matrixResult[i][j] = RANDOM.nextFloat() * range + minimum;
                 }
             }
             return matrixResult;

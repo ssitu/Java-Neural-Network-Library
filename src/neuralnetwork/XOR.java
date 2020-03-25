@@ -30,10 +30,10 @@ public class XOR {
         System.out.println(nn.NETWORKSIZE);
         System.out.println(nn.toString());
         ArrayList<Data> data = new ArrayList<>();
-        data.add(new Data(new float[]{1, 1}, new float[]{0}));
-        data.add(new Data(new float[]{0, 1}, new float[]{1}));
-        data.add(new Data(new float[]{1, 0}, new float[]{1}));
-        data.add(new Data(new float[]{0, 0}, new float[]{0}));
+        data.add(new Data(new float[]{1, 1}, new float[]{0}));//True, True = False
+        data.add(new Data(new float[]{0, 1}, new float[]{1}));//False, True = True
+        data.add(new Data(new float[]{1, 0}, new float[]{1}));//True, False = True
+        data.add(new Data(new float[]{0, 0}, new float[]{0}));//False, False = False
         NNLib.graph(false, nn);
         for (int i = 0; i < 10000000; i++) {
             int random = (int) (Math.random() * 4);
