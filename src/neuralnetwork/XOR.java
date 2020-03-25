@@ -20,7 +20,17 @@ public class XOR {
                 this.targets[0] = targets;
             }
         }
-        NNest.NN nn = new NNest().new NN("xor", .001, 7777, "sigmoid", "sigmoid", "quadratic", "nadam", 2, 2, 1);
+        NNLib.NN nn = new NNLib().new NN(
+                "xor",//Name for Saving & Graph Title
+                .001,//Learning Rate for Optimizer
+                7777,//Seed For Reproducibility
+                NNLib.ActivationFunction.SIGMOID,//Hiddens
+                NNLib.ActivationFunction.SIGMOID,//Outputs
+                NNLib.LossFunction.QUADRATIC,//Loss/Cost/Error Function
+                NNLib.Optimizer.NADAM,//Stochastic Gradient Descent Optimizer
+                2, 2, 1//Network Architecture
+        );
+
         System.out.println(nn.NETWORKSIZE);
         System.out.println(nn.toString());
         ArrayList<Data> data = new ArrayList<>();
@@ -36,7 +46,7 @@ public class XOR {
         data.get(2).addTargets(1);
         data.get(3).addInputs(0, 0);
         data.get(3).addTargets(0);
-        NNest.graph(false, nn);
+        NNLib.graph(false, nn);
         for (int i = 0; i < 10000000; i++) {
             int random = (int) (Math.random() * 4);
             nn.print(data.get(random).inputs, "inputs");
