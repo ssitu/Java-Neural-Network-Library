@@ -32,6 +32,10 @@ public class NNLib extends Application implements Serializable {
         VANILLA, MOMENTUM, ADAM, NADAM
     }
 
+    public enum Initializer {
+        VANILLA, HE, XAVIER
+    }
+
     private static boolean graphMeasuresAccuracy;
     private static NN nnForGraph;
 
@@ -42,11 +46,32 @@ public class NNLib extends Application implements Serializable {
             float[][] weights;
             float[][] biases;
 
-            Layer(int previousNodes, int nodes) {
-                weights = create(previousNodes, nodes, 0);
-                biases = create(1, nodes, 0);
-                weights = scale(randomize(weights, 2, -1), (float) Math.sqrt(2.0 / previousNodes));
+            Layer(int nodesIn, int nodesOut, Initializer initializer) {
+                weights = create(nodesIn, nodesOut, 0);
+                biases = create(1, nodesOut, 0);
+                weights = randomize(weights, 2, -1);
                 biases = randomize(biases, 2, -1);
+                if (Initializer.VANILLA == initializer) {
+                    weights = vanilla(weights);
+                } else if (Initializer.HE == initializer) {
+                    weights = he(weights, nodesIn);
+                } else if (Initializer.XAVIER == initializer) {
+                    weights = xavier(weights, nodesIn);
+                } else {
+                    throw new IllegalArgumentException("INVALID INITIALIZATION METHOD");
+                }
+            }
+
+            private float[][] vanilla(float[][] weights) {
+                return weights;
+            }
+
+            private float[][] he(float[][] weights, int nodesIn) {
+                return scale(weights, (float) Math.sqrt(2 / nodesIn));
+            }
+
+            private float[][] xavier(float[][] weights, int nodesIn) {
+                return scale(weights, (float) (1 / Math.sqrt(nodesIn)));
             }
         }
 
@@ -59,6 +84,7 @@ public class NNLib extends Application implements Serializable {
         private final float lr;
         private double cost;
         final int NETWORKSIZE;//Total layers not including the input layer
+        private final Initializer INITIALIZER;
         private final ActivationFunction HIDDENACTIVATIONFUNCTION;
         private final ActivationFunction OUTPUTACTIVATIONFUNCTION;
         private final LossFunction LOSSFUNCTION;
@@ -72,47 +98,28 @@ public class NNLib extends Application implements Serializable {
         private transient BiFunction<Float, float[][], BiFunction<float[][], float[][], float[][][]>> optimizer;
         private transient BiFunction<float[][], float[][], float[][]> dotProduct = (a, b) -> dot(a, b);
 
-        /**
-         * @param saveName Used in the name of the save file
-         * @param learningRate Learning rate for the gradient descent.
-         * @param seed Seed for reproducible random values.
-         * @param hiddenActivationFunction Activation function for the hidden
-         * layers (sigmoid, tanh, relu, leakyrelu).
-         * @param outputActivationFunction Activation function for the output
-         * layer (regression: sigmoid, tanh, linear; classification: softmax).
-         * @param lossFunction Cost function to measure error (regression:
-         * quadratic; classification: log/crossentropy).
-         * @param optimizer Gradient updater for stochastic gradient descent,
-         * leave blank for none (momentum, adam, nadam).
-         * @param layerNodes Amount of numbers specifies the amount of layers
-         * while the value of the numbers specifies the amount of neurons for
-         * that layer. Must have more than two numbers (input layer, hidden
-         * layers, output layer).
-         */
-        NN(String saveName, double learningRate, long seed, ActivationFunction hiddenActivationFunction, ActivationFunction outputActivationFunction, LossFunction lossFunction, Optimizer optimizer, int... layerNodes) {
-            NAME = saveName;
-            lr = (float) learningRate;
+        NN(String name, long seed, double learningRate, Initializer weightInitializer, ActivationFunction hiddenActivationFunction, ActivationFunction outputActivationFunction, LossFunction lossFunction, Optimizer optimizer, int... layerNodes) {
+            NAME = name;
             R.setSeed(seed);
-            this.HIDDENACTIVATIONFUNCTION = hiddenActivationFunction;
-            this.OUTPUTACTIVATIONFUNCTION = outputActivationFunction;
-            this.LOSSFUNCTION = lossFunction;
-            this.OPTIMIZER = optimizer;
-            this.LAYERNODES = layerNodes;
+            lr = (float) learningRate;
+            INITIALIZER = weightInitializer;
+            HIDDENACTIVATIONFUNCTION = hiddenActivationFunction;
+            OUTPUTACTIVATIONFUNCTION = outputActivationFunction;
+            LOSSFUNCTION = lossFunction;
+            OPTIMIZER = optimizer;
+            LAYERNODES = layerNodes;
             network = new Layer[layerNodes.length - 1];
-            if (layerNodes.length < 3) {
-                throw new IllegalArgumentException("MUST HAVE MORE THAN 2 LAYERS IN THE NEURAL NETWORK");
-            }
             //Activation functions for the hidden layers
-            setActivationFunctionHiddens(hiddenActivationFunction);
+            setActivationFunctionHiddens(HIDDENACTIVATIONFUNCTION);
             //Activation functions for the output layer
-            setActivationFunctionOutputs(outputActivationFunction);
+            setActivationFunctionOutputs(OUTPUTACTIVATIONFUNCTION);
             //Cost functions for the backpropagation
-            setLossFunction(lossFunction);
+            setLossFunction(LOSSFUNCTION);
             //Optimizer
-            setOptimizer(optimizer);
+            setOptimizer(OPTIMIZER);
             //Adding each layer
             for (int i = 1; i < layerNodes.length; i++) {
-                Layer layer = new Layer(layerNodes[i - 1], layerNodes[i]);
+                Layer layer = new Layer(layerNodes[i - 1], layerNodes[i], INITIALIZER);
                 network[i - 1] = layer;
             }
             NETWORKSIZE = network.length;
@@ -152,7 +159,7 @@ public class NNLib extends Application implements Serializable {
         }
 
         public NN clone() {
-            NN nnCopy = new NN(NAME, lr, seed, HIDDENACTIVATIONFUNCTION, OUTPUTACTIVATIONFUNCTION, LOSSFUNCTION, OPTIMIZER, LAYERNODES);
+            NN nnCopy = new NN(NAME, seed, lr, INITIALIZER, HIDDENACTIVATIONFUNCTION, OUTPUTACTIVATIONFUNCTION, LOSSFUNCTION, OPTIMIZER, LAYERNODES);
             for (int i = 0; i < getNetworkSize(); i++) {
                 nnCopy.getNetworkLayer(i).weights = copy(getNetworkLayer(i).weights);
                 nnCopy.getNetworkLayer(i).biases = copy(getNetworkLayer(i).biases);
@@ -461,18 +468,14 @@ public class NNLib extends Application implements Serializable {
         }
 
         private float relu(float x, boolean derivative) {
-            if (derivative == true) {
+            if (derivative) {
                 if (x < 0) {
                     return 0;
                 } else {
                     return 1;
                 }
             } else {
-                if (x < 0) {
-                    return 0;
-                } else {
-                    return x;
-                }
+                return Math.max(0, x);
             }
         }
 
@@ -496,11 +499,7 @@ public class NNLib extends Application implements Serializable {
                     return 1;
                 }
             } else {
-                if (x < 0) {
-                    return .001f * x;
-                } else {
-                    return x;
-                }
+                return Math.max(.001f * x, x);
             }
         }
 

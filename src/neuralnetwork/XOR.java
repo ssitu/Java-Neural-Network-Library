@@ -10,42 +10,30 @@ public class XOR {
             float[][] inputs;
             float[][] targets;
 
-            void addInputs(float... inputs) {
-                this.inputs = new float[1][inputs.length];
-                this.inputs[0] = inputs;
-            }
-
-            void addTargets(float... targets) {
-                this.targets = new float[1][targets.length];
-                this.targets[0] = targets;
+            Data(float[] inputs, float[] targets) {
+                this.inputs = new float[][]{inputs};
+                this.targets = new float[][]{targets};
             }
         }
         NNLib.NN nn = new NNLib().new NN(
                 "xor",//Name for Saving & Graph Title
-                .001,//Learning Rate for Optimizer
                 7777,//Seed For Reproducibility
+                .001,//Learning Rate for Optimizer
+                NNLib.Initializer.VANILLA,//Weight Initializer Method
                 NNLib.ActivationFunction.SIGMOID,//Hiddens
                 NNLib.ActivationFunction.SIGMOID,//Outputs
                 NNLib.LossFunction.QUADRATIC,//Loss/Cost/Error Function
-                NNLib.Optimizer.NADAM,//Stochastic Gradient Descent Optimizer
+                NNLib.Optimizer.ADAM,//Stochastic Gradient Descent Optimizer
                 2, 2, 1//Network Architecture
         );
 
         System.out.println(nn.NETWORKSIZE);
         System.out.println(nn.toString());
         ArrayList<Data> data = new ArrayList<>();
-        data.add(new Data());
-        data.add(new Data());
-        data.add(new Data());
-        data.add(new Data());
-        data.get(0).addInputs(1, 1);
-        data.get(0).addTargets(0);
-        data.get(1).addInputs(0, 1);
-        data.get(1).addTargets(1);
-        data.get(2).addInputs(1, 0);
-        data.get(2).addTargets(1);
-        data.get(3).addInputs(0, 0);
-        data.get(3).addTargets(0);
+        data.add(new Data(new float[]{1, 1}, new float[]{0}));
+        data.add(new Data(new float[]{0, 1}, new float[]{1}));
+        data.add(new Data(new float[]{1, 0}, new float[]{1}));
+        data.add(new Data(new float[]{0, 0}, new float[]{0}));
         NNLib.graph(false, nn);
         for (int i = 0; i < 10000000; i++) {
             int random = (int) (Math.random() * 4);

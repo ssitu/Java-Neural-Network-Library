@@ -17,8 +17,9 @@ public class XOR_Classification {
         }
         NNLib.NN nn = new NNLib().new NN(
                 "xor_classification",//Name for Saving & Graph Title
-                .001,//Learning Rate for Optimizer
                 7777,//Seed For Reproducibility
+                .001,//Learning Rate for Optimizer
+                NNLib.Initializer.VANILLA,//Weight Initializer Method
                 NNLib.ActivationFunction.SIGMOID,//Hiddens
                 NNLib.ActivationFunction.SOFTMAX,//Outputs
                 NNLib.LossFunction.CROSS_ENTROPY,//Loss/Cost/Error Function
