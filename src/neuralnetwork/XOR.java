@@ -27,6 +27,8 @@ public class XOR {
                 2, 2, 1//Network Architecture
         );
 
+        nn.load();
+        
         System.out.println(nn.NETWORKSIZE);
         System.out.println(nn.toString());
         ArrayList<Data> data = new ArrayList<>();
@@ -41,6 +43,9 @@ public class XOR {
 //            nn.print(nn.feedforward(data.get(index).inputs), "feedforward");
 //            System.out.println("");
             nn.backpropagation(data.get(index).inputs, data.get(index).targets);
+            if(i % 10000 == 0){
+                nn.save();
+            }
         }
         System.exit(0);
     }

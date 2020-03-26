@@ -87,7 +87,7 @@ public class NNLib extends Application implements Serializable {
         private int threads;
         private final String NAME;
         private Layer[] network;
-        private final Random RANDOM = new Random();
+        private Random random = new Random();
         private long seed;
         private final float lr;
         private double cost;
@@ -108,7 +108,7 @@ public class NNLib extends Application implements Serializable {
 
         NN(String name, long seed, double learningRate, Initializer weightInitializer, ActivationFunction hiddenActivationFunction, ActivationFunction outputActivationFunction, LossFunction lossFunction, Optimizer optimizer, int... layerNodes) {
             NAME = name;
-            RANDOM.setSeed(seed);
+            random.setSeed(seed);
             lr = (float) learningRate;
             INITIALIZER = weightInitializer;
             HIDDENACTIVATIONFUNCTION = hiddenActivationFunction;
@@ -166,7 +166,7 @@ public class NNLib extends Application implements Serializable {
         }
 
         public Random getRandom() {
-            return RANDOM;
+            return random;
         }
 
         @Override
@@ -185,6 +185,7 @@ public class NNLib extends Application implements Serializable {
                 ObjectOutputStream out = new ObjectOutputStream(fileOut);
                 out.writeObject(this);
             } catch (IOException e) {
+                e.printStackTrace();
             }
         }
 
@@ -192,10 +193,14 @@ public class NNLib extends Application implements Serializable {
             try {
                 FileInputStream fileIn = new FileInputStream(System.getProperty("user.dir") + "/" + NAME + "_neuralnetwork(" + toString() + ")");
                 ObjectInputStream in = new ObjectInputStream(fileIn);
-                network = ((NN) in.readObject()).network;
+                NN nn = (NN) in.readObject();
 //                random = ((NN)in.readObject()).random;
+//                network = ((NN)in.readObject()).network;
+                network = nn.network;
+                random = nn.random;
                 return true;
             } catch (IOException | ClassNotFoundException e) {
+                e.printStackTrace();
                 System.out.println("Could not load network settings.");
                 return false;
             }
@@ -232,7 +237,7 @@ public class NNLib extends Application implements Serializable {
                 for (int j = 0; j < getNetworkLayer(i).biases.length; j++) {
                     for (int k = 0; k < getNetworkLayer(i).biases[0].length; k++) {
                         if (Math.random() < mutateRate) {
-                            getNetworkLayer(i).biases[j][k] = (float) (RANDOM.nextFloat() * range - (range / 2));
+                            getNetworkLayer(i).biases[j][k] = (float) (random.nextFloat() * range - (range / 2));
                         }
                     }
                 }
@@ -243,12 +248,12 @@ public class NNLib extends Application implements Serializable {
             for (int i = 0; i < getNetworkSize(); i++) {
                 for (int j = 0; j < getNetworkLayer(i).weights.length; j++) {
                     for (int k = 0; k < getNetworkLayer(i).weights[0].length; k++) {
-                        getNetworkLayer(i).weights[j][k] = (float) (RANDOM.nextFloat() * range - (range / 2));
+                        getNetworkLayer(i).weights[j][k] = (float) (random.nextFloat() * range - (range / 2));
                     }
                 }
                 for (int j = 0; j < getNetworkLayer(i).biases.length; j++) {
                     for (int k = 0; k < getNetworkLayer(i).biases[0].length; k++) {
-                        getNetworkLayer(i).biases[j][k] = (float) (RANDOM.nextFloat() * range - (range / 2));
+                        getNetworkLayer(i).biases[j][k] = (float) (random.nextFloat() * range - (range / 2));
                     }
                 }
             }
@@ -341,98 +346,107 @@ public class NNLib extends Application implements Serializable {
 
         public void setSeed(long seed) {
             this.seed = seed;
-            RANDOM.setSeed(seed);
+            random.setSeed(seed);
         }
 
         public void setActivationFunctionHiddens(ActivationFunction hiddenActivationFunction) {
             if (null == hiddenActivationFunction) {
                 throw new IllegalArgumentException("INVALID ACTIVATION FUNCTION FOR THE HIDDEN LAYER");
-            } else switch (hiddenActivationFunction) {
-                case SIGMOID:
-                    activationHiddens = (a, b) -> activationSigmoid(a, b);
-                    break;
-                case TANH:
-                    activationHiddens = (a, b) -> activationTanh(a, b);
-                    break;
-                case RELU:
-                    activationHiddens = (a, b) -> activationRelu(a, b);
-                    break;
-                case LEAKYRELU:
-                    activationHiddens = (a, b) -> activationLeakyRelu(a, b);
-                    break;
-                case LINEAR:
-                    activationHiddens = (a, b) -> activationLinear(a, b);
-                    break;
-                case SOFTMAX:
-                    activationHiddens = (a, b) -> activationSoftmax(a, b);
-                    break;
-                default:
-                    throw new IllegalArgumentException("INVALID ACTIVATION FUNCTION FOR THE HIDDEN LAYER");
+            } else {
+                switch (hiddenActivationFunction) {
+                    case SIGMOID:
+                        activationHiddens = (a, b) -> activationSigmoid(a, b);
+                        break;
+                    case TANH:
+                        activationHiddens = (a, b) -> activationTanh(a, b);
+                        break;
+                    case RELU:
+                        activationHiddens = (a, b) -> activationRelu(a, b);
+                        break;
+                    case LEAKYRELU:
+                        activationHiddens = (a, b) -> activationLeakyRelu(a, b);
+                        break;
+                    case LINEAR:
+                        activationHiddens = (a, b) -> activationLinear(a, b);
+                        break;
+                    case SOFTMAX:
+                        activationHiddens = (a, b) -> activationSoftmax(a, b);
+                        break;
+                    default:
+                        throw new IllegalArgumentException("INVALID ACTIVATION FUNCTION FOR THE HIDDEN LAYER");
+                }
             }
         }
 
         public void setActivationFunctionOutputs(ActivationFunction outputActivationFunction) {
             if (null == outputActivationFunction) {
                 throw new IllegalArgumentException("INVALID ACTIVATION FUNCTION FOR THE OUTPUT LAYER");
-            } else switch (outputActivationFunction) {
-                case SIGMOID:
-                    activationOutputs = (a, b) -> activationSigmoid(a, b);
-                    break;
-                case TANH:
-                    activationOutputs = (a, b) -> activationTanh(a, b);
-                    break;
-                case RELU:
-                    activationOutputs = (a, b) -> activationRelu(a, b);
-                    break;
-                case LEAKYRELU:
-                    activationOutputs = (a, b) -> activationLeakyRelu(a, b);
-                    break;
-                case LINEAR:
-                    activationOutputs = (a, b) -> activationLinear(a, b);
-                    break;
-                case SOFTMAX:
-                    activationOutputs = (a, b) -> activationSoftmax(a, b);
-                    break;
-                default:
-                    throw new IllegalArgumentException("INVALID ACTIVATION FUNCTION FOR THE OUTPUT LAYER");
+            } else {
+                switch (outputActivationFunction) {
+                    case SIGMOID:
+                        activationOutputs = (a, b) -> activationSigmoid(a, b);
+                        break;
+                    case TANH:
+                        activationOutputs = (a, b) -> activationTanh(a, b);
+                        break;
+                    case RELU:
+                        activationOutputs = (a, b) -> activationRelu(a, b);
+                        break;
+                    case LEAKYRELU:
+                        activationOutputs = (a, b) -> activationLeakyRelu(a, b);
+                        break;
+                    case LINEAR:
+                        activationOutputs = (a, b) -> activationLinear(a, b);
+                        break;
+                    case SOFTMAX:
+                        activationOutputs = (a, b) -> activationSoftmax(a, b);
+                        break;
+                    default:
+                        throw new IllegalArgumentException("INVALID ACTIVATION FUNCTION FOR THE OUTPUT LAYER");
+                }
             }
         }
 
         public void setLossFunction(LossFunction lossFunction) {
             if (null == lossFunction) {
                 throw new IllegalArgumentException("INVALID COST FUNCTION");
-            } else switch (lossFunction) {
-                case QUADRATIC:
-                    this.lossFunction = (a, b) -> (c) -> lossQuadratic(a, b, c);
-                    break;
-            //The target should be passed as making the correct classification as the highest value
-                case CROSS_ENTROPY:
-                    this.lossFunction = (a, b) -> (c) -> lossLog(a, b, c);
-                    break;
-                default:
-                    throw new IllegalArgumentException("INVALID COST FUNCTION");
+            } else {
+                switch (lossFunction) {
+                    case QUADRATIC:
+                        this.lossFunction = (a, b) -> (c) -> lossQuadratic(a, b, c);
+                        break;
+                    //The target should be passed as making the correct classification as the highest value
+                    case CROSS_ENTROPY:
+                        this.lossFunction = (a, b) -> (c) -> lossLog(a, b, c);
+                        break;
+                    default:
+                        throw new IllegalArgumentException("INVALID COST FUNCTION");
+                }
             }
         }
 
         public void setOptimizer(Optimizer optimizer) {
             if (null == optimizer) {
                 throw new IllegalArgumentException("INVALID OPTIMIZER");
-            } else switch (optimizer) {
-                case VANILLA:
-                    this.optimizer = (a, b) -> (c, d) -> {
-                        return new float[][][]{scale(a, b), null, null};
-                    };  break;
-                case MOMENTUM:
-                    this.optimizer = (a, b) -> (c, d) -> momentum(a, b, c);
-                    break;
-                case ADAM:
-                    this.optimizer = (a, b) -> (c, d) -> adam(a, b, c, d);
-                    break;
-                case NADAM:
-                    this.optimizer = (a, b) -> (c, d) -> nadam(a, b, c, d);
-                    break;
-                default:
-                    throw new IllegalArgumentException("INVALID OPTIMIZER");
+            } else {
+                switch (optimizer) {
+                    case VANILLA:
+                        this.optimizer = (a, b) -> (c, d) -> {
+                            return new float[][][]{scale(a, b), null, null};
+                        };
+                        break;
+                    case MOMENTUM:
+                        this.optimizer = (a, b) -> (c, d) -> momentum(a, b, c);
+                        break;
+                    case ADAM:
+                        this.optimizer = (a, b) -> (c, d) -> adam(a, b, c, d);
+                        break;
+                    case NADAM:
+                        this.optimizer = (a, b) -> (c, d) -> nadam(a, b, c, d);
+                        break;
+                    default:
+                        throw new IllegalArgumentException("INVALID OPTIMIZER");
+                }
             }
         }
 
@@ -701,7 +715,7 @@ public class NNLib extends Application implements Serializable {
             int columns = matrixResult[0].length;
             for (int i = 0; i < rows; i++) {
                 for (int j = 0; j < columns; j++) {
-                    matrixResult[i][j] = RANDOM.nextFloat() * range + minimum;
+                    matrixResult[i][j] = random.nextFloat() * range + minimum;
                 }
             }
             return matrixResult;
@@ -888,7 +902,7 @@ public class NNLib extends Application implements Serializable {
             for (int i = 0; i < threads; i++) {
                 try {
                     threadArray[i].join();
-                } catch (Exception e) {
+                } catch (InterruptedException e) {
 
                 }
             }
