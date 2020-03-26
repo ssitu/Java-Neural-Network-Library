@@ -194,8 +194,6 @@ public class NNLib extends Application implements Serializable {
                 FileInputStream fileIn = new FileInputStream(System.getProperty("user.dir") + "/" + NAME + "_neuralnetwork(" + toString() + ")");
                 ObjectInputStream in = new ObjectInputStream(fileIn);
                 NN nn = (NN) in.readObject();
-//                random = ((NN)in.readObject()).random;
-//                network = ((NN)in.readObject()).network;
                 network = nn.network;
                 random = nn.random;
                 return true;
