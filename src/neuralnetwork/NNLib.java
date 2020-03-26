@@ -39,7 +39,7 @@ public class NNLib extends Application implements Serializable {
     private static boolean graphMeasuresAccuracy;
     private static NN nnForGraph;
 
-    public class NN implements Serializable {
+    public final class NN implements Serializable {
 
         private class Layer implements Serializable {
 
@@ -51,14 +51,22 @@ public class NNLib extends Application implements Serializable {
                 biases = create(1, nodesOut, 0);
                 weights = randomize(weights, 2, -1);
                 biases = randomize(biases, 2, -1);
-                if (Initializer.VANILLA == initializer) {
-                    weights = vanilla(weights);
-                } else if (Initializer.HE == initializer) {
-                    weights = he(weights, nodesIn);
-                } else if (Initializer.XAVIER == initializer) {
-                    weights = xavier(weights, nodesIn);
-                } else {
+                if (null == initializer) {
                     throw new IllegalArgumentException("INVALID INITIALIZATION METHOD");
+                } else {
+                    switch (initializer) {
+                        case VANILLA:
+                            weights = vanilla(weights);
+                            break;
+                        case HE:
+                            weights = he(weights, nodesIn);
+                            break;
+                        case XAVIER:
+                            weights = xavier(weights, nodesIn);
+                            break;
+                        default:
+                            throw new IllegalArgumentException("INVALID INITIALIZATION METHOD");
+                    }
                 }
             }
 
@@ -90,8 +98,8 @@ public class NNLib extends Application implements Serializable {
         private final LossFunction LOSSFUNCTION;
         private final Optimizer OPTIMIZER;
         private final int[] LAYERNODES;
-        private float[][][][] previousMomentsW;
-        private float[][][][] previousMomentsB;
+        private final float[][][][] previousMomentsW;
+        private final float[][][][] previousMomentsB;
         private transient BiFunction<float[][], Boolean, float[][]> activationHiddens;
         private transient BiFunction<float[][], Boolean, float[][]> activationOutputs;
         private transient BiFunction<float[][], float[][], Function<Boolean, float[][]>> lossFunction;
@@ -149,7 +157,6 @@ public class NNLib extends Application implements Serializable {
             try {
                 return network[layerIndex];
             } catch (Exception e) {
-                e.printStackTrace();
             }
             return null;
         }
@@ -157,8 +164,8 @@ public class NNLib extends Application implements Serializable {
         public int getNetworkSize() {
             return network.length;
         }
-        
-        public Random getNetworkRandom(){
+
+        public Random getRandom() {
             return RANDOM;
         }
 
@@ -178,7 +185,6 @@ public class NNLib extends Application implements Serializable {
                 ObjectOutputStream out = new ObjectOutputStream(fileOut);
                 out.writeObject(this);
             } catch (IOException e) {
-                e.printStackTrace();
             }
         }
 
@@ -191,7 +197,6 @@ public class NNLib extends Application implements Serializable {
                 return true;
             } catch (IOException | ClassNotFoundException e) {
                 System.out.println("Could not load network settings.");
-                e.printStackTrace();
                 return false;
             }
         }
@@ -340,65 +345,94 @@ public class NNLib extends Application implements Serializable {
         }
 
         public void setActivationFunctionHiddens(ActivationFunction hiddenActivationFunction) {
-            if (ActivationFunction.SIGMOID == hiddenActivationFunction) {
-                activationHiddens = (a, b) -> activationSigmoid(a, b);
-            } else if (ActivationFunction.TANH == hiddenActivationFunction) {
-                activationHiddens = (a, b) -> activationTanh(a, b);
-            } else if (ActivationFunction.RELU == hiddenActivationFunction) {
-                activationHiddens = (a, b) -> activationRelu(a, b);
-            } else if (ActivationFunction.LEAKYRELU == hiddenActivationFunction) {
-                activationHiddens = (a, b) -> activationLeakyRelu(a, b);
-            } else if (ActivationFunction.LINEAR == hiddenActivationFunction) {
-                activationHiddens = (a, b) -> activationLinear(a, b);
-            } else if (ActivationFunction.SOFTMAX == hiddenActivationFunction) {
-                activationHiddens = (a, b) -> activationSoftmax(a, b);
-            } else {
+            if (null == hiddenActivationFunction) {
                 throw new IllegalArgumentException("INVALID ACTIVATION FUNCTION FOR THE HIDDEN LAYER");
+            } else switch (hiddenActivationFunction) {
+                case SIGMOID:
+                    activationHiddens = (a, b) -> activationSigmoid(a, b);
+                    break;
+                case TANH:
+                    activationHiddens = (a, b) -> activationTanh(a, b);
+                    break;
+                case RELU:
+                    activationHiddens = (a, b) -> activationRelu(a, b);
+                    break;
+                case LEAKYRELU:
+                    activationHiddens = (a, b) -> activationLeakyRelu(a, b);
+                    break;
+                case LINEAR:
+                    activationHiddens = (a, b) -> activationLinear(a, b);
+                    break;
+                case SOFTMAX:
+                    activationHiddens = (a, b) -> activationSoftmax(a, b);
+                    break;
+                default:
+                    throw new IllegalArgumentException("INVALID ACTIVATION FUNCTION FOR THE HIDDEN LAYER");
             }
         }
 
         public void setActivationFunctionOutputs(ActivationFunction outputActivationFunction) {
-            if (ActivationFunction.SIGMOID == outputActivationFunction) {
-                activationOutputs = (a, b) -> activationSigmoid(a, b);
-            } else if (ActivationFunction.TANH == outputActivationFunction) {
-                activationOutputs = (a, b) -> activationTanh(a, b);
-            } else if (ActivationFunction.RELU == outputActivationFunction) {
-                activationOutputs = (a, b) -> activationRelu(a, b);
-            } else if (ActivationFunction.LEAKYRELU == outputActivationFunction) {
-                activationOutputs = (a, b) -> activationLeakyRelu(a, b);
-            } else if (ActivationFunction.LINEAR == outputActivationFunction) {
-                activationOutputs = (a, b) -> activationLinear(a, b);
-            } else if (ActivationFunction.SOFTMAX == outputActivationFunction) {
-                activationOutputs = (a, b) -> activationSoftmax(a, b);
-            } else {
+            if (null == outputActivationFunction) {
                 throw new IllegalArgumentException("INVALID ACTIVATION FUNCTION FOR THE OUTPUT LAYER");
+            } else switch (outputActivationFunction) {
+                case SIGMOID:
+                    activationOutputs = (a, b) -> activationSigmoid(a, b);
+                    break;
+                case TANH:
+                    activationOutputs = (a, b) -> activationTanh(a, b);
+                    break;
+                case RELU:
+                    activationOutputs = (a, b) -> activationRelu(a, b);
+                    break;
+                case LEAKYRELU:
+                    activationOutputs = (a, b) -> activationLeakyRelu(a, b);
+                    break;
+                case LINEAR:
+                    activationOutputs = (a, b) -> activationLinear(a, b);
+                    break;
+                case SOFTMAX:
+                    activationOutputs = (a, b) -> activationSoftmax(a, b);
+                    break;
+                default:
+                    throw new IllegalArgumentException("INVALID ACTIVATION FUNCTION FOR THE OUTPUT LAYER");
             }
         }
 
         public void setLossFunction(LossFunction lossFunction) {
-            if (LossFunction.QUADRATIC == lossFunction) {
-                this.lossFunction = (a, b) -> (c) -> lossQuadratic(a, b, c);
-            } else if (LossFunction.CROSS_ENTROPY == lossFunction)//The target should be passed as making the correct classification as the highest value
-            {
-                this.lossFunction = (a, b) -> (c) -> lossLog(a, b, c);
-            } else {
+            if (null == lossFunction) {
                 throw new IllegalArgumentException("INVALID COST FUNCTION");
+            } else switch (lossFunction) {
+                case QUADRATIC:
+                    this.lossFunction = (a, b) -> (c) -> lossQuadratic(a, b, c);
+                    break;
+            //The target should be passed as making the correct classification as the highest value
+                case CROSS_ENTROPY:
+                    this.lossFunction = (a, b) -> (c) -> lossLog(a, b, c);
+                    break;
+                default:
+                    throw new IllegalArgumentException("INVALID COST FUNCTION");
             }
         }
 
         public void setOptimizer(Optimizer optimizer) {
-            if (Optimizer.VANILLA == optimizer) {
-                this.optimizer = (a, b) -> (c, d) -> {
-                    return new float[][][]{scale(a, b), null, null};
-                };
-            } else if (Optimizer.MOMENTUM == optimizer) {
-                this.optimizer = (a, b) -> (c, d) -> momentum(a, b, c);
-            } else if (Optimizer.ADAM == optimizer) {
-                this.optimizer = (a, b) -> (c, d) -> adam(a, b, c, d);
-            } else if (Optimizer.NADAM == optimizer) {
-                this.optimizer = (a, b) -> (c, d) -> nadam(a, b, c, d);
-            } else {
+            if (null == optimizer) {
                 throw new IllegalArgumentException("INVALID OPTIMIZER");
+            } else switch (optimizer) {
+                case VANILLA:
+                    this.optimizer = (a, b) -> (c, d) -> {
+                        return new float[][][]{scale(a, b), null, null};
+                    };  break;
+                case MOMENTUM:
+                    this.optimizer = (a, b) -> (c, d) -> momentum(a, b, c);
+                    break;
+                case ADAM:
+                    this.optimizer = (a, b) -> (c, d) -> adam(a, b, c, d);
+                    break;
+                case NADAM:
+                    this.optimizer = (a, b) -> (c, d) -> nadam(a, b, c, d);
+                    break;
+                default:
+                    throw new IllegalArgumentException("INVALID OPTIMIZER");
             }
         }
 

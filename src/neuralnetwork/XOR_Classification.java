@@ -37,10 +37,10 @@ public class XOR_Classification {
         data.add(new Data(new float[]{0, 0}, new float[]{0, 1}));
         NNLib.graph(false, nn);
         for (int i = 0; i < 10000000; i++) {
-            int random = (int) (Math.random() * 4);
-            nn.print(data.get(random).inputs, "inputs");
-            nn.print(nn.feedforward(data.get(random).inputs), "feedforward");
-            nn.backpropagation(data.get(random).inputs, data.get(random).targets);
+            int index = nn.getRandom().nextInt(4);
+            nn.print(data.get(index).inputs, "inputs");
+            nn.print(nn.feedforward(data.get(index).inputs), "feedforward");
+            nn.backpropagation(data.get(index).inputs, data.get(index).targets);
         }
         System.exit(0);
     }
