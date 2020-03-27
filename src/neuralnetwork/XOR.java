@@ -26,9 +26,6 @@ public class XOR {
                 NNLib.Optimizer.ADAM,//Stochastic Gradient Descent Optimizer
                 2, 2, 1//Network Architecture
         );
-
-        nn.load();
-        
         System.out.println(nn.NETWORKSIZE);
         System.out.println(nn.toString());
         ArrayList<Data> data = new ArrayList<>();
@@ -39,13 +36,10 @@ public class XOR {
         NNLib.graph(false, nn);
         for (int i = 0; i < 10000000; i++) {
             int index = nn.getRandom().nextInt(4);
-//            nn.print(data.get(index).inputs, "inputs");
-//            nn.print(nn.feedforward(data.get(index).inputs), "feedforward");
-//            System.out.println("");
+            nn.print(data.get(index).inputs, "inputs");
+            nn.print(nn.feedforward(data.get(index).inputs), "feedforward");
+            System.out.println("");
             nn.backpropagation(data.get(index).inputs, data.get(index).targets);
-            if(i % 10000 == 0){
-                nn.save();
-            }
         }
         System.exit(0);
     }

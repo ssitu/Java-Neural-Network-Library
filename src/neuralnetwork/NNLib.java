@@ -116,7 +116,6 @@ public class NNLib extends Application implements Serializable {
             LOSSFUNCTION = lossFunction;
             OPTIMIZER = optimizer;
             LAYERNODES = layerNodes;
-            network = new Layer[layerNodes.length - 1];
             //Activation functions for the hidden layers
             setActivationFunctionHiddens(HIDDENACTIVATIONFUNCTION);
             //Activation functions for the output layer
@@ -126,6 +125,7 @@ public class NNLib extends Application implements Serializable {
             //Optimizer
             setOptimizer(OPTIMIZER);
             //Adding each layer
+            network = new Layer[layerNodes.length - 1];
             for (int i = 1; i < layerNodes.length; i++) {
                 Layer layer = new Layer(layerNodes[i - 1], layerNodes[i], INITIALIZER);
                 network[i - 1] = layer;
@@ -154,11 +154,7 @@ public class NNLib extends Application implements Serializable {
         }
 
         public Layer getNetworkLayer(int layerIndex) {//Layer 0 is the layer after the inputs (first hidden layer)
-            try {
-                return network[layerIndex];
-            } catch (Exception e) {
-            }
-            return null;
+            return network[layerIndex];
         }
 
         public int getNetworkSize() {
