@@ -5,6 +5,7 @@ import java.util.ArrayList;
 public class XOR_Classification {
 
     public static void main(String[] args) {
+        final boolean PRINT = true;
         class Data {
 
             float[][] inputs;
@@ -23,7 +24,7 @@ public class XOR_Classification {
                 NNLib.ActivationFunction.SIGMOID,//Hiddens
                 NNLib.ActivationFunction.SOFTMAX,//Outputs
                 NNLib.LossFunction.CROSS_ENTROPY,//Loss/Cost/Error Function
-                NNLib.Optimizer.NADAM,//Stochastic Gradient Descent Optimizer
+                NNLib.Optimizer.AMSGRAD,//Stochastic Gradient Descent Optimizer
                 2, 2, 2//Network Architecture
         );
         System.out.println(nn.NETWORKSIZE);
@@ -38,8 +39,11 @@ public class XOR_Classification {
         NNLib.graph(false, nn);
         for (int i = 0; i < 10000000; i++) {
             int index = nn.getRandom().nextInt(4);
-            nn.print(data.get(index).inputs, "inputs");
-            nn.print(nn.feedforward(data.get(index).inputs), "feedforward");
+            if (PRINT) {
+                nn.print(data.get(index).inputs, "inputs");
+                nn.print(nn.feedforward(data.get(index).inputs), "feedforward");
+                System.out.println("");
+            }
             nn.backpropagation(data.get(index).inputs, data.get(index).targets);
         }
         System.exit(0);

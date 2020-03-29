@@ -5,6 +5,7 @@ import java.util.ArrayList;
 public class XOR {
 
     public static void main(String[] args) {
+        final boolean PRINT = true;
         class Data {
 
             float[][] inputs;
@@ -18,27 +19,30 @@ public class XOR {
         NNLib.NN nn = new NNLib().new NN(
                 "xor",//Name for Saving & Graph Title
                 7777,//Seed For Reproducibility
-                .001,//Learning Rate for Optimizer
+                .1,//Learning Rate for Optimizer
                 NNLib.Initializer.VANILLA,//Weight Initializer Method
                 NNLib.ActivationFunction.SIGMOID,//Hiddens
                 NNLib.ActivationFunction.SIGMOID,//Outputs
                 NNLib.LossFunction.QUADRATIC,//Loss/Cost/Error Function
-                NNLib.Optimizer.ADAM,//Stochastic Gradient Descent Optimizer
+                NNLib.Optimizer.VANILLA,//Stochastic Gradient Descent Optimizer
                 2, 2, 1//Network Architecture
         );
         System.out.println(nn.NETWORKSIZE);
         System.out.println(nn.toString());
         ArrayList<Data> data = new ArrayList<>();
+
         data.add(new Data(new float[]{1, 1}, new float[]{0}));//True, True = False
         data.add(new Data(new float[]{0, 1}, new float[]{1}));//False, True = True
         data.add(new Data(new float[]{1, 0}, new float[]{1}));//True, False = True
         data.add(new Data(new float[]{0, 0}, new float[]{0}));//False, False = False
         NNLib.graph(false, nn);
-        for (int i = 0; i < 10000000; i++) {
+        for (int i = 0; i < 1000000000; i++) {
             int index = nn.getRandom().nextInt(4);
-            nn.print(data.get(index).inputs, "inputs");
-            nn.print(nn.feedforward(data.get(index).inputs), "feedforward");
-            System.out.println("");
+            if (PRINT) {
+                nn.print(data.get(index).inputs, "inputs");
+                nn.print(nn.feedforward(data.get(index).inputs), "feedforward");
+                System.out.println("");
+            }
             nn.backpropagation(data.get(index).inputs, data.get(index).targets);
         }
         System.exit(0);
