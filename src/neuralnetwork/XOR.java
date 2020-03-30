@@ -31,6 +31,7 @@ public class XOR {
         System.out.println(nn.toString());
         ArrayList<Data> data = new ArrayList<>();
 
+        //XOR truth table
         data.add(new Data(new float[]{1, 1}, new float[]{0}));//True, True = False
         data.add(new Data(new float[]{0, 1}, new float[]{1}));//False, True = True
         data.add(new Data(new float[]{1, 0}, new float[]{1}));//True, False = True

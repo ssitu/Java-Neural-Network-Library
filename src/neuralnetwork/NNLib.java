@@ -776,7 +776,6 @@ public class NNLib extends Application implements Serializable {
         }
 
         public float[][] randomize(float[][] matrix, float range, float minimum) {
-            sizeException(matrix);
             float[][] matrixResult = matrix;
             int rows = matrixResult.length;
             int columns = matrixResult[0].length;
@@ -789,7 +788,6 @@ public class NNLib extends Application implements Serializable {
         }
 
         public float[][] transpose(float[][] matrix) {
-            sizeException(matrix);
             float[][] matrixResult = new float[matrix[0].length][matrix.length];
             int rows = matrix.length;
             int columns = matrix[0].length;
@@ -802,7 +800,6 @@ public class NNLib extends Application implements Serializable {
         }
 
         public float[][] scale(float[][] matrix, float factor) {
-            sizeException(matrix);
             int rows = matrix.length;
             int columns = matrix[0].length;
             float[][] matrixResult = new float[rows][columns];
@@ -815,7 +812,6 @@ public class NNLib extends Application implements Serializable {
         }
 
         public float[][] scale(float factor, float[][] matrix) {
-            sizeException(matrix);
             int rows = matrix.length;
             int columns = matrix[0].length;
             float[][] matrixResult = new float[rows][columns];
@@ -828,9 +824,6 @@ public class NNLib extends Application implements Serializable {
         }
 
         public float[][] add(float[][] matrixA, float[][] matrixB) {
-            sizeException(matrixA);
-            sizeException(matrixB);
-            dimensionMismatch(matrixA, matrixB);
             int rows = matrixA.length;
             int columns = matrixA[0].length;
             float[][] matrixResult = new float[rows][columns];
@@ -843,9 +836,6 @@ public class NNLib extends Application implements Serializable {
         }
 
         public float[][] subtract(float[][] matrixA, float[][] matrixB) {
-            sizeException(matrixA);
-            sizeException(matrixB);
-            dimensionMismatch(matrixA, matrixB);
             int rows = matrixA.length;
             int columns = matrixA[0].length;
             float[][] matrixResult = new float[rows][columns];
@@ -858,9 +848,6 @@ public class NNLib extends Application implements Serializable {
         }
 
         public float[][] multiply(float[][] matrixA, float[][] matrixB) {
-            sizeException(matrixA);
-            sizeException(matrixB);
-            dimensionMismatch(matrixA, matrixB);
             int rows = matrixA.length;
             int columns = matrixA[0].length;
             float[][] matrixResult = new float[rows][columns];
@@ -873,9 +860,6 @@ public class NNLib extends Application implements Serializable {
         }
 
         public float[][] divide(float[][] matrixA, float[][] matrixB) {
-            sizeException(matrixA);
-            sizeException(matrixB);
-            dimensionMismatch(matrixA, matrixB);
             int rows = matrixA.length;
             int columns = matrixA[0].length;
             float[][] matrixResult = new float[rows][columns];
@@ -888,26 +872,18 @@ public class NNLib extends Application implements Serializable {
         }
 
         public float[][] dot(float[][] m1, float[][] m2) {
-            //make sure lengths of rows are the same for each matrix
-            sizeException(m1);
-            sizeException(m2);
-            dotDimensionMismatch(m1, m2);
             int rows = m1.length;
             int columns = m2[0].length;
             int columns2 = m1[0].length;
-            float[][] matrixResult = new float[rows][columns];//result matrix
-            //multiply A row elements by B column elements = 1 element in result matrix
-            for (int i = 0; i < rows; i++)//A rows or B columns or Result rows
-            {
-                for (int k = 0; k < columns2; k++)//A rows or B columns or Result columns
-                {
-                    for (int j = 0; j < columns; j++)//A columns or B rows
-                    {
-                        matrixResult[i][j] += m1[i][k] * m2[k][j];//Making the j loop the inner most loop improves performance than if k or i is the inner most loop
+            float[][] result = new float[rows][columns];
+            for (int i = 0; i < rows; i++) {
+                for (int k = 0; k < columns2; k++) {
+                    for (int j = 0; j < columns; j++) {
+                        result[i][j] += m1[i][k] * m2[k][j];
                     }
                 }
             }
-            return matrixResult;
+            return result;
         }
 
         private class MatrixThread extends Thread {
@@ -954,9 +930,6 @@ public class NNLib extends Application implements Serializable {
         }
 
         public float[][] dotThreads(float[][] m1, float[][] m2) {
-            sizeException(m1);
-            sizeException(m2);
-            dotDimensionMismatch(m1, m2);
             MatrixThread[] threadArray = new MatrixThread[threads];
             int rows = m1.length;
             int columns = m2[0].length;
