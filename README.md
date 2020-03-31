@@ -15,17 +15,20 @@ NNLib.graphJFX(boolean, NN) should be used when working with JavaFX applications
 The parameters take in enums from the NNLib class:
 
     public enum LossFunction {
-        QUADRATIC, CROSS_ENTROPY
+        QUADRATIC,
+        CROSS_ENTROPY
     }
 
     public enum ActivationFunction {
-        SIGMOID, TANH, RELU, LEAKYRELU, LINEAR, SOFTMAX
+        LINEAR, SIGMOID, TANH, RELU, LEAKYRELU, SWISH, MISH,
+        SOFTMAX
     }
 
     public enum Optimizer {
-        VANILLA, MOMENTUM, ADAM, NADAM
+        VANILLA, MOMENTUM, RMSPROP, ADAM, ADAMAX, NADAM, AMSGRAD
     }
 
     public enum Initializer {
-        VANILLA, HE, XAVIER
+        VANILLA, XAVIER, HE
     }
+
