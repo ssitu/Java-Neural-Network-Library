@@ -21,9 +21,8 @@ import javafx.stage.Stage;
 
 public class NNLib extends Application implements Serializable {
 
-    public enum LossFunction {
-        QUADRATIC,
-        CROSS_ENTROPY
+    public enum Initializer {
+        VANILLA, XAVIER, HE
     }
 
     public enum ActivationFunction {
@@ -31,12 +30,13 @@ public class NNLib extends Application implements Serializable {
         SOFTMAX
     }
 
-    public enum Optimizer {
-        VANILLA, MOMENTUM, RMSPROP, ADAM, ADAMAX, NADAM, AMSGRAD
+    public enum LossFunction {
+        QUADRATIC,
+        CROSS_ENTROPY
     }
 
-    public enum Initializer {
-        VANILLA, XAVIER, HE
+    public enum Optimizer {
+        VANILLA, MOMENTUM, RMSPROP, ADAM, ADAMAX, NADAM, AMSGRAD
     }
 
     private static boolean graphMeasuresAccuracy;
@@ -872,14 +872,46 @@ public class NNLib extends Application implements Serializable {
         }
 
         public float[][] dot(float[][] m1, float[][] m2) {
-            int rows = m1.length;
-            int columns = m2[0].length;
-            int columns2 = m1[0].length;
-            float[][] result = new float[rows][columns];
-            for (int i = 0; i < rows; i++) {
-                for (int k = 0; k < columns2; k++) {
-                    for (int j = 0; j < columns; j++) {
-                        result[i][j] += m1[i][k] * m2[k][j];
+            int rows1 = m1.length;
+            int columns1 = m1[0].length;
+            int columns2 = m2[0].length;
+            float[][] result = new float[rows1][columns2];
+            if (columns1 % 4 == 0) {
+                for (int i = 0; i < rows1; i++) {
+                    for (int k = 0; k < columns1; k += 4) {
+                        for (int j = 0; j < columns2; j++) {
+                            result[i][j] += m1[i][k] * m2[k][j];
+                            result[i][j] += m1[i][k + 1] * m2[k + 1][j];
+                            result[i][j] += m1[i][k + 2] * m2[k + 2][j];
+                            result[i][j] += m1[i][k + 3] * m2[k + 3][j];
+                        }
+                    }
+                }
+            } else if (columns1 % 3 == 0) {
+                for (int i = 0; i < rows1; i++) {
+                    for (int k = 0; k < columns1; k += 3) {
+                        for (int j = 0; j < columns2; j++) {
+                            result[i][j] += m1[i][k] * m2[k][j];
+                            result[i][j] += m1[i][k + 1] * m2[k + 1][j];
+                            result[i][j] += m1[i][k + 2] * m2[k + 2][j];
+                        }
+                    }
+                }
+            } else if (columns1 % 2 == 0) {
+                for (int i = 0; i < rows1; i++) {
+                    for (int k = 0; k < columns1; k += 2) {
+                        for (int j = 0; j < columns2; j++) {
+                            result[i][j] += m1[i][k] * m2[k][j];
+                            result[i][j] += m1[i][k + 1] * m2[k + 1][j];
+                        }
+                    }
+                }
+            } else {
+                for (int i = 0; i < rows1; i++) {
+                    for (int k = 0; k < columns1; k++) {
+                        for (int j = 0; j < columns2; j++) {
+                            result[i][j] += m1[i][k] * m2[k][j];
+                        }
                     }
                 }
             }

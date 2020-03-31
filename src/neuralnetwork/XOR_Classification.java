@@ -37,7 +37,7 @@ public class XOR_Classification {
         data.add(new Data(new float[]{1, 0}, new float[]{1, 0}));
         data.add(new Data(new float[]{0, 0}, new float[]{0, 1}));
         NNLib.graph(false, nn);
-        for (int i = 0; i < 10000000; i++) {
+        for (int i = 0; i < 10_000_000; i++) {
             int index = nn.getRandom().nextInt(4);
             if (PRINT) {
                 nn.print(data.get(index).inputs, "inputs");
