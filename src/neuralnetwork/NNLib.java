@@ -33,7 +33,7 @@ public class NNLib extends Application implements Serializable {
         QUADRATIC(.5), HUBER(1), HUBERPSEUDO(1), CUSTOM(0),
         CROSS_ENTROPY(0);
 
-        private float steepness;
+        float steepness;
 
         private LossFunction(double steepnessFactor) {
             steepness = (float) steepnessFactor;
@@ -99,18 +99,18 @@ public class NNLib extends Application implements Serializable {
 
         private long sessions = 0;
         private int threads;
-        private final String NAME;
+        public final String NAME;
         private Layer[] network;
         private Random random = new Random();
         private long seed;
         private final float lr;
         private double cost;
-        final int NETWORKSIZE;//Total layers not including the input layer
+        public final int NETWORKSIZE;//Total layers not including the input layer
         private final Initializer INITIALIZER;
-        private final ActivationFunction HIDDENACTIVATIONFUNCTION;
-        private final ActivationFunction OUTPUTACTIVATIONFUNCTION;
+        private ActivationFunction HIDDENACTIVATIONFUNCTION;
+        private ActivationFunction OUTPUTACTIVATIONFUNCTION;
         private LossFunction LOSSFUNCTION;
-        private final Optimizer OPTIMIZER;
+        private Optimizer OPTIMIZER;
         private final int[] LAYERNODES;
         private final float[][][][] previousMomentsW;
         private final float[][][][] previousMomentsB;
@@ -135,7 +135,7 @@ public class NNLib extends Application implements Serializable {
             //Activation functions for the output layer
             setActivationFunctionOutputs(OUTPUTACTIVATIONFUNCTION);
             //Cost functions for the backpropagation
-            setLossFunction(lossFunction);
+            setLossFunction(LOSSFUNCTION);
             //Optimizer
             setOptimizer(OPTIMIZER);
             //Adding each layer
@@ -398,6 +398,11 @@ public class NNLib extends Application implements Serializable {
                         throw new IllegalArgumentException("INVALID ACTIVATION FUNCTION FOR THE " + layer + " LAYER");
                 }
             }
+            if (hiddens) {
+                HIDDENACTIVATIONFUNCTION = activationFunction;
+            } else {
+                OUTPUTACTIVATIONFUNCTION = activationFunction;
+            }
             return activation;
         }
 
@@ -415,26 +420,25 @@ public class NNLib extends Application implements Serializable {
             } else {
                 switch (lossFunction) {
                     case QUADRATIC:
-                        LOSSFUNCTION = lossFunction;
                         this.lossFunction = (a, b) -> lossQuadratic(a, b);
                         break;
                     case HUBER:
-                        LOSSFUNCTION = lossFunction;
                         this.lossFunction = (a, b) -> lossHuber(a, b);
+                        break;
                     case HUBERPSEUDO:
-                        LOSSFUNCTION = lossFunction;
                         this.lossFunction = (a, b) -> lossPseudoHuber(a, b);
+                        break;
                     case CUSTOM:
-                        LOSSFUNCTION = lossFunction;
-                        this.lossFunction = (a, b) -> custom(a, b);
+                        this.lossFunction = (a, b) -> lossCustom(a, b);
+                        break;
                     case CROSS_ENTROPY:
-                        LOSSFUNCTION = lossFunction;
                         this.lossFunction = (a, b) -> lossLog(a, b);
                         break;
                     default:
                         throw new IllegalArgumentException("INVALID COST FUNCTION");
                 }
             }
+            LOSSFUNCTION = lossFunction;
         }
 
         public void setOptimizer(Optimizer updater) {
@@ -465,6 +469,7 @@ public class NNLib extends Application implements Serializable {
                         throw new IllegalArgumentException("INVALID OPTIMIZER");
                 }
             }
+            OPTIMIZER = updater;
         }
 
         private float[][][] momentum(float lr, float[][] gradients, float[][] v) {
@@ -766,7 +771,7 @@ public class NNLib extends Application implements Serializable {
             return divide(a, root);
         }
 
-        private float[][] custom(float[][] outputs, float[][] targets) {
+        private float[][] lossCustom(float[][] outputs, float[][] targets) {
             int columns = outputs[0].length;
             final float[][] a = subtract(outputs, targets);
             final float[][] aSquared = square(a);

@@ -3,14 +3,14 @@ package neuralnetwork;
 import java.util.ArrayList;
 
 public class XOR {
-    
+
     public static void main(String[] args) {
-        final boolean PRINT = true;
+        final boolean PRINT = false;
         class Data {
-            
+
             float[][] inputs;
             float[][] targets;
-            
+
             Data(float[] inputs, float[] targets) {
                 this.inputs = new float[][]{inputs};
                 this.targets = new float[][]{targets};
