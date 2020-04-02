@@ -5,7 +5,7 @@ import java.util.ArrayList;
 public class XOR {
 
     public static void main(String[] args) {
-        final boolean PRINT = false;
+        final boolean PRINT = true;
         class Data {
 
             float[][] inputs;

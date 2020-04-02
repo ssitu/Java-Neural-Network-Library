@@ -1266,8 +1266,7 @@ public class NNLib extends Application implements Serializable {
         NNLib.graphMeasuresAccuracy = graphMeasuresAccuracy;
         NNLib.nnForGraph = nnForGraph;
         new Thread(() -> {
-            NNLib.launch(NNLib.class
-            );
+            NNLib.launch(NNLib.class);
         }).start();
     }
 
