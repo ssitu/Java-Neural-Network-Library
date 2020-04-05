@@ -33,7 +33,7 @@ public class NNLib extends Application implements Serializable {
         QUADRATIC(.5), HUBER(1), HUBERPSEUDO(1), CUSTOM(0),
         CROSS_ENTROPY(0);
 
-        float steepness;
+        private float steepness;
 
         private LossFunction(double steepnessFactor) {
             steepness = (float) steepnessFactor;
@@ -130,18 +130,13 @@ public class NNLib extends Application implements Serializable {
             LOSSFUNCTION = lossFunction;
             OPTIMIZER = optimizer;
             LAYERNODES = layerNodes;
-            //Activation functions for the hidden layers
             setActivationFunctionHiddens(HIDDENACTIVATIONFUNCTION);
-            //Activation functions for the output layer
             setActivationFunctionOutputs(OUTPUTACTIVATIONFUNCTION);
-            //Cost functions for the backpropagation
             setLossFunction(LOSSFUNCTION);
-            //Optimizer
             setOptimizer(OPTIMIZER);
-            //Adding each layer
             network = new Layer[layerNodes.length - 1];
             for (int i = 1; i < layerNodes.length; i++) {
-                Layer layer = new Layer(layerNodes[i - 1], layerNodes[i], INITIALIZER);
+                Layer layer = new Layer(layerNodes[i - 1], layerNodes[i], INITIALIZER);//Adding each layer
                 network[i - 1] = layer;
             }
             NETWORKSIZE = network.length;
@@ -167,7 +162,7 @@ public class NNLib extends Application implements Serializable {
             return networkLayers;
         }
 
-        public Layer getNetworkLayer(int layerIndex) {//Layer 0 is the layer after the inputs (first hidden layer)
+        public Layer getNetworkLayer(int layerIndex) {//0 returns the layer after the inputs (first hidden layer). Holds weights between itself and the layer before.
             return network[layerIndex];
         }
 
@@ -225,9 +220,9 @@ public class NNLib extends Application implements Serializable {
                 Layer currentLayer = network[i];
                 outputs = activationHiddens.apply(add(dotProduct.apply(outputs, currentLayer.weights), currentLayer.biases), false);
             }
-            //Feed the output from the hidden layers to the output layers with its activation function
             Layer lastLayer = network[NETWORKSIZE - 1];
-            outputs = activationOutputs.apply(add(dotProduct.apply(outputs, lastLayer.weights), lastLayer.biases), false);
+            outputs = activationOutputs.apply(add(dotProduct.apply(outputs, lastLayer.weights), lastLayer.biases), false);//Feed the output from the hidden layers to the output layer with its activation function
+
             return outputs;
         }
 
@@ -246,11 +241,11 @@ public class NNLib extends Application implements Serializable {
             float[][] bGradients;
             float[][] wGradients;
             float[][] dZ_dA = {{}};
-            float[][][] Z = new float[NETWORKSIZE][][];//"Z" = the unactivated inputs from the weights and biases
+            float[][][] Z = new float[NETWORKSIZE][][];//"Z" = the unactivated outputs from the weights and biases
             float[][][] A = new float[NETWORKSIZE + 1][][];//"A" = the activated "Z"s
             A[0] = outputs;
             for (int i = 0; i < NETWORKSIZE - 1; i++) {
-                Layer currentLayer = network[i];//Increase performance by reducing amount of pointers
+                Layer currentLayer = network[i];
                 outputs = add(dotProduct.apply(outputs, currentLayer.weights), currentLayer.biases);//Computing "Z"
                 Z[i] = outputs;
                 outputs = activationHiddens.apply(outputs, false);//Computing "A"
@@ -263,8 +258,8 @@ public class NNLib extends Application implements Serializable {
             dC_dA = lossFunction.apply(A[NETWORKSIZE], targets);
             boolean outputLayer = true;
             for (int i = 0; i < NETWORKSIZE; i++) {
-                int currentIndex = NETWORKSIZE - 1 - i;//Increase performance by reducing amount of pointers
-                Layer currentLayer = network[currentIndex];//Increase performance by reducing amount of pointers
+                int currentIndex = NETWORKSIZE - 1 - i;
+                Layer currentLayer = network[currentIndex];
                 if (!outputLayer) {
                     dZ_dA = network[currentIndex + 1].weights;
                 }
