@@ -962,10 +962,10 @@ public class NNLib extends Application implements Serializable {
                 for (int i = 0; i < rows1; i++) {
                     for (int k = 0; k < columns1; k += 4) {
                         for (int j = 0; j < columns2; j++) {
-                            result[i][j] += m1[i][k] * m2[k][j];
-                            result[i][j] += m1[i][k + 1] * m2[k + 1][j];
-                            result[i][j] += m1[i][k + 2] * m2[k + 2][j];
-                            result[i][j] += m1[i][k + 3] * m2[k + 3][j];
+                            result[i][j] += m1[i][k] * m2[k][j]
+                                    + m1[i][k + 1] * m2[k + 1][j]
+                                    + m1[i][k + 2] * m2[k + 2][j]
+                                    + m1[i][k + 3] * m2[k + 3][j];
                         }
                     }
                 }
@@ -973,9 +973,9 @@ public class NNLib extends Application implements Serializable {
                 for (int i = 0; i < rows1; i++) {
                     for (int k = 0; k < columns1; k += 3) {
                         for (int j = 0; j < columns2; j++) {
-                            result[i][j] += m1[i][k] * m2[k][j];
-                            result[i][j] += m1[i][k + 1] * m2[k + 1][j];
-                            result[i][j] += m1[i][k + 2] * m2[k + 2][j];
+                            result[i][j] += m1[i][k] * m2[k][j]
+                                    + m1[i][k + 1] * m2[k + 1][j]
+                                    + m1[i][k + 2] * m2[k + 2][j];
                         }
                     }
                 }
@@ -983,8 +983,8 @@ public class NNLib extends Application implements Serializable {
                 for (int i = 0; i < rows1; i++) {
                     for (int k = 0; k < columns1; k += 2) {
                         for (int j = 0; j < columns2; j++) {
-                            result[i][j] += m1[i][k] * m2[k][j];
-                            result[i][j] += m1[i][k + 1] * m2[k + 1][j];
+                            result[i][j] += m1[i][k] * m2[k][j]
+                                    + m1[i][k + 1] * m2[k + 1][j];
                         }
                     }
                 }
