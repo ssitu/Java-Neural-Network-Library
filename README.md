@@ -1,6 +1,6 @@
 # Neural Network Class/Library For Java
 
-An adjustable neural network class or library without dependencies, with an example of solving the XOR problem along with a classification variation.
+An adjustable neural network class or library without dependencies outside of Java's API packages, with an example of solving the XOR problem along with a classification variation.
 
 Thought it would be easier to have the necessities of neural networks in one class. I add features when I need to use them in my other projects.
 
@@ -12,7 +12,7 @@ To show a graph of the cost or accuracy can be shown with the static method NNLi
 
 NNLib.graphJFX(boolean, NN) should be used when working with JavaFX applications. It will create a new stage instead of creating a new JavaFX thread to avoid the exception that comes with multiple JavaFX threads. The second argument takes in the neural network that will be graphed. This version of the method allows for graphs of different neural networks.
 
-The parameters take in enums from the NNLib class:
+The parameters take in enums from the [NNLib class](https://github.com/SSithub/Neural-Network-Library-Class/blob/Floats/src/neuralnetwork/NNLib.java):
 
     public enum Initializer {
         VANILLA, XAVIER, HE
