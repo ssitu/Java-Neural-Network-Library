@@ -235,11 +235,8 @@ public class NNLib extends Application implements Serializable {
             return outputs;
         }
 
-        public void backpropagation(float[][] inputs, float[][] targets) {//Using notation from neuralnetworksanddeeplearning.com
+        public void backpropagation(float[][] inputs, float[][] targets) {//Length of targets should match the length of the output layer (Using notation from neuralnetworksanddeeplearning.com)
             Layer lastLayer = network[NETWORKSIZE - 1];
-            if (targets[0].length != lastLayer.biases[0].length) {
-                throw new IllegalArgumentException("TARGETS ARRAY DO NOT MATCH THE SIZE OF THE OUTPUT LAYER");
-            }
             float[][] outputs = inputs;
             //Each partial derivative is used in this order
             float[][] dC_dA;
