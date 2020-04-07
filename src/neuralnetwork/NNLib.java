@@ -46,7 +46,7 @@ public class NNLib extends Application implements Serializable {
 
     }
 
-    public enum Optimizer {
+    static public enum Optimizer {
         VANILLA, MOMENTUM, RMSPROP, ADAM, ADAMAX, NADAM, AMSGRAD
     }
 
@@ -1213,7 +1213,7 @@ public class NNLib extends Application implements Serializable {
         return divide(subtract(inputs, create(1, elements, mean)), create(1, elements, deviation));
     }
 
-    private float sigmoid(float x, boolean derivative) {
+    static public float sigmoid(float x, boolean derivative) {
         if (derivative) {
             return sigmoid(x, false) * (1 - sigmoid(x, false));//sigmoid'(x)
         }
