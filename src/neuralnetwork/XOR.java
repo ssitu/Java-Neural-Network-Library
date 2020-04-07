@@ -12,9 +12,9 @@ public class XOR {
                 7777,//Seed For Reproducibility
                 .1,//Learning Rate for Optimizer
                 Initializer.VANILLA,//Weight & Bias Initializer Method
-                ActivationFunction.SIGMOID,//Hiddens
+                ActivationFunction.TANH,//Hiddens
                 ActivationFunction.SIGMOID,//Outputs
-                LossFunction.QUADRATIC.steepness(9),//Loss/Cost/Error Function
+                LossFunction.QUADRATIC.steepness(2),//Loss/Cost/Error Function
                 Optimizer.VANILLA,//Stochastic Gradient Descent Optimizer
                 2, 2, 1//Network Architecture
         );
