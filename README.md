@@ -6,7 +6,7 @@ Thought it would be easier to have the necessities of neural networks in one cla
 
 I could not think of another way to display a graph in JavaFX of the progress of the network, so I settled on a outer class that nests the neural network class inside.
 
-See the XOR example for an example on initializing a neural network: https://github.com/SSithub/Neural-Network-Library-Class/blob/Floats/src/neuralnetwork/XOR.java
+See the included [XOR problem](https://github.com/SSithub/Neural-Network-Library-Class/blob/Floats/src/neuralnetwork/XOR.java) for an example on initializing a neural network. There is also a [classification variation of the XOR problem](https://github.com/SSithub/Neural-Network-Library-Class/blob/Floats/src/neuralnetwork/XOR_Classification.java). 
 
 To show a graph of the cost or accuracy can be shown with the static method NNLib.graph(boolean, NN), where true will measure accuracy while false will measure cost. The NN argument takes in the neural network that will be used to plot the graph. There can only be one neural network that can be graphed currently, as there can not be more than one JavaFX thread. Attempting to call this method more than once will cause a JavaFX exception but is handled by JavaFX. The new call will cause the graph to plot the NN that is passed, replacing the old NN.
 
