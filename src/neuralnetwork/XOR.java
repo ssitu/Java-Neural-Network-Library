@@ -14,7 +14,7 @@ public class XOR {
                 Initializer.VANILLA,//Weight & Bias Initializer Method
                 ActivationFunction.SIGMOID,//Hiddens
                 ActivationFunction.SIGMOID,//Outputs
-                LossFunction.QUADRATIC.steepness(10),//Loss/Cost/Error Function
+                LossFunction.QUADRATIC.steepness(9),//Loss/Cost/Error Function
                 Optimizer.VANILLA,//Stochastic Gradient Descent Optimizer
                 2, 2, 1//Network Architecture
         );
@@ -31,8 +31,8 @@ public class XOR {
         for (int i = 0; i < 10_000_000; i++) {
             int index = nn.getRandom().nextInt(4);
             if (PRINT) {
-                nn.print(data.get(index).inputs, "inputs");
-                nn.print(nn.feedforward(data.get(index).inputs), "feedforward");
+                NNLib.print(data.get(index).inputs, "inputs");
+                NNLib.print(nn.feedforward(data.get(index).inputs), "feedforward");
                 System.out.println("");
             }
             nn.backpropagation(data.get(index).inputs, data.get(index).targets);

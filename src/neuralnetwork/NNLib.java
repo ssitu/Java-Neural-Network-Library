@@ -170,13 +170,22 @@ public class NNLib extends Application implements Serializable {
             return network.length;
         }
 
+        public Random getRandom() {
+            return random;
+        }
+
         public void setSeed(long seed) {
             this.seed = seed;
             random.setSeed(seed);
         }
 
-        public Random getRandom() {
-            return random;
+        public void setThreads(int numberOfThreads) {
+            if (numberOfThreads <= 1) {
+                dotProduct = (a, b) -> dot(a, b);
+            } else {
+                threads = numberOfThreads;
+                dotProduct = (a, b) -> dotThreads(a, b);
+            }
         }
 
         @Override
@@ -539,13 +548,6 @@ public class NNLib extends Application implements Serializable {
             }
         }
 
-        private float sigmoid(float x, boolean derivative) {
-            if (derivative) {
-                return sigmoid(x, false) * (1 - sigmoid(x, false));//sigmoid'(x)
-            }
-            return 1 / (1 + (float) Math.exp(-x));//sigmoid(x)
-        }
-
         private float[][] activationSigmoid(float[][] matrix, boolean derivative) {
             int rows = matrix.length;
             int columns = matrix[0].length;
@@ -556,14 +558,6 @@ public class NNLib extends Application implements Serializable {
                 }
             }
             return matrixResult;
-        }
-
-        private float tanh(float x, boolean derivative) {
-            if (derivative == true) {
-                float val = tanh(x, false);
-                return 1 - val * val;//tanh'(x)
-            }
-            return (2 / (1 + (float) Math.exp(-2 * x))) - 1;//tanh(x)
         }
 
         private float[][] activationTanh(float[][] matrix, boolean derivative) {
@@ -782,224 +776,6 @@ public class NNLib extends Application implements Serializable {
             return divide(subtract(outputs, targets), add(multiply(subtract(create(rows, columns, 1), outputs), outputs), create(rows, columns, Float.MIN_VALUE)));//Adding minimum value to prevent dividing by zero
         }
 
-        public float[][] normalTanh(float[][] inputs) {
-            int elements = inputs[0].length;
-            float[][] result = new float[1][elements];
-            float mean = sum(inputs) / elements;
-            float deviation = (float) (Math.sqrt(sum(square(subtract(inputs, create(1, elements, mean)))) / (mean)));
-            for (int i = 0; i < inputs[0].length; i++) {
-                result[0][i] = (float) (.5 * (tanh((float) (.01 * ((inputs[0][i] - mean) / (deviation))), false) + 1));//Tanh estimator normalization
-            }
-            return result;
-        }
-
-        public float[][] normalZScore(float[][] inputs) {
-            int elements = inputs[0].length;
-            float mean = sum(inputs) / elements;
-            float deviation = (float) (Math.sqrt(sum(square(subtract(inputs, create(1, elements, mean)))) / (mean)));
-            return divide(subtract(inputs, create(1, elements, mean)), create(1, elements, deviation));
-        }
-
-        private void sizeException(float[][] matrix) {
-            int rows = matrix.length;
-            int columns = matrix[0].length;
-            for (int i = 0; i < rows; i++) {
-                if (matrix[i].length != columns) {
-                    throw new IllegalArgumentException("Inconsistent Matrix Size");
-                }
-            }
-        }
-
-        private void dotDimensionMismatch(float[][] matrixA, float[][] matrixB) {
-            if (matrixA[0].length != matrixB.length)//A columns must equal B rows
-            {
-                throw new IllegalArgumentException("Matrices Dimension Mismatch");
-            }
-        }
-
-        private void dimensionMismatch(float[][] matrixA, float[][] matrixB) {
-            if (matrixA.length != matrixB.length || matrixA[0].length != matrixB[0].length) {
-                throw new IllegalArgumentException("Matrices Dimension Mismatch");
-            }
-        }
-
-        public void print(float[][] matrix, String nameOfMatrix) {
-            System.out.println(nameOfMatrix + ": ");
-            int rows = matrix.length;
-            int columns = matrix[0].length;
-            for (int i = 0; i < rows; i++) {
-                for (int j = 0; j < columns; j++) {
-                    System.out.print("[" + matrix[i][j] + "] ");
-                }
-                System.out.println("");
-            }
-        }
-
-        public float[][] doubleToFloat(double[][] matrix) {
-            int rows = matrix.length;
-            int columns = matrix[0].length;
-            float[][] matrixResult = new float[rows][columns];
-            for (int i = 0; i < rows; i++) {
-                for (int j = 0; j < columns; j++) {
-                    matrixResult[i][j] = (float) (matrix[i][j]);
-                }
-            }
-            return matrixResult;
-        }
-
-        public float[][] create(int rows, int columns, float valueToAllElements) {
-            float[][] matrixResult = new float[rows][columns];
-            for (int i = 0; i < rows; i++) {
-                for (int j = 0; j < columns; j++) {
-                    matrixResult[i][j] = valueToAllElements;
-                }
-            }
-            return matrixResult;
-        }
-
-        public float[][] randomize(float[][] matrix, float range, float minimum) {
-            float[][] matrixResult = matrix;
-            int rows = matrixResult.length;
-            int columns = matrixResult[0].length;
-            for (int i = 0; i < rows; i++) {
-                for (int j = 0; j < columns; j++) {
-                    matrixResult[i][j] = random.nextFloat() * range + minimum;
-                }
-            }
-            return matrixResult;
-        }
-
-        public float[][] transpose(float[][] matrix) {
-            float[][] matrixResult = new float[matrix[0].length][matrix.length];
-            int rows = matrix.length;
-            int columns = matrix[0].length;
-            for (int j = 0; j < columns; j++) {
-                for (int i = 0; i < rows; i++) {
-                    matrixResult[j][i] = matrix[i][j];
-                }
-            }
-            return matrixResult;
-        }
-
-        public float[][] scale(float[][] matrix, float factor) {
-            int rows = matrix.length;
-            int columns = matrix[0].length;
-            float[][] matrixResult = new float[rows][columns];
-            for (int i = 0; i < rows; i++) {
-                for (int j = 0; j < columns; j++) {
-                    matrixResult[i][j] = factor * matrix[i][j];
-                }
-            }
-            return matrixResult;
-        }
-
-        public float[][] scale(float factor, float[][] matrix) {
-            int rows = matrix.length;
-            int columns = matrix[0].length;
-            float[][] matrixResult = new float[rows][columns];
-            for (int i = 0; i < rows; i++) {
-                for (int j = 0; j < columns; j++) {
-                    matrixResult[i][j] = factor * matrix[i][j];
-                }
-            }
-            return matrixResult;
-        }
-
-        public float[][] add(float[][] matrixA, float[][] matrixB) {
-            int rows = matrixA.length;
-            int columns = matrixA[0].length;
-            float[][] matrixResult = new float[rows][columns];
-            for (int i = 0; i < rows; i++) {
-                for (int j = 0; j < columns; j++) {
-                    matrixResult[i][j] = matrixA[i][j] + matrixB[i][j];
-                }
-            }
-            return matrixResult;
-        }
-
-        public float[][] subtract(float[][] matrixA, float[][] matrixB) {
-            int rows = matrixA.length;
-            int columns = matrixA[0].length;
-            float[][] matrixResult = new float[rows][columns];
-            for (int i = 0; i < rows; i++) {
-                for (int j = 0; j < columns; j++) {
-                    matrixResult[i][j] = matrixA[i][j] - matrixB[i][j];
-                }
-            }
-            return matrixResult;
-        }
-
-        public float[][] multiply(float[][] matrixA, float[][] matrixB) {
-            int rows = matrixA.length;
-            int columns = matrixA[0].length;
-            float[][] matrixResult = new float[rows][columns];
-            for (int i = 0; i < rows; i++) {
-                for (int j = 0; j < columns; j++) {
-                    matrixResult[i][j] = matrixA[i][j] * matrixB[i][j];
-                }
-            }
-            return matrixResult;
-        }
-
-        public float[][] divide(float[][] matrixA, float[][] matrixB) {
-            int rows = matrixA.length;
-            int columns = matrixA[0].length;
-            float[][] matrixResult = new float[rows][columns];
-            for (int i = 0; i < rows; i++) {
-                for (int j = 0; j < columns; j++) {
-                    matrixResult[i][j] = matrixA[i][j] / matrixB[i][j];
-                }
-            }
-            return matrixResult;
-        }
-
-        public float[][] dot(float[][] m1, float[][] m2) {
-            int rows1 = m1.length;
-            int columns1 = m1[0].length;
-            int columns2 = m2[0].length;
-            float[][] result = new float[rows1][columns2];
-            if (columns1 % 4 == 0) {
-                for (int i = 0; i < rows1; i++) {
-                    for (int k = 0; k < columns1; k += 4) {
-                        for (int j = 0; j < columns2; j++) {
-                            result[i][j] += m1[i][k] * m2[k][j]
-                                    + m1[i][k + 1] * m2[k + 1][j]
-                                    + m1[i][k + 2] * m2[k + 2][j]
-                                    + m1[i][k + 3] * m2[k + 3][j];
-                        }
-                    }
-                }
-            } else if (columns1 % 3 == 0) {
-                for (int i = 0; i < rows1; i++) {
-                    for (int k = 0; k < columns1; k += 3) {
-                        for (int j = 0; j < columns2; j++) {
-                            result[i][j] += m1[i][k] * m2[k][j]
-                                    + m1[i][k + 1] * m2[k + 1][j]
-                                    + m1[i][k + 2] * m2[k + 2][j];
-                        }
-                    }
-                }
-            } else if (columns1 % 2 == 0) {
-                for (int i = 0; i < rows1; i++) {
-                    for (int k = 0; k < columns1; k += 2) {
-                        for (int j = 0; j < columns2; j++) {
-                            result[i][j] += m1[i][k] * m2[k][j]
-                                    + m1[i][k + 1] * m2[k + 1][j];
-                        }
-                    }
-                }
-            } else {
-                for (int i = 0; i < rows1; i++) {
-                    for (int k = 0; k < columns1; k++) {
-                        for (int j = 0; j < columns2; j++) {
-                            result[i][j] += m1[i][k] * m2[k][j];
-                        }
-                    }
-                }
-            }
-            return result;
-        }
-
         private class MatrixThread extends Thread {
 
             int num;
@@ -1034,15 +810,6 @@ public class NNLib extends Application implements Serializable {
             }
         }
 
-        public void setThreads(int numberOfThreads) {
-            if (numberOfThreads <= 1) {
-                dotProduct = (a, b) -> dot(a, b);
-            } else {
-                threads = numberOfThreads;
-                dotProduct = (a, b) -> dotThreads(a, b);
-            }
-        }
-
         public float[][] dotThreads(float[][] m1, float[][] m2) {
             MatrixThread[] threadArray = new MatrixThread[threads];
             int rows = m1.length;
@@ -1062,158 +829,403 @@ public class NNLib extends Application implements Serializable {
             }
             return result;
         }
+    }
 
-        public float[][] power(float[][] matrix, double power) {
-            int rows = matrix.length;
-            int columns = matrix[0].length;
-            float[][] matrixResult = new float[rows][columns];
-            for (int i = 0; i < rows; i++) {
-                for (int j = 0; j < columns; j++) {
-                    matrixResult[i][j] = (float) Math.pow(matrix[i][j], power);
-                }
+    private void sizeException(float[][] matrix) {
+        int rows = matrix.length;
+        int columns = matrix[0].length;
+        for (int i = 0; i < rows; i++) {
+            if (matrix[i].length != columns) {
+                throw new IllegalArgumentException("Inconsistent Matrix Size");
             }
-            return matrixResult;
         }
+    }
 
-        public float[][] square(float[][] matrix) {
-            int rows = matrix.length;
-            int columns = matrix[0].length;
-            float[][] matrixResult = new float[rows][columns];
-            for (int i = 0; i < rows; i++) {
-                for (int j = 0; j < columns; j++) {
-                    float val = matrix[i][j];
-                    matrixResult[i][j] = val * val;
-                }
+    private void dotDimensionMismatch(float[][] matrixA, float[][] matrixB) {
+        if (matrixA[0].length != matrixB.length)//A columns must equal B rows
+        {
+            throw new IllegalArgumentException("Matrices Dimension Mismatch");
+        }
+    }
+
+    private void dimensionMismatch(float[][] matrixA, float[][] matrixB) {
+        if (matrixA.length != matrixB.length || matrixA[0].length != matrixB[0].length) {
+            throw new IllegalArgumentException("Matrices Dimension Mismatch");
+        }
+    }
+
+    static public void print(float[][] matrix, String nameOfMatrix) {
+        System.out.println(nameOfMatrix + ": ");
+        int rows = matrix.length;
+        int columns = matrix[0].length;
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < columns; j++) {
+                System.out.print("[" + matrix[i][j] + "] ");
             }
-            return matrixResult;
+            System.out.println("");
         }
+    }
 
-        public float[][] sqrt(float[][] matrix) {
-            int rows = matrix.length;
-            int columns = matrix[0].length;
-            float[][] matrixResult = new float[rows][columns];
-            for (int i = 0; i < rows; i++) {
-                for (int j = 0; j < columns; j++) {
-                    matrixResult[i][j] = (float) Math.sqrt(matrix[i][j]);
-                }
+    static public float[][] doubleToFloat(double[][] matrix) {
+        int rows = matrix.length;
+        int columns = matrix[0].length;
+        float[][] matrixResult = new float[rows][columns];
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < columns; j++) {
+                matrixResult[i][j] = (float) (matrix[i][j]);
             }
-            return matrixResult;
         }
+        return matrixResult;
+    }
 
-        public float sum(float[][] matrix) {
-            float sum = 0;
-            int rows = matrix.length;
-            int columns = matrix[0].length;
-            for (int i = 0; i < rows; i++) {
-                for (int j = 0; j < columns; j++) {
-                    sum += matrix[i][j];
-                }
+    static public float[][] create(int rows, int columns, float valueToAllElements) {
+        float[][] matrixResult = new float[rows][columns];
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < columns; j++) {
+                matrixResult[i][j] = valueToAllElements;
             }
-            return sum;
         }
+        return matrixResult;
+    }
 
-        public float[][] ln(float[][] matrix) {
-            int rows = matrix.length;
-            int columns = matrix[0].length;
-            float[][] result = new float[rows][columns];
-            for (int i = 0; i < rows; i++) {
-                for (int j = 0; j < columns; j++) {
-                    result[i][j] = (float) Math.log(matrix[i][j]);
-                }
+    static public float[][] randomize(float[][] matrix, float range, float minimum) {
+        float[][] matrixResult = matrix;
+        int rows = matrixResult.length;
+        int columns = matrixResult[0].length;
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < columns; j++) {
+                matrixResult[i][j] = (float) Math.random() * range + minimum;
             }
-            return result;
         }
+        return matrixResult;
+    }
 
-        public float[][] copy(float[][] matrix) {
-            return Arrays.stream(matrix).map(el -> el.clone()).toArray(a -> matrix.clone());
+    static public float[][] randomize(float[][] matrix, float range, float minimum, Random random) {
+        float[][] matrixResult = matrix;
+        int rows = matrixResult.length;
+        int columns = matrixResult[0].length;
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < columns; j++) {
+                matrixResult[i][j] = random.nextFloat() * range + minimum;
+            }
         }
+        return matrixResult;
+    }
 
-        public float[][] oneHot(float[][] m) {
-            int rows = m.length;
-            int columns = m[0].length;
-            float[][] result = create(rows, columns, 0);
-            float max = Float.NEGATIVE_INFINITY;
-            int x = 0;
-            int y = 0;
+    static public float[][] transpose(float[][] matrix) {
+        float[][] matrixResult = new float[matrix[0].length][matrix.length];
+        int rows = matrix.length;
+        int columns = matrix[0].length;
+        for (int j = 0; j < columns; j++) {
             for (int i = 0; i < rows; i++) {
-                for (int j = 0; j < columns; j++) {
-                    if (max < m[i][j]) {
-                        max = m[i][j];
-                        x = i;
-                        y = j;
+                matrixResult[j][i] = matrix[i][j];
+            }
+        }
+        return matrixResult;
+    }
+
+    static public float[][] scale(float[][] matrix, float factor) {
+        int rows = matrix.length;
+        int columns = matrix[0].length;
+        float[][] matrixResult = new float[rows][columns];
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < columns; j++) {
+                matrixResult[i][j] = factor * matrix[i][j];
+            }
+        }
+        return matrixResult;
+    }
+
+    static public float[][] scale(float factor, float[][] matrix) {
+        int rows = matrix.length;
+        int columns = matrix[0].length;
+        float[][] matrixResult = new float[rows][columns];
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < columns; j++) {
+                matrixResult[i][j] = factor * matrix[i][j];
+            }
+        }
+        return matrixResult;
+    }
+
+    static public float[][] add(float[][] matrixA, float[][] matrixB) {
+        int rows = matrixA.length;
+        int columns = matrixA[0].length;
+        float[][] matrixResult = new float[rows][columns];
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < columns; j++) {
+                matrixResult[i][j] = matrixA[i][j] + matrixB[i][j];
+            }
+        }
+        return matrixResult;
+    }
+
+    static public float[][] subtract(float[][] matrixA, float[][] matrixB) {
+        int rows = matrixA.length;
+        int columns = matrixA[0].length;
+        float[][] matrixResult = new float[rows][columns];
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < columns; j++) {
+                matrixResult[i][j] = matrixA[i][j] - matrixB[i][j];
+            }
+        }
+        return matrixResult;
+    }
+
+    static public float[][] multiply(float[][] matrixA, float[][] matrixB) {
+        int rows = matrixA.length;
+        int columns = matrixA[0].length;
+        float[][] matrixResult = new float[rows][columns];
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < columns; j++) {
+                matrixResult[i][j] = matrixA[i][j] * matrixB[i][j];
+            }
+        }
+        return matrixResult;
+    }
+
+    static public float[][] divide(float[][] matrixA, float[][] matrixB) {
+        int rows = matrixA.length;
+        int columns = matrixA[0].length;
+        float[][] matrixResult = new float[rows][columns];
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < columns; j++) {
+                matrixResult[i][j] = matrixA[i][j] / matrixB[i][j];
+            }
+        }
+        return matrixResult;
+    }
+
+    static public float[][] dot(float[][] m1, float[][] m2) {
+        int rows1 = m1.length;
+        int columns1 = m1[0].length;
+        int columns2 = m2[0].length;
+        float[][] result = new float[rows1][columns2];
+        if (columns1 % 4 == 0) {
+            for (int i = 0; i < rows1; i++) {
+                for (int k = 0; k < columns1; k += 4) {
+                    for (int j = 0; j < columns2; j++) {
+                        result[i][j] += m1[i][k] * m2[k][j]
+                                + m1[i][k + 1] * m2[k + 1][j]
+                                + m1[i][k + 2] * m2[k + 2][j]
+                                + m1[i][k + 3] * m2[k + 3][j];
                     }
                 }
             }
-            result[x][y] = 1;
-            return result;
-        }
-
-        public float[][] abs(float[][] m) {
-            int rows = m.length;
-            int columns = m[0].length;
-            float[][] result = new float[rows][columns];
-            for (int i = 0; i < rows; i++) {
-                for (int j = 0; j < columns; j++) {
-                    result[i][j] = Math.abs(m[i][j]);
-                }
-            }
-            return result;
-        }
-
-        public float[][] max(float[][] m1, float[][] m2) {//Size must match
-            int rows = m1.length;
-            int columns = m1[0].length;
-            float[][] result = new float[rows][columns];
-            for (int i = 0; i < rows; i++) {
-                for (int j = 0; j < columns; j++) {
-                    float val1 = m1[i][j];
-                    float val2 = m2[i][j];
-                    if (val1 > val2) {
-                        result[i][j] = val1;
-                    } else {
-                        result[i][j] = val2;
+        } else if (columns1 % 3 == 0) {
+            for (int i = 0; i < rows1; i++) {
+                for (int k = 0; k < columns1; k += 3) {
+                    for (int j = 0; j < columns2; j++) {
+                        result[i][j] += m1[i][k] * m2[k][j]
+                                + m1[i][k + 1] * m2[k + 1][j]
+                                + m1[i][k + 2] * m2[k + 2][j];
                     }
                 }
             }
-            return result;
-        }
-
-        public int argmax(float[][] oneRowMatrix) {
-            float max = Float.NEGATIVE_INFINITY;
-            int index = 0;
-            for (int i = 0; i < oneRowMatrix[0].length; i++) {
-                if (max < oneRowMatrix[0][i]) {
-                    max = oneRowMatrix[0][i];
-                    index = i;
+        } else if (columns1 % 2 == 0) {
+            for (int i = 0; i < rows1; i++) {
+                for (int k = 0; k < columns1; k += 2) {
+                    for (int j = 0; j < columns2; j++) {
+                        result[i][j] += m1[i][k] * m2[k][j]
+                                + m1[i][k + 1] * m2[k + 1][j];
+                    }
                 }
             }
-            return index;
-        }
-
-        public int argmin(float[][] oneRowMatrix) {
-            float min = Float.POSITIVE_INFINITY;
-            int index = 0;
-            for (int i = 0; i < oneRowMatrix[0].length; i++) {
-                if (min > oneRowMatrix[0][i]) {
-                    min = oneRowMatrix[0][i];
-                    index = i;
+        } else {
+            for (int i = 0; i < rows1; i++) {
+                for (int k = 0; k < columns1; k++) {
+                    for (int j = 0; j < columns2; j++) {
+                        result[i][j] += m1[i][k] * m2[k][j];
+                    }
                 }
             }
-            return index;
         }
+        return result;
+    }
 
-        public float[][] append(float[][] oneRow1, float[][] oneRow2) {
-            int length1 = oneRow1[0].length;
-            int length2 = oneRow2[0].length;
-            float[][] result = new float[1][length1 + length2];
-            for (int i = 0; i < length1; i++) {
-                result[0][i] = oneRow1[0][i];
+    static public float[][] power(float[][] matrix, double power) {
+        int rows = matrix.length;
+        int columns = matrix[0].length;
+        float[][] matrixResult = new float[rows][columns];
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < columns; j++) {
+                matrixResult[i][j] = (float) Math.pow(matrix[i][j], power);
             }
-            for (int i = 0; i < length2; i++) {
-                result[0][i + length1] = oneRow2[0][i];
-            }
-            return result;
         }
+        return matrixResult;
+    }
+
+    static public float[][] square(float[][] matrix) {
+        int rows = matrix.length;
+        int columns = matrix[0].length;
+        float[][] matrixResult = new float[rows][columns];
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < columns; j++) {
+                float val = matrix[i][j];
+                matrixResult[i][j] = val * val;
+            }
+        }
+        return matrixResult;
+    }
+
+    static public float[][] sqrt(float[][] matrix) {
+        int rows = matrix.length;
+        int columns = matrix[0].length;
+        float[][] matrixResult = new float[rows][columns];
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < columns; j++) {
+                matrixResult[i][j] = (float) Math.sqrt(matrix[i][j]);
+            }
+        }
+        return matrixResult;
+    }
+
+    static public float sum(float[][] matrix) {
+        float sum = 0;
+        int rows = matrix.length;
+        int columns = matrix[0].length;
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < columns; j++) {
+                sum += matrix[i][j];
+            }
+        }
+        return sum;
+    }
+
+    static public float[][] ln(float[][] matrix) {
+        int rows = matrix.length;
+        int columns = matrix[0].length;
+        float[][] result = new float[rows][columns];
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < columns; j++) {
+                result[i][j] = (float) Math.log(matrix[i][j]);
+            }
+        }
+        return result;
+    }
+
+    static public float[][] copy(float[][] matrix) {
+        return Arrays.stream(matrix).map(el -> el.clone()).toArray(a -> matrix.clone());
+    }
+
+    static public float[][] oneHot(float[][] m) {
+        int rows = m.length;
+        int columns = m[0].length;
+        float[][] result = create(rows, columns, 0);
+        float max = Float.NEGATIVE_INFINITY;
+        int x = 0;
+        int y = 0;
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < columns; j++) {
+                if (max < m[i][j]) {
+                    max = m[i][j];
+                    x = i;
+                    y = j;
+                }
+            }
+        }
+        result[x][y] = 1;
+        return result;
+    }
+
+    static public float[][] abs(float[][] m) {
+        int rows = m.length;
+        int columns = m[0].length;
+        float[][] result = new float[rows][columns];
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < columns; j++) {
+                result[i][j] = Math.abs(m[i][j]);
+            }
+        }
+        return result;
+    }
+
+    static public float[][] max(float[][] m1, float[][] m2) {//Size must match
+        int rows = m1.length;
+        int columns = m1[0].length;
+        float[][] result = new float[rows][columns];
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < columns; j++) {
+                float val1 = m1[i][j];
+                float val2 = m2[i][j];
+                if (val1 > val2) {
+                    result[i][j] = val1;
+                } else {
+                    result[i][j] = val2;
+                }
+            }
+        }
+        return result;
+    }
+
+    static public int argmax(float[][] oneRowMatrix) {
+        float max = Float.NEGATIVE_INFINITY;
+        int index = 0;
+        for (int i = 0; i < oneRowMatrix[0].length; i++) {
+            if (max < oneRowMatrix[0][i]) {
+                max = oneRowMatrix[0][i];
+                index = i;
+            }
+        }
+        return index;
+    }
+
+    static public int argmin(float[][] oneRowMatrix) {
+        float min = Float.POSITIVE_INFINITY;
+        int index = 0;
+        for (int i = 0; i < oneRowMatrix[0].length; i++) {
+            if (min > oneRowMatrix[0][i]) {
+                min = oneRowMatrix[0][i];
+                index = i;
+            }
+        }
+        return index;
+    }
+
+    static public float[][] append(float[][] oneRow1, float[][] oneRow2) {
+        int length1 = oneRow1[0].length;
+        int length2 = oneRow2[0].length;
+        float[][] result = new float[1][length1 + length2];
+        for (int i = 0; i < length1; i++) {
+            result[0][i] = oneRow1[0][i];
+        }
+        for (int i = 0; i < length2; i++) {
+            result[0][i + length1] = oneRow2[0][i];
+        }
+        return result;
+    }
+
+    static public float[][] normalTanh(float[][] inputs) {
+        int elements = inputs[0].length;
+        float[][] result = new float[1][elements];
+        float mean = sum(inputs) / elements;
+        float deviation = (float) (Math.sqrt(sum(square(subtract(inputs, create(1, elements, mean)))) / (mean)));
+        for (int i = 0; i < inputs[0].length; i++) {
+            result[0][i] = (float) (.5 * (tanh((float) (.01 * ((inputs[0][i] - mean) / (deviation))), false) + 1));//Tanh estimator normalization
+        }
+        return result;
+    }
+
+    static public float[][] normalZScore(float[][] inputs) {
+        int elements = inputs[0].length;
+        float mean = sum(inputs) / elements;
+        float deviation = (float) (Math.sqrt(sum(square(subtract(inputs, create(1, elements, mean)))) / (mean)));
+        return divide(subtract(inputs, create(1, elements, mean)), create(1, elements, deviation));
+    }
+
+    private float sigmoid(float x, boolean derivative) {
+        if (derivative) {
+            return sigmoid(x, false) * (1 - sigmoid(x, false));//sigmoid'(x)
+        }
+        return 1 / (1 + (float) Math.exp(-x));//sigmoid(x)
+    }
+
+    static public float tanh(float x, boolean derivative) {
+        if (derivative == true) {
+            float val = tanh(x, false);
+            return 1 - val * val;//tanh'(x)
+        }
+        return (2 / (1 + (float) Math.exp(-2 * x))) - 1;//tanh(x)
     }
 
     private static void initGraph(Stage stage, NN nn) {

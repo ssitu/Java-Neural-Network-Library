@@ -31,8 +31,8 @@ public class XOR_Classification {
         for (int i = 0; i < 10_000_000; i++) {
             int index = nn.getRandom().nextInt(4);
             if (PRINT) {
-                nn.print(data.get(index).inputs, "inputs");
-                nn.print(nn.feedforward(data.get(index).inputs), "feedforward");
+                NNLib.print(data.get(index).inputs, "inputs");
+                NNLib.print(nn.feedforward(data.get(index).inputs), "feedforward");
                 System.out.println("");
             }
             nn.backpropagation(data.get(index).inputs, data.get(index).targets);
