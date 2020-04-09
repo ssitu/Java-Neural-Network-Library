@@ -9,6 +9,7 @@ import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Random;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 import javafx.application.Application;
 import static javafx.application.Application.launch;
 import javafx.application.Platform;
@@ -30,8 +31,8 @@ public class NNLib extends Application implements Serializable {
     }
 
     public enum LossFunction {
-        QUADRATIC(.5), HUBER(1), HUBERPSEUDO(1), CUSTOM(0),
-        CROSS_ENTROPY(0);
+        QUADRATIC(.5), HUBER(1), HUBERPSEUDO(1), CUSTOM(1),
+        CROSS_ENTROPY(1);
 
         private float steepness;
 
@@ -46,7 +47,7 @@ public class NNLib extends Application implements Serializable {
 
     }
 
-    static public enum Optimizer {
+    public enum Optimizer {
         VANILLA, MOMENTUM, RMSPROP, ADAM, ADAMAX, NADAM, AMSGRAD
     }
 
@@ -55,52 +56,10 @@ public class NNLib extends Application implements Serializable {
 
     public final class NN implements Serializable {
 
-        private class Layer implements Serializable {
-
-            float[][] weights;
-            float[][] biases;
-
-            Layer(int nodesIn, int nodesOut, Initializer initializer) {
-                weights = create(nodesIn, nodesOut, 0);
-                biases = create(1, nodesOut, 0);
-                weights = randomize(weights, 2, -1);
-                biases = randomize(biases, 2, -1);
-                if (null == initializer) {
-                    throw new IllegalArgumentException("INVALID INITIALIZATION METHOD");
-                } else {
-                    switch (initializer) {
-                        case VANILLA:
-                            weights = vanilla(weights);
-                            break;
-                        case XAVIER:
-                            weights = xavier(weights, nodesIn);
-                            break;
-                        case HE:
-                            weights = he(weights, nodesIn);
-                            break;
-                        default:
-                            throw new IllegalArgumentException("INVALID INITIALIZATION METHOD");
-                    }
-                }
-            }
-
-            private float[][] vanilla(float[][] weights) {
-                return weights;
-            }
-
-            private float[][] xavier(float[][] weights, int nodesIn) {
-                return scale(weights, (float) (1 / Math.sqrt(nodesIn)));
-            }
-
-            private float[][] he(float[][] weights, int nodesIn) {
-                return scale(weights, (float) Math.sqrt(2 / nodesIn));
-            }
-        }
-
         private long sessions = 0;
         private int threads;
         public final String NAME;
-        private Layer[] network;
+        private DenseLayer[] network;
         private Random random = new Random();
         private long seed;
         private final float lr;
@@ -134,9 +93,9 @@ public class NNLib extends Application implements Serializable {
             setActivationFunctionOutputs(OUTPUTACTIVATIONFUNCTION);
             setLossFunction(LOSSFUNCTION);
             setOptimizer(OPTIMIZER);
-            network = new Layer[layerNodes.length - 1];
+            network = new DenseLayer[layerNodes.length - 1];
             for (int i = 1; i < layerNodes.length; i++) {
-                Layer layer = new Layer(layerNodes[i - 1], layerNodes[i], INITIALIZER);//Adding each layer
+                DenseLayer layer = new DenseLayer(layerNodes[i - 1], layerNodes[i], INITIALIZER, random);//Adding each layer
                 network[i - 1] = layer;
             }
             NETWORKSIZE = network.length;
@@ -155,14 +114,14 @@ public class NNLib extends Application implements Serializable {
         @Override
         public String toString() {
             String networkLayers = "";
-            for (Layer layer : network) {
+            for (DenseLayer layer : network) {
                 networkLayers += layer.weights.length + ",";
             }
             networkLayers += network[NETWORKSIZE - 1].weights[0].length;
             return networkLayers;
         }
 
-        public Layer getNetworkLayer(int layerIndex) {//0 returns the layer after the inputs (first hidden layer). Holds weights between itself and the layer before.
+        public DenseLayer getNetworkLayer(int layerIndex) {//0 returns the layer after the inputs (first hidden layer). Holds weights between itself and the layer before.
             return network[layerIndex];
         }
 
@@ -202,7 +161,8 @@ public class NNLib extends Application implements Serializable {
             try {
                 FileOutputStream fileOut = new FileOutputStream(System.getProperty("user.dir") + "/" + NAME + "_neuralnetwork(" + toString() + ")");
                 ObjectOutputStream out = new ObjectOutputStream(fileOut);
-                out.writeObject(this);
+                Object[] arr = {network, random};
+                out.writeObject(arr);
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -212,9 +172,9 @@ public class NNLib extends Application implements Serializable {
             try {
                 FileInputStream fileIn = new FileInputStream(System.getProperty("user.dir") + "/" + NAME + "_neuralnetwork(" + toString() + ")");
                 ObjectInputStream in = new ObjectInputStream(fileIn);
-                NN nn = (NN) in.readObject();
-                network = nn.network;
-                random = nn.random;
+                Object[] arr = (Object[]) in.readObject();
+                network = (DenseLayer[]) arr[0];
+                random = (Random) arr[1];
                 return true;
             } catch (IOException | ClassNotFoundException e) {
                 e.printStackTrace();
@@ -226,17 +186,17 @@ public class NNLib extends Application implements Serializable {
         public float[][] feedforward(float[][] inputs) {
             float[][] outputs = inputs;
             for (int i = 0; i < NETWORKSIZE - 1; i++) {//Feed the inputs through the hidden layers
-                Layer currentLayer = network[i];
+                DenseLayer currentLayer = network[i];
                 outputs = activationHiddens.apply(add(dotProduct.apply(outputs, currentLayer.weights), currentLayer.biases), false);
             }
-            Layer lastLayer = network[NETWORKSIZE - 1];
+            DenseLayer lastLayer = network[NETWORKSIZE - 1];
             outputs = activationOutputs.apply(add(dotProduct.apply(outputs, lastLayer.weights), lastLayer.biases), false);//Feed the output from the hidden layers to the output layer with its activation function
 
             return outputs;
         }
 
         public void backpropagation(float[][] inputs, float[][] targets) {//Length of targets should match the length of the output layer (Using notation from neuralnetworksanddeeplearning.com)
-            Layer lastLayer = network[NETWORKSIZE - 1];
+            DenseLayer lastLayer = network[NETWORKSIZE - 1];
             float[][] outputs = inputs;
             //Each partial derivative is used in this order
             float[][] dC_dA;
@@ -251,7 +211,7 @@ public class NNLib extends Application implements Serializable {
             float[][][] A = new float[NETWORKSIZE + 1][][];//"A" = the activated "Z"s
             A[0] = outputs;
             for (int i = 0; i < NETWORKSIZE - 1; i++) {
-                Layer currentLayer = network[i];
+                DenseLayer currentLayer = network[i];
                 outputs = add(dotProduct.apply(outputs, currentLayer.weights), currentLayer.biases);//Computing "Z"
                 Z[i] = outputs;
                 outputs = activationHiddens.apply(outputs, false);//Computing "A"
@@ -265,7 +225,7 @@ public class NNLib extends Application implements Serializable {
             boolean outputLayer = true;
             for (int i = 0; i < NETWORKSIZE; i++) {
                 int currentIndex = NETWORKSIZE - 1 - i;
-                Layer currentLayer = network[currentIndex];
+                DenseLayer currentLayer = network[currentIndex];
                 if (!outputLayer) {
                     dZ_dA = network[currentIndex + 1].weights;
                 }
@@ -540,33 +500,17 @@ public class NNLib extends Application implements Serializable {
             if (!derivative) {
                 return matrix;
             } else {
-                float[][] matrixResult = create(matrix.length, matrix[0].length, 1);
-                return matrixResult;
+                float[][] result = create(matrix.length, matrix[0].length, 1);
+                return result;
             }
         }
 
         private float[][] activationSigmoid(float[][] matrix, boolean derivative) {
-            int rows = matrix.length;
-            int columns = matrix[0].length;
-            float[][] matrixResult = new float[rows][columns];
-            for (int i = 0; i < rows; i++) {
-                for (int j = 0; j < columns; j++) {
-                    matrixResult[i][j] = sigmoid(matrix[i][j], derivative);
-                }
-            }
-            return matrixResult;
+            return function(matrix, a -> sigmoid(a, derivative));
         }
 
         private float[][] activationTanh(float[][] matrix, boolean derivative) {
-            int rows = matrix.length;
-            int columns = matrix[0].length;
-            float[][] matrixResult = new float[rows][columns];
-            for (int i = 0; i < rows; i++) {
-                for (int j = 0; j < columns; j++) {
-                    matrixResult[i][j] = tanh(matrix[i][j], derivative);
-                }
-            }
-            return matrixResult;
+            return function(matrix, a -> tanh(a, derivative));
         }
 
         private float relu(float x, boolean derivative) {
@@ -582,15 +526,7 @@ public class NNLib extends Application implements Serializable {
         }
 
         private float[][] activationRelu(float[][] matrix, boolean derivative) {
-            int rows = matrix.length;
-            int columns = matrix[0].length;
-            float[][] matrixResult = new float[rows][columns];
-            for (int i = 0; i < rows; i++) {
-                for (int j = 0; j < columns; j++) {
-                    matrixResult[i][j] = relu(matrix[i][j], derivative);
-                }
-            }
-            return matrixResult;
+            return function(matrix, a -> relu(a, derivative));
         }
 
         private float leakyRelu(float x, boolean derivative) {
@@ -606,35 +542,18 @@ public class NNLib extends Application implements Serializable {
         }
 
         private float[][] activationLeakyRelu(float[][] matrix, boolean derivative) {
-            int rows = matrix.length;
-            int columns = matrix[0].length;
-            float[][] matrixResult = new float[rows][columns];
-            for (int i = 0; i < rows; i++) {
-                for (int j = 0; j < columns; j++) {
-                    matrixResult[i][j] = leakyRelu(matrix[i][j], derivative);
-                }
-            }
-            return matrixResult;
+            return function(matrix, a -> leakyRelu(a, derivative));
         }
 
         private float swish(float x, boolean derivative) {
             if (!derivative) {
                 return x * sigmoid(x, false);
-            } else {
-                return x * sigmoid(x, true) + sigmoid(x, false);
             }
+            return x * sigmoid(x, true) + sigmoid(x, false);
         }
 
-        private float[][] activationSwish(float[][] m, boolean derivative) {
-            int rows = m.length;
-            int columns = m[0].length;
-            float[][] result = new float[rows][columns];
-            for (int i = 0; i < rows; i++) {
-                for (int j = 0; j < columns; j++) {
-                    result[i][j] = swish(m[i][j], derivative);
-                }
-            }
-            return result;
+        private float[][] activationSwish(float[][] matrix, boolean derivative) {
+            return function(matrix, a -> swish(a, derivative));
         }
 
         private float mish(float x, boolean derivative) {
@@ -646,16 +565,8 @@ public class NNLib extends Application implements Serializable {
             }
         }
 
-        private float[][] activationMish(float[][] m, boolean derivative) {
-            int rows = m.length;
-            int columns = m[0].length;
-            float[][] result = new float[rows][columns];
-            for (int i = 0; i < rows; i++) {
-                for (int j = 0; j < columns; j++) {
-                    result[i][j] = mish(m[i][j], derivative);
-                }
-            }
-            return result;
+        private float[][] activationMish(float[][] matrix, boolean derivative) {
+            return function(matrix, a -> mish(a, derivative));
         }
 
         private float[][] activationCustom(float[][] x, boolean derivative) {
@@ -680,21 +591,9 @@ public class NNLib extends Application implements Serializable {
         }
 
         public float[][] softmax(float[][] matrix) {
-            int rows = matrix.length;
-            int columns = matrix[0].length;
-            float[][] matrixResult = new float[rows][columns];
-            float sum = 0;
-            for (int i = 0; i < rows; i++) {
-                for (int j = 0; j < columns; j++) {
-                    sum += Math.exp(matrix[i][j]);
-                }
-            }
-            for (int i = 0; i < rows; i++) {
-                for (int j = 0; j < columns; j++) {
-                    matrixResult[i][j] = (float) Math.exp(matrix[i][j]) / sum;
-                }
-            }
-            return matrixResult;
+            float[][] e = exp(matrix);
+            float inverseSum = 1 / sum(e);
+            return scale(inverseSum, e);
         }
 
         private float[][] activationSoftmax(float[][] matrix, boolean derivative) {
@@ -703,20 +602,14 @@ public class NNLib extends Application implements Serializable {
                 return result;
             }
             float[][] ones = create(matrix.length, matrix[0].length, 1);
-            float[][] derivatives = multiply(result, subtract(ones, result));
-            return derivatives;
+            return multiply(result, subtract(ones, result));
         }
 
         private float[][] lossQuadratic(float[][] outputs, float[][] targets) {
             final float factor = LOSSFUNCTION.steepness;
-            float[][] loss = scale(factor, square(subtract(outputs, targets)));//m(f(x) - y)^2 where f(x) is the output of the network and y is the target output
-            int columns = loss[0].length;
-            double total = 0;
-            for (int j = 0; j < columns; j++) {
-                total += loss[0][j];
-            }
-            cost = total / columns;
-            return scale(2 * factor, subtract(outputs, targets));
+            int columns = outputs[0].length;
+            cost = sum(scale(factor, square(subtract(outputs, targets)))) / columns;//m(f(x) - y)^2 where f(x) is the output of the network and y is the target output
+            return scale(2 * factor, subtract(outputs, targets));//Derivative of the loss function for each sample, 2m(f(x) - y)
         }
 
         private float[][] lossHuber(float[][] outputs, float[][] targets) {//Notation at https://en.wikipedia.org/wiki/Huber_loss
@@ -767,10 +660,10 @@ public class NNLib extends Application implements Serializable {
         }
 
         private float[][] lossLog(float[][] outputs, float[][] targets) {
-            cost = -sum(multiply(targets, ln(outputs)));//Update cost
-            int rows = outputs.length;
             int columns = outputs[0].length;
-            return divide(subtract(outputs, targets), add(multiply(subtract(create(rows, columns, 1), outputs), outputs), create(rows, columns, Float.MIN_VALUE)));//Adding minimum value to prevent dividing by zero
+            cost = -sum(multiply(targets, ln(outputs))) / columns;//Update cost
+            return divide(subtract(outputs, targets), add(multiply(subtract(create(1, columns, 1), outputs), outputs), create(1, columns, Float.MIN_VALUE)));//Adding minimum value to prevent dividing by zero
+//            return subtract(outputs, targets);
         }
 
         private class MatrixThread extends Thread {
@@ -828,6 +721,48 @@ public class NNLib extends Application implements Serializable {
         }
     }
 
+    public class DenseLayer implements Serializable {
+
+        float[][] weights;
+        float[][] biases;
+
+        DenseLayer(int nodesIn, int nodesOut, Initializer initializer, Random random) {
+            weights = create(nodesIn, nodesOut, 0);
+            biases = create(1, nodesOut, 0);
+            weights = randomize(weights, 2, -1, random);
+            biases = randomize(biases, 2, -1, random);
+            if (null == initializer) {
+                throw new IllegalArgumentException("INVALID INITIALIZATION METHOD");
+            } else {
+                switch (initializer) {
+                    case VANILLA:
+                        weights = vanilla(weights);
+                        break;
+                    case XAVIER:
+                        weights = xavier(weights, nodesIn);
+                        break;
+                    case HE:
+                        weights = he(weights, nodesIn);
+                        break;
+                    default:
+                        throw new IllegalArgumentException("INVALID INITIALIZATION METHOD");
+                }
+            }
+        }
+
+        private float[][] vanilla(float[][] weights) {
+            return weights;
+        }
+
+        private float[][] xavier(float[][] weights, int nodesIn) {
+            return scale(weights, (float) (1 / Math.sqrt(nodesIn)));
+        }
+
+        private float[][] he(float[][] weights, int nodesIn) {
+            return scale(weights, (float) Math.sqrt(2 / nodesIn));
+        }
+    }
+
     private void sizeException(float[][] matrix) {
         int rows = matrix.length;
         int columns = matrix[0].length;
@@ -851,7 +786,7 @@ public class NNLib extends Application implements Serializable {
         }
     }
 
-    static public void print(float[][] matrix, String nameOfMatrix) {
+    public static void print(float[][] matrix, String nameOfMatrix) {
         System.out.println(nameOfMatrix + ": ");
         int rows = matrix.length;
         int columns = matrix[0].length;
@@ -863,137 +798,73 @@ public class NNLib extends Application implements Serializable {
         }
     }
 
-    static public float[][] doubleToFloat(double[][] matrix) {
+    public static float[][] doubleToFloat(double[][] matrix) {
         int rows = matrix.length;
         int columns = matrix[0].length;
-        float[][] matrixResult = new float[rows][columns];
+        float[][] result = new float[rows][columns];
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < columns; j++) {
-                matrixResult[i][j] = (float) (matrix[i][j]);
+                result[i][j] = (float) (matrix[i][j]);
             }
         }
-        return matrixResult;
+        return result;
     }
 
-    static public float[][] create(int rows, int columns, float valueToAllElements) {
-        float[][] matrixResult = new float[rows][columns];
+    public static float[][] create(int rows, int columns, float valueToAllElements) {
+        float[][] result = new float[rows][columns];
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < columns; j++) {
-                matrixResult[i][j] = valueToAllElements;
+                result[i][j] = valueToAllElements;
             }
         }
-        return matrixResult;
+        return result;
     }
 
-    static public float[][] randomize(float[][] matrix, float range, float minimum) {
-        float[][] matrixResult = matrix;
-        int rows = matrixResult.length;
-        int columns = matrixResult[0].length;
-        for (int i = 0; i < rows; i++) {
-            for (int j = 0; j < columns; j++) {
-                matrixResult[i][j] = (float) Math.random() * range + minimum;
-            }
-        }
-        return matrixResult;
+    public static float[][] randomize(float[][] matrix, float range, float minimum) {
+        return function(matrix, a -> (float) Math.random() * range + minimum);
     }
 
-    static public float[][] randomize(float[][] matrix, float range, float minimum, Random random) {
-        float[][] matrixResult = matrix;
-        int rows = matrixResult.length;
-        int columns = matrixResult[0].length;
-        for (int i = 0; i < rows; i++) {
-            for (int j = 0; j < columns; j++) {
-                matrixResult[i][j] = random.nextFloat() * range + minimum;
-            }
-        }
-        return matrixResult;
+    public static float[][] randomize(float[][] matrix, float range, float minimum, Random random) {
+        return function(matrix, a -> random.nextFloat() * range + minimum);
     }
 
-    static public float[][] transpose(float[][] matrix) {
-        float[][] matrixResult = new float[matrix[0].length][matrix.length];
+    public static float[][] transpose(float[][] matrix) {
         int rows = matrix.length;
         int columns = matrix[0].length;
+        float[][] result = new float[columns][rows];
         for (int j = 0; j < columns; j++) {
             for (int i = 0; i < rows; i++) {
-                matrixResult[j][i] = matrix[i][j];
+                result[j][i] = matrix[i][j];
             }
         }
-        return matrixResult;
+        return result;
     }
 
-    static public float[][] scale(float[][] matrix, float factor) {
-        int rows = matrix.length;
-        int columns = matrix[0].length;
-        float[][] matrixResult = new float[rows][columns];
-        for (int i = 0; i < rows; i++) {
-            for (int j = 0; j < columns; j++) {
-                matrixResult[i][j] = factor * matrix[i][j];
-            }
-        }
-        return matrixResult;
+    public static float[][] scale(float[][] matrix, float factor) {
+        return function(matrix, a -> factor * a);
     }
 
-    static public float[][] scale(float factor, float[][] matrix) {
-        int rows = matrix.length;
-        int columns = matrix[0].length;
-        float[][] matrixResult = new float[rows][columns];
-        for (int i = 0; i < rows; i++) {
-            for (int j = 0; j < columns; j++) {
-                matrixResult[i][j] = factor * matrix[i][j];
-            }
-        }
-        return matrixResult;
+    public static float[][] scale(float factor, float[][] matrix) {
+        return function(matrix, a -> factor * a);
     }
 
-    static public float[][] add(float[][] matrixA, float[][] matrixB) {
-        int rows = matrixA.length;
-        int columns = matrixA[0].length;
-        float[][] matrixResult = new float[rows][columns];
-        for (int i = 0; i < rows; i++) {
-            for (int j = 0; j < columns; j++) {
-                matrixResult[i][j] = matrixA[i][j] + matrixB[i][j];
-            }
-        }
-        return matrixResult;
+    public static float[][] add(float[][] matrix1, float[][] matrix2) {
+        return bifunction(matrix1, matrix2, (a, b) -> a + b);
     }
 
-    static public float[][] subtract(float[][] matrixA, float[][] matrixB) {
-        int rows = matrixA.length;
-        int columns = matrixA[0].length;
-        float[][] matrixResult = new float[rows][columns];
-        for (int i = 0; i < rows; i++) {
-            for (int j = 0; j < columns; j++) {
-                matrixResult[i][j] = matrixA[i][j] - matrixB[i][j];
-            }
-        }
-        return matrixResult;
+    public static float[][] subtract(float[][] matrix1, float[][] matrix2) {
+        return bifunction(matrix1, matrix2, (a, b) -> a - b);
     }
 
-    static public float[][] multiply(float[][] matrixA, float[][] matrixB) {
-        int rows = matrixA.length;
-        int columns = matrixA[0].length;
-        float[][] matrixResult = new float[rows][columns];
-        for (int i = 0; i < rows; i++) {
-            for (int j = 0; j < columns; j++) {
-                matrixResult[i][j] = matrixA[i][j] * matrixB[i][j];
-            }
-        }
-        return matrixResult;
+    public static float[][] multiply(float[][] matrix1, float[][] matrix2) {
+        return bifunction(matrix1, matrix2, (a, b) -> a * b);
     }
 
-    static public float[][] divide(float[][] matrixA, float[][] matrixB) {
-        int rows = matrixA.length;
-        int columns = matrixA[0].length;
-        float[][] matrixResult = new float[rows][columns];
-        for (int i = 0; i < rows; i++) {
-            for (int j = 0; j < columns; j++) {
-                matrixResult[i][j] = matrixA[i][j] / matrixB[i][j];
-            }
-        }
-        return matrixResult;
+    public static float[][] divide(float[][] matrix1, float[][] matrix2) {
+        return bifunction(matrix1, matrix2, (a, b) -> a / b);
     }
 
-    static public float[][] dot(float[][] m1, float[][] m2) {
+    public static float[][] dot(float[][] m1, float[][] m2) {
         int rows1 = m1.length;
         int columns1 = m1[0].length;
         int columns2 = m2[0].length;
@@ -1040,44 +911,19 @@ public class NNLib extends Application implements Serializable {
         return result;
     }
 
-    static public float[][] power(float[][] matrix, double power) {
-        int rows = matrix.length;
-        int columns = matrix[0].length;
-        float[][] matrixResult = new float[rows][columns];
-        for (int i = 0; i < rows; i++) {
-            for (int j = 0; j < columns; j++) {
-                matrixResult[i][j] = (float) Math.pow(matrix[i][j], power);
-            }
-        }
-        return matrixResult;
+    public static float[][] power(float[][] matrix, double power) {
+        return function(matrix, a -> (float) Math.pow(a, power));
     }
 
-    static public float[][] square(float[][] matrix) {
-        int rows = matrix.length;
-        int columns = matrix[0].length;
-        float[][] matrixResult = new float[rows][columns];
-        for (int i = 0; i < rows; i++) {
-            for (int j = 0; j < columns; j++) {
-                float val = matrix[i][j];
-                matrixResult[i][j] = val * val;
-            }
-        }
-        return matrixResult;
+    public static float[][] square(float[][] matrix) {
+        return function(matrix, a -> a * a);
     }
 
-    static public float[][] sqrt(float[][] matrix) {
-        int rows = matrix.length;
-        int columns = matrix[0].length;
-        float[][] matrixResult = new float[rows][columns];
-        for (int i = 0; i < rows; i++) {
-            for (int j = 0; j < columns; j++) {
-                matrixResult[i][j] = (float) Math.sqrt(matrix[i][j]);
-            }
-        }
-        return matrixResult;
+    public static float[][] sqrt(float[][] matrix) {
+        return function(matrix, a -> (float) Math.sqrt(a));
     }
 
-    static public float sum(float[][] matrix) {
+    public static float sum(float[][] matrix) {
         float sum = 0;
         int rows = matrix.length;
         int columns = matrix[0].length;
@@ -1089,33 +935,33 @@ public class NNLib extends Application implements Serializable {
         return sum;
     }
 
-    static public float[][] ln(float[][] matrix) {
-        int rows = matrix.length;
-        int columns = matrix[0].length;
-        float[][] result = new float[rows][columns];
-        for (int i = 0; i < rows; i++) {
-            for (int j = 0; j < columns; j++) {
-                result[i][j] = (float) Math.log(matrix[i][j]);
-            }
-        }
-        return result;
+    public static float[][] abs(float[][] matrix) {
+        return function(matrix, a -> Math.abs(a));
     }
 
-    static public float[][] copy(float[][] matrix) {
+    public static float[][] exp(float[][] matrix) {
+        return function(matrix, a -> (float) Math.exp(a));
+    }
+
+    public static float[][] ln(float[][] matrix) {
+        return function(matrix, a -> (float) Math.log(a));
+    }
+
+    public static float[][] copy(float[][] matrix) {
         return Arrays.stream(matrix).map(el -> el.clone()).toArray(a -> matrix.clone());
     }
 
-    static public float[][] oneHot(float[][] m) {
-        int rows = m.length;
-        int columns = m[0].length;
+    public static float[][] oneHot(float[][] matrix) {
+        int rows = matrix.length;
+        int columns = matrix[0].length;
         float[][] result = create(rows, columns, 0);
         float max = Float.NEGATIVE_INFINITY;
         int x = 0;
         int y = 0;
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < columns; j++) {
-                if (max < m[i][j]) {
-                    max = m[i][j];
+                if (max < matrix[i][j]) {
+                    max = matrix[i][j];
                     x = i;
                     y = j;
                 }
@@ -1125,19 +971,7 @@ public class NNLib extends Application implements Serializable {
         return result;
     }
 
-    static public float[][] abs(float[][] m) {
-        int rows = m.length;
-        int columns = m[0].length;
-        float[][] result = new float[rows][columns];
-        for (int i = 0; i < rows; i++) {
-            for (int j = 0; j < columns; j++) {
-                result[i][j] = Math.abs(m[i][j]);
-            }
-        }
-        return result;
-    }
-
-    static public float[][] max(float[][] m1, float[][] m2) {//Size must match
+    public static float[][] max(float[][] m1, float[][] m2) {//Size must match
         int rows = m1.length;
         int columns = m1[0].length;
         float[][] result = new float[rows][columns];
@@ -1155,7 +989,7 @@ public class NNLib extends Application implements Serializable {
         return result;
     }
 
-    static public int argmax(float[][] oneRowMatrix) {
+    public static int argmax(float[][] oneRowMatrix) {
         float max = Float.NEGATIVE_INFINITY;
         int index = 0;
         for (int i = 0; i < oneRowMatrix[0].length; i++) {
@@ -1167,7 +1001,7 @@ public class NNLib extends Application implements Serializable {
         return index;
     }
 
-    static public int argmin(float[][] oneRowMatrix) {
+    public static int argmin(float[][] oneRowMatrix) {
         float min = Float.POSITIVE_INFINITY;
         int index = 0;
         for (int i = 0; i < oneRowMatrix[0].length; i++) {
@@ -1179,7 +1013,7 @@ public class NNLib extends Application implements Serializable {
         return index;
     }
 
-    static public float[][] append(float[][] oneRow1, float[][] oneRow2) {
+    public static float[][] append(float[][] oneRow1, float[][] oneRow2) {
         int length1 = oneRow1[0].length;
         int length2 = oneRow2[0].length;
         float[][] result = new float[1][length1 + length2];
@@ -1192,37 +1026,61 @@ public class NNLib extends Application implements Serializable {
         return result;
     }
 
-    static public float[][] normalTanh(float[][] inputs) {
+    public static float[][] normalTanh(float[][] inputs) {
         int elements = inputs[0].length;
         float[][] result = new float[1][elements];
         float mean = sum(inputs) / elements;
-        float deviation = (float) (Math.sqrt(sum(square(subtract(inputs, create(1, elements, mean)))) / (mean)));
+        float deviation = (float) (Math.sqrt(sum(square(subtract(inputs, create(1, elements, mean)))) / mean));
         for (int i = 0; i < inputs[0].length; i++) {
             result[0][i] = (float) (.5 * (tanh((float) (.01 * ((inputs[0][i] - mean) / (deviation))), false) + 1));//Tanh estimator normalization
         }
         return result;
     }
 
-    static public float[][] normalZScore(float[][] inputs) {
+    public static float[][] normalZScore(float[][] inputs) {
         int elements = inputs[0].length;
         float mean = sum(inputs) / elements;
         float deviation = (float) (Math.sqrt(sum(square(subtract(inputs, create(1, elements, mean)))) / (mean)));
         return divide(subtract(inputs, create(1, elements, mean)), create(1, elements, deviation));
     }
 
-    static public float sigmoid(float x, boolean derivative) {
+    public static float sigmoid(float x, boolean derivative) {
         if (derivative) {
             return sigmoid(x, false) * (1 - sigmoid(x, false));//sigmoid'(x)
         }
         return 1 / (1 + (float) Math.exp(-x));//sigmoid(x)
     }
 
-    static public float tanh(float x, boolean derivative) {
+    public static float tanh(float x, boolean derivative) {
         if (derivative == true) {
             float val = tanh(x, false);
             return 1 - val * val;//tanh'(x)
         }
         return (2 / (1 + (float) Math.exp(-2 * x))) - 1;//tanh(x)
+    }
+
+    public static float[][] function(float[][] matrix, Function<Float, Float> function) {
+        int rows = matrix.length;
+        int columns = matrix[0].length;
+        float[][] result = new float[rows][columns];
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < columns; j++) {
+                result[i][j] = function.apply(matrix[i][j]);
+            }
+        }
+        return result;
+    }
+
+    public static float[][] bifunction(float[][] m1, float[][] m2, BiFunction<Float, Float, Float> bifunction) {
+        int rows = m1.length;
+        int columns = m1[0].length;
+        float[][] result = new float[rows][columns];
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < columns; j++) {
+                result[i][j] = bifunction.apply(m1[i][j], m2[i][j]);
+            }
+        }
+        return result;
     }
 
     private static void initGraph(Stage stage, NN nn) {

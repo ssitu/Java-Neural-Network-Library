@@ -6,11 +6,11 @@ import neuralnetwork.NNLib.*;
 public class XOR_Classification {
 
     public static void main(String[] args) {
-        final boolean PRINT = true;
+        final boolean PRINT = false;
         NN nn = new NNLib().new NN(
                 "xor_classification",//Name for Saving & Graph Title
                 7777,//Seed For Reproducibility
-                .001,//Learning Rate for Optimizer
+                .0001,//Learning Rate for Optimizer
                 Initializer.VANILLA,//Weight Initializer Method
                 ActivationFunction.SIGMOID,//Hiddens
                 ActivationFunction.SOFTMAX,//Outputs
@@ -28,7 +28,7 @@ public class XOR_Classification {
         data.add(new Data(new float[]{1, 0}, new float[]{1, 0}));
         data.add(new Data(new float[]{0, 0}, new float[]{0, 1}));
         NNLib.graph(true, nn);
-        for (int i = 0; i < 10_000_000; i++) {
+        for (int i = 0; i < 1_000_000; i++) {
             int index = nn.getRandom().nextInt(4);
             if (PRINT) {
                 NNLib.print(data.get(index).inputs, "inputs");
