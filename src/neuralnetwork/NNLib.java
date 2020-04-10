@@ -513,56 +513,16 @@ public class NNLib extends Application implements Serializable {
             return function(matrix, a -> tanh(a, derivative));
         }
 
-        private float relu(float x, boolean derivative) {
-            if (derivative) {
-                if (x < 0) {
-                    return 0;
-                } else {
-                    return 1;
-                }
-            } else {
-                return Math.max(0, x);
-            }
-        }
-
         private float[][] activationRelu(float[][] matrix, boolean derivative) {
             return function(matrix, a -> relu(a, derivative));
         }
 
-        private float leakyRelu(float x, boolean derivative) {
-            if (derivative == true) {
-                if (x < 0) {
-                    return .001f;
-                } else {
-                    return 1;
-                }
-            } else {
-                return Math.max(.001f * x, x);
-            }
-        }
-
         private float[][] activationLeakyRelu(float[][] matrix, boolean derivative) {
-            return function(matrix, a -> leakyRelu(a, derivative));
-        }
-
-        private float swish(float x, boolean derivative) {
-            if (!derivative) {
-                return x * sigmoid(x, false);
-            }
-            return x * sigmoid(x, true) + sigmoid(x, false);
+            return function(matrix, a -> leakyrelu(a, derivative));
         }
 
         private float[][] activationSwish(float[][] matrix, boolean derivative) {
             return function(matrix, a -> swish(a, derivative));
-        }
-
-        private float mish(float x, boolean derivative) {
-            if (!derivative) {
-                return (float) (x * tanh((float) Math.log(1 + Math.exp(x)), false));
-            } else {
-                double x_ = (double) x;
-                return (float) ((Math.exp(x_) * ((4 * (x_ + 1)) + (4 * Math.exp(2 * x_)) + (Math.exp(3 * x_)) + (Math.exp(x_) * (4 * x_ + 6)))) / ((2 * Math.exp(2 * x_)) + (Math.exp(2 * x_)) + 2));
-            }
         }
 
         private float[][] activationMish(float[][] matrix, boolean derivative) {
@@ -588,12 +548,6 @@ public class NNLib extends Application implements Serializable {
                 }
                 return result;
             }
-        }
-
-        public float[][] softmax(float[][] matrix) {
-            float[][] e = exp(matrix);
-            float inverseSum = 1 / sum(e);
-            return scale(inverseSum, e);
         }
 
         private float[][] activationSoftmax(float[][] matrix, boolean derivative) {
@@ -821,11 +775,11 @@ public class NNLib extends Application implements Serializable {
     }
 
     public static float[][] randomize(float[][] matrix, float range, float minimum) {
-        return function(matrix, a -> (float) Math.random() * range + minimum);
+        return function(matrix, val -> (float) Math.random() * range + minimum);
     }
 
     public static float[][] randomize(float[][] matrix, float range, float minimum, Random random) {
-        return function(matrix, a -> random.nextFloat() * range + minimum);
+        return function(matrix, val -> random.nextFloat() * range + minimum);
     }
 
     public static float[][] transpose(float[][] matrix) {
@@ -841,27 +795,27 @@ public class NNLib extends Application implements Serializable {
     }
 
     public static float[][] scale(float[][] matrix, float factor) {
-        return function(matrix, a -> factor * a);
+        return function(matrix, val -> factor * val);
     }
 
     public static float[][] scale(float factor, float[][] matrix) {
-        return function(matrix, a -> factor * a);
+        return function(matrix, val -> factor * val);
     }
 
     public static float[][] add(float[][] matrix1, float[][] matrix2) {
-        return bifunction(matrix1, matrix2, (a, b) -> a + b);
+        return bifunction(matrix1, matrix2, (val1, val2) -> val1 + val2);
     }
 
     public static float[][] subtract(float[][] matrix1, float[][] matrix2) {
-        return bifunction(matrix1, matrix2, (a, b) -> a - b);
+        return bifunction(matrix1, matrix2, (val1, val2) -> val1 - val2);
     }
 
     public static float[][] multiply(float[][] matrix1, float[][] matrix2) {
-        return bifunction(matrix1, matrix2, (a, b) -> a * b);
+        return bifunction(matrix1, matrix2, (val1, val2) -> val1 * val2);
     }
 
     public static float[][] divide(float[][] matrix1, float[][] matrix2) {
-        return bifunction(matrix1, matrix2, (a, b) -> a / b);
+        return bifunction(matrix1, matrix2, (val1, val2) -> val1 / val2);
     }
 
     public static float[][] dot(float[][] m1, float[][] m2) {
@@ -1057,6 +1011,52 @@ public class NNLib extends Application implements Serializable {
             return 1 - val * val;//tanh'(x)
         }
         return (2 / (1 + (float) Math.exp(-2 * x))) - 1;//tanh(x)
+    }
+
+    public static float relu(float x, boolean derivative) {
+        if (derivative) {
+            if (x < 0) {
+                return 0;
+            } else {
+                return 1;
+            }
+        } else {
+            return Math.max(0, x);
+        }
+    }
+
+    public static float leakyrelu(float x, boolean derivative) {
+        if (derivative == true) {
+            if (x < 0) {
+                return .001f;
+            } else {
+                return 1;
+            }
+        } else {
+            return Math.max(.001f * x, x);
+        }
+    }
+
+    public static float swish(float x, boolean derivative) {
+        if (!derivative) {
+            return x * sigmoid(x, false);
+        }
+        return x * sigmoid(x, true) + sigmoid(x, false);
+    }
+
+    public static float mish(float x, boolean derivative) {
+        if (!derivative) {
+            return (float) (x * tanh((float) Math.log(1 + Math.exp(x)), false));
+        } else {
+            double x_ = (double) x;
+            return (float) ((Math.exp(x_) * ((4 * (x_ + 1)) + (4 * Math.exp(2 * x_)) + (Math.exp(3 * x_)) + (Math.exp(x_) * (4 * x_ + 6)))) / ((2 * Math.exp(2 * x_)) + (Math.exp(2 * x_)) + 2));
+        }
+    }
+
+    public static float[][] softmax(float[][] matrix) {
+        float[][] e = exp(matrix);
+        float inverseSum = 1 / sum(e);
+        return scale(inverseSum, e);
     }
 
     public static float[][] function(float[][] matrix, Function<Float, Float> function) {

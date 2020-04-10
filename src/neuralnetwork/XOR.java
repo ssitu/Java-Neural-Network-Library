@@ -28,7 +28,7 @@ public class XOR {
         data.add(new Data(new float[]{1, 0}, new float[]{1}));//True, False = True
         data.add(new Data(new float[]{0, 0}, new float[]{0}));//False, False = False
         NNLib.graph(false, nn);
-        for (int i = 0; i < 100_000_000; i++) {
+        for (int i = 0; i < 1_000_000_000; i++) {
             int index = nn.getRandom().nextInt(4);
             if (PRINT) {
                 NNLib.print(data.get(index).inputs, "inputs");
