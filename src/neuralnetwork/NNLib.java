@@ -241,11 +241,11 @@ public class NNLib extends Application implements Serializable {
                 if (!outputLayer) {
                     dC_dA = dotProduct.apply(dC_dZ, transpose(dZ_dA));
                 }
-                if (outputLayer) {
-                    dC_dZ = multiply(dA_dZ, dC_dA);
-                } else {
-                    dC_dZ = multiply(dC_dA, dA_dZ);
-                }
+//                if (outputLayer) {
+//                    dC_dZ = multiply(dA_dZ, dC_dA);
+//                } else {
+                dC_dZ = multiply(dC_dA, dA_dZ);
+//                }
                 dC_dW = dotProduct.apply(transpose(dZ_dW), dC_dZ);
                 //Add optimizer or updater to gradients
                 float[][][] updateB = optimizer.apply(lr, dC_dZ).apply(previousMomentsB[0][currentIndex], previousMomentsB[1][currentIndex]);
@@ -559,12 +559,12 @@ public class NNLib extends Application implements Serializable {
         }
 
         private float[][] activationSoftmax(float[][] matrix, boolean derivative) {
-            float[][] result = softmax(matrix);
             if (!derivative) {
-                return result;
+                return softmax(matrix);
             }
+            float[][] softmax = softmax(matrix);
             float[][] ones = create(matrix.length, matrix[0].length, 1);
-            return multiply(result, subtract(ones, result));
+            return multiply(softmax, subtract(ones, softmax));
         }
 
         private float[][] lossQuadratic(float[][] outputs, float[][] targets) {
@@ -613,12 +613,8 @@ public class NNLib extends Application implements Serializable {
         }
 
         private float[][] lossLog(float[][] outputs, float[][] targets) {
-            int columns = outputs[0].length;
-            cost = -sum(multiply(targets, ln(outputs))) / columns;//Update cost
-            float[][] ones = create(1, columns, 1);
-//            return divide(subtract(outputs, targets), add(multiply(subtract(ones, outputs), outputs), create(1, columns, Float.MIN_VALUE)));//Adding minimum value to prevent dividing by zero
-//            return subtract(outputs, targets);
-            return add(multiply(targets, subtract(outputs, ones)), multiply(subtract(ones, targets), outputs));
+            cost = -sum(multiply(targets, ln(outputs)));//Update cost
+            return subtract(outputs, targets);
         }
 
         private class MatrixThread extends Thread {

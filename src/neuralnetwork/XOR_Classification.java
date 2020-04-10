@@ -18,7 +18,7 @@ public class XOR_Classification {
                 Optimizer.AMSGRAD,//Stochastic Gradient Descent Optimizer
                 2, 2, 2//Network Architecture
         );
-        nn.setActivationFunctionHiddens((matrix, derivative) -> {
+        nn.setActivationFunctionHiddens((matrix, derivative) -> {//Custom activation function
             int rows = matrix.length;
             int columns = matrix[0].length;
             if (!derivative) {
@@ -47,10 +47,10 @@ public class XOR_Classification {
         data.add(new Data(new float[]{0, 1}, new float[]{1, 0}));
         data.add(new Data(new float[]{1, 0}, new float[]{1, 0}));
         data.add(new Data(new float[]{0, 0}, new float[]{0, 1}));
-        NNLib.graph(true, nn);
+        NNLib.graph(false, nn);
         for (int i = 0; i < 1_000_000; i++) {
             int index = nn.getRandom().nextInt(4);
-            if (PRINT && i % 100 == 0) {
+            if (PRINT && i % 1000 == 0) {
                 NNLib.print(data.get(index).inputs, "inputs");
                 NNLib.print(nn.feedforward(data.get(index).inputs), "feedforward");
                 System.out.println("");
