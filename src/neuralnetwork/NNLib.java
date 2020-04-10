@@ -26,13 +26,15 @@ public class NNLib extends Application implements Serializable {
     }
 
     public enum ActivationFunction {
-        LINEAR, SIGMOID, TANH, RELU, LEAKYRELU, SWISH, MISH, CUSTOM,
-        SOFTMAX
+        LINEAR, SIGMOID, TANH, RELU, LEAKYRELU, SWISH, MISH,
+        SOFTMAX,
+        CUSTOM //Custom function cannot be set in the NN enum constructor
     }
 
     public enum LossFunction {
-        QUADRATIC(.5), HUBER(1), HUBERPSEUDO(1), CUSTOM(1),
-        CROSS_ENTROPY(1);
+        QUADRATIC(.5), HUBER(1), HUBERPSEUDO(1),
+        CROSS_ENTROPY(1),
+        CUSTOM(0); //Custom function cannot be set in the NN enum constructor
 
         private float steepness;
 
@@ -349,9 +351,6 @@ public class NNLib extends Application implements Serializable {
                     case MISH:
                         activation = (a, b) -> activationMish(a, b);
                         break;
-                    case CUSTOM:
-                        activation = (a, b) -> activationCustom(a, b);
-                        break;
                     case SOFTMAX:
                         activation = (a, b) -> activationSoftmax(a, b);
                         break;
@@ -375,6 +374,14 @@ public class NNLib extends Application implements Serializable {
             activationOutputs = assignActivationFunction(activationOutputs, outputActivationFunction, false);
         }
 
+        public void setActivationFunctionHiddens(BiFunction<float[][], Boolean, float[][]> differentiableFunction) {
+            activationHiddens = differentiableFunction;
+        }
+
+        public void setActivationFunctionOutputs(BiFunction<float[][], Boolean, float[][]> differentiableFunction) {
+            activationOutputs = differentiableFunction;
+        }
+
         public void setLossFunction(LossFunction lossFunction) {
             if (null == lossFunction) {
                 throw new IllegalArgumentException("INVALID COST FUNCTION");
@@ -389,9 +396,6 @@ public class NNLib extends Application implements Serializable {
                     case HUBERPSEUDO:
                         this.lossFunction = (a, b) -> lossPseudoHuber(a, b);
                         break;
-                    case CUSTOM:
-                        this.lossFunction = (a, b) -> lossCustom(a, b);
-                        break;
                     case CROSS_ENTROPY:
                         this.lossFunction = (a, b) -> lossLog(a, b);
                         break;
@@ -400,6 +404,11 @@ public class NNLib extends Application implements Serializable {
                 }
             }
             LOSSFUNCTION = lossFunction;
+        }
+
+        public void setLossFunction(BiFunction<float[][], float[][], float[][]> lossFunction) {
+            this.lossFunction = lossFunction;
+            LOSSFUNCTION = LossFunction.CUSTOM;
         }
 
         public void setOptimizer(Optimizer updater) {
@@ -529,27 +538,6 @@ public class NNLib extends Application implements Serializable {
             return function(matrix, a -> mish(a, derivative));
         }
 
-        private float[][] activationCustom(float[][] x, boolean derivative) {
-            int rows = x.length;
-            int columns = x[0].length;
-            if (!derivative) {
-                return max(activationTanh(x, false), x);
-            } else {
-                float[][] result = new float[rows][columns];
-                for (int i = 0; i < rows; i++) {
-                    for (int j = 0; j < columns; j++) {
-                        float val = x[i][j];
-                        if (tanh(val, false) > val) {
-                            result[i][j] = tanh(val, true);
-                        } else {
-                            result[i][j] = 1;
-                        }
-                    }
-                }
-                return result;
-            }
-        }
-
         private float[][] activationSoftmax(float[][] matrix, boolean derivative) {
             float[][] result = softmax(matrix);
             if (!derivative) {
@@ -604,20 +592,13 @@ public class NNLib extends Application implements Serializable {
             return divide(a, root);
         }
 
-        private float[][] lossCustom(float[][] outputs, float[][] targets) {
-            int columns = outputs[0].length;
-            final float[][] a = subtract(outputs, targets);
-            final float[][] aSquared = square(a);
-            final float[][] constant = create(1, columns, .25f);
-            cost = sum(divide(a, add(constant, aSquared))) / columns;//Loss Function
-            return divide(subtract(constant, aSquared), square(add(aSquared, constant)));//Derivative of the function with respect to a
-        }
-
         private float[][] lossLog(float[][] outputs, float[][] targets) {
             int columns = outputs[0].length;
             cost = -sum(multiply(targets, ln(outputs))) / columns;//Update cost
-            return divide(subtract(outputs, targets), add(multiply(subtract(create(1, columns, 1), outputs), outputs), create(1, columns, Float.MIN_VALUE)));//Adding minimum value to prevent dividing by zero
+            float[][] ones = create(1, columns, 1);
+//            return divide(subtract(outputs, targets), add(multiply(subtract(ones, outputs), outputs), create(1, columns, Float.MIN_VALUE)));//Adding minimum value to prevent dividing by zero
 //            return subtract(outputs, targets);
+            return add(multiply(targets, subtract(outputs, ones)), multiply(subtract(ones, targets), outputs));
         }
 
         private class MatrixThread extends Thread {
@@ -714,29 +695,6 @@ public class NNLib extends Application implements Serializable {
 
         private float[][] he(float[][] weights, int nodesIn) {
             return scale(weights, (float) Math.sqrt(2 / nodesIn));
-        }
-    }
-
-    private void sizeException(float[][] matrix) {
-        int rows = matrix.length;
-        int columns = matrix[0].length;
-        for (int i = 0; i < rows; i++) {
-            if (matrix[i].length != columns) {
-                throw new IllegalArgumentException("Inconsistent Matrix Size");
-            }
-        }
-    }
-
-    private void dotDimensionMismatch(float[][] matrixA, float[][] matrixB) {
-        if (matrixA[0].length != matrixB.length)//A columns must equal B rows
-        {
-            throw new IllegalArgumentException("Matrices Dimension Mismatch");
-        }
-    }
-
-    private void dimensionMismatch(float[][] matrixA, float[][] matrixB) {
-        if (matrixA.length != matrixB.length || matrixA[0].length != matrixB[0].length) {
-            throw new IllegalArgumentException("Matrices Dimension Mismatch");
         }
     }
 
@@ -866,15 +824,15 @@ public class NNLib extends Application implements Serializable {
     }
 
     public static float[][] power(float[][] matrix, double power) {
-        return function(matrix, a -> (float) Math.pow(a, power));
+        return function(matrix, val -> (float) Math.pow(val, power));
     }
 
     public static float[][] square(float[][] matrix) {
-        return function(matrix, a -> a * a);
+        return function(matrix, val -> val * val);
     }
 
     public static float[][] sqrt(float[][] matrix) {
-        return function(matrix, a -> (float) Math.sqrt(a));
+        return function(matrix, val -> (float) Math.sqrt(val));
     }
 
     public static float sum(float[][] matrix) {
@@ -890,15 +848,15 @@ public class NNLib extends Application implements Serializable {
     }
 
     public static float[][] abs(float[][] matrix) {
-        return function(matrix, a -> Math.abs(a));
+        return function(matrix, val -> Math.abs(val));
     }
 
     public static float[][] exp(float[][] matrix) {
-        return function(matrix, a -> (float) Math.exp(a));
+        return function(matrix, val -> (float) Math.exp(val));
     }
 
     public static float[][] ln(float[][] matrix) {
-        return function(matrix, a -> (float) Math.log(a));
+        return function(matrix, val -> (float) Math.log(val));
     }
 
     public static float[][] copy(float[][] matrix) {
@@ -925,14 +883,14 @@ public class NNLib extends Application implements Serializable {
         return result;
     }
 
-    public static float[][] max(float[][] m1, float[][] m2) {//Size must match
-        int rows = m1.length;
-        int columns = m1[0].length;
+    public static float[][] max(float[][] matrix1, float[][] matrix2) {//Size must match
+        int rows = matrix1.length;
+        int columns = matrix1[0].length;
         float[][] result = new float[rows][columns];
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < columns; j++) {
-                float val1 = m1[i][j];
-                float val2 = m2[i][j];
+                float val1 = matrix1[i][j];
+                float val2 = matrix2[i][j];
                 if (val1 > val2) {
                     result[i][j] = val1;
                 } else {
