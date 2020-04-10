@@ -19,13 +19,15 @@ The parameters take in enums from the [NNLib class](https://github.com/SSithub/N
     }
 
     public enum ActivationFunction {
-        LINEAR, SIGMOID, TANH, RELU, LEAKYRELU, SWISH, MISH, CUSTOM,
-        SOFTMAX
+        LINEAR, SIGMOID, TANH, RELU, LEAKYRELU, SWISH, MISH,
+        SOFTMAX,
+        CUSTOM //Custom cannot be set in the NN enum constructor
     }
 
     public enum LossFunction {
-        QUADRATIC(.5), HUBER(1), HUBERPSEUDO(1), CUSTOM(0),
-        CROSS_ENTROPY(0);
+        QUADRATIC(.5), HUBER(1), HUBERPSEUDO(1),
+        CROSS_ENTROPY(1),
+        CUSTOM(0); //Custom cannot be set in the NN enum constructor
 
         private float steepness;
 
@@ -41,5 +43,6 @@ The parameters take in enums from the [NNLib class](https://github.com/SSithub/N
     }
 
     public enum Optimizer {
-        VANILLA, MOMENTUM, RMSPROP, ADAM, ADAMAX, NADAM, AMSGRAD
+        VANILLA, MOMENTUM, RMSPROP, ADAM, ADAMAX, NADAM, AMSGRAD,
+        CUSTOM //Custom cannot be set in the NN enum constructor
     }
