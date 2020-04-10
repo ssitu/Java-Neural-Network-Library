@@ -28,13 +28,13 @@ public class NNLib extends Application implements Serializable {
     public enum ActivationFunction {
         LINEAR, SIGMOID, TANH, RELU, LEAKYRELU, SWISH, MISH,
         SOFTMAX,
-        CUSTOM //Custom function cannot be set in the NN enum constructor
+        CUSTOM //Custom cannot be set in the NN enum constructor
     }
 
     public enum LossFunction {
         QUADRATIC(.5), HUBER(1), HUBERPSEUDO(1),
         CROSS_ENTROPY(1),
-        CUSTOM(0); //Custom function cannot be set in the NN enum constructor
+        CUSTOM(0); //Custom cannot be set in the NN enum constructor
 
         private float steepness;
 
@@ -50,7 +50,8 @@ public class NNLib extends Application implements Serializable {
     }
 
     public enum Optimizer {
-        VANILLA, MOMENTUM, RMSPROP, ADAM, ADAMAX, NADAM, AMSGRAD
+        VANILLA, MOMENTUM, RMSPROP, ADAM, ADAMAX, NADAM, AMSGRAD,
+        CUSTOM //Custom cannot be set in the NN enum constructor
     }
 
     private static boolean graphMeasuresAccuracy;
@@ -376,10 +377,12 @@ public class NNLib extends Application implements Serializable {
 
         public void setActivationFunctionHiddens(BiFunction<float[][], Boolean, float[][]> differentiableFunction) {
             activationHiddens = differentiableFunction;
+            HIDDENACTIVATIONFUNCTION = ActivationFunction.CUSTOM;
         }
 
         public void setActivationFunctionOutputs(BiFunction<float[][], Boolean, float[][]> differentiableFunction) {
             activationOutputs = differentiableFunction;
+            HIDDENACTIVATIONFUNCTION = ActivationFunction.CUSTOM;
         }
 
         public void setLossFunction(LossFunction lossFunction) {
@@ -440,6 +443,23 @@ public class NNLib extends Application implements Serializable {
                 }
             }
             OPTIMIZER = updater;
+        }
+
+        /**
+         *
+         * @param optimizer The first two function parameters are strictly for
+         * the learning rate and the gradients respectively. The last two
+         * function parameters are storage for info such as previous moments of
+         * the optimizer's operations on the gradients. The return value is an
+         * array of a maximum of three matrixes where the first element is the
+         * gradient to be subtracted from the network weights and biases. The
+         * last two elements are stored to be passed into the next iteration of
+         * the optimizer as the third and forth parameters of the nested
+         * BiFunction.
+         */
+        public void setOptimizer(BiFunction<Float, float[][], BiFunction<float[][], float[][], float[][][]>> optimizer) {
+            this.optimizer = optimizer;
+            OPTIMIZER = Optimizer.CUSTOM;
         }
 
         private float[][][] momentum(float lr, float[][] gradients, float[][] v) {
