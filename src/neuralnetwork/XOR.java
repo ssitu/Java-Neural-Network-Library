@@ -11,12 +11,10 @@ public class XOR {
                 "xor",//Name for Saving & Graph Title
                 7777,//Seed For Reproducibility
                 .01,//Learning Rate for Optimizer
-                Initializer.VANILLA,//Weight & Bias Initializer Method
-                ActivationFunction.SIGMOID,//Hiddens
-                ActivationFunction.SIGMOID,//Outputs
-                LossFunction.QUADRATIC.steepness(2),//Loss/Cost/Error Function
+                LossFunction.QUADRATIC(.5f),//Loss/Cost/Error Function
                 Optimizer.VANILLA,//Stochastic Gradient Descent Optimizer
-                2, 2, 1//Network Architecture
+                new LayerDense(2, 2, ActivationFunction.SIGMOID, Initializer.VANILLA),//2 in, 2 out
+                new LayerDense(2, 1, ActivationFunction.SIGMOID, Initializer.VANILLA)//2 in from the previous layer, 1 out
         );
         System.out.println(nn.NETWORKSIZE);
         System.out.println(nn.toString());

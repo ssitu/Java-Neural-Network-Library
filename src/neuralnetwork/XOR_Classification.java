@@ -1,24 +1,14 @@
 package neuralnetwork;
 
 import java.util.ArrayList;
+import java.util.function.BiFunction;
 import neuralnetwork.NNLib.*;
 
 public class XOR_Classification {
 
     public static void main(String[] args) {
         final boolean PRINT = true;
-        NN nn = new NNLib().new NN(
-                "xor_classification",//Name for Saving & Graph Title
-                7777,//Seed For Reproducibility
-                .001,//Learning Rate for Optimizer
-                Initializer.VANILLA,//Weight Initializer Method
-                ActivationFunction.SIGMOID,//Hiddens
-                ActivationFunction.SOFTMAX,//Outputs
-                LossFunction.CROSS_ENTROPY,//Loss/Cost/Error Function
-                Optimizer.AMSGRAD,//Stochastic Gradient Descent Optimizer
-                2, 2, 2//Network Architecture
-        );
-        nn.setActivationFunctionHiddens((matrix, derivative) -> {//Custom activation function
+        final BiFunction<float[][], Boolean, float[][]> CUSTOM = (matrix, derivative) -> {//Custom activation function
             int rows = matrix.length;
             int columns = matrix[0].length;
             if (!derivative) {
@@ -37,7 +27,16 @@ public class XOR_Classification {
                 }
                 return result;
             }
-        });
+        };
+        NN nn = new NNLib().new NN(
+                "xor_classification",//Name for Saving & Graph Title
+                7777,//Seed For Reproducibility
+                .001,//Learning Rate for Optimizer
+                LossFunction.CROSSENTROPY(),//Loss/Cost/Error Function
+                Optimizer.AMSGRAD,//Stochastic Gradient Descent Optimizer
+                new LayerDense(2, 2, CUSTOM, Initializer.HE),
+                new LayerDense(2, 1, ActivationFunction.SIGMOID, Initializer.XAVIER)
+        );
         System.out.println(nn.NETWORKSIZE);
         System.out.println(nn.toString());
         ArrayList<Data> data = new ArrayList<>();
