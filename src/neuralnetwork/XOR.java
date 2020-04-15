@@ -9,7 +9,7 @@ public class XOR {
         final boolean PRINT = true;
         NN nn = new NNLib().new NN(
                 "xor",//Name for Saving & Graph Title
-                7777,//Seed For Reproducibility
+                777,//Seed For Reproducibility
                 .01,//Learning Rate for Optimizer
                 LossFunction.QUADRATIC(.5f),//Loss/Cost/Error Function
                 Optimizer.VANILLA,//Stochastic Gradient Descent Optimizer

@@ -1,7 +1,6 @@
 package neuralnetwork;
 
 import java.util.ArrayList;
-import java.util.function.BiFunction;
 import neuralnetwork.NNLib.*;
 
 public class XOR_Classification {
@@ -30,12 +29,12 @@ public class XOR_Classification {
         };
         NN nn = new NNLib().new NN(
                 "xor_classification",//Name for Saving & Graph Title
-                7777,//Seed For Reproducibility
+                777,//Seed For Reproducibility
                 .001,//Learning Rate for Optimizer
-                LossFunction.CROSSENTROPY(),//Loss/Cost/Error Function
-                Optimizer.AMSGRAD,//Stochastic Gradient Descent Optimizer
-                new LayerDense(2, 2, CUSTOM, Initializer.HE),
-                new LayerDense(2, 1, ActivationFunction.SIGMOID, Initializer.XAVIER)
+                LossFunction.CROSSENTROPY(1),//Loss/Cost/Error Function
+                Optimizer.VANILLA,//Stochastic Gradient Descent Optimizer
+                new LayerDense(2, 2, CUSTOM, Initializer.XAVIER),
+                new LayerDense(2, 2, ActivationFunction.SOFTMAX, Initializer.XAVIER)
         );
         System.out.println(nn.NETWORKSIZE);
         System.out.println(nn.toString());
@@ -47,9 +46,9 @@ public class XOR_Classification {
         data.add(new Data(new float[]{1, 0}, new float[]{1, 0}));
         data.add(new Data(new float[]{0, 0}, new float[]{0, 1}));
         NNLib.graph(false, nn);
-        for (int i = 0; i < 1_000_000; i++) {
+        for (int i = 0; i < 1_000_00000; i++) {
             int index = nn.getRandom().nextInt(4);
-            if (PRINT && i % 1000 == 0) {
+            if (PRINT && i % 100000 == 0) {
                 NNLib.print(data.get(index).inputs, "inputs");
                 NNLib.print(nn.feedforward(data.get(index).inputs), "feedforward");
                 System.out.println("");

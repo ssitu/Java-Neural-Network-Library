@@ -8,8 +8,6 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Random;
-import java.util.function.BiFunction;
-import java.util.function.Function;
 import javafx.application.Application;
 import static javafx.application.Application.launch;
 import javafx.application.Platform;
@@ -21,25 +19,36 @@ import javafx.stage.Stage;
 
 public class NNLib extends Application implements Serializable {
 
+    public interface Function<T, R> extends java.util.function.Function<T, R>, Serializable {
+    }
+
+    public interface BiFunction<T, S, R> extends java.util.function.BiFunction<T, S, R>, Serializable {
+    }
+
+    public interface TriFunction<T, S, U, R> extends Serializable {
+
+        R apply(T t, S s, U u);
+    }
+
     private static boolean graphMeasuresAccuracy;
     private static NN nnForGraph;
     private static int threads;
-    private static transient BiFunction<float[][], float[][], float[][]> dotProduct = (a, b) -> dot(a, b);
+    private static BiFunction<float[][], float[][], float[][]> dotProduct = (a, b) -> dot(a, b);
 
     public final class NN implements Serializable {
 
-        private long sessions = 0;
         public final String NAME;
+        public final int NETWORKSIZE;//Counts only the hidden layers and yhe output layer, the input layer doesn't count.
         private Layer[] network;
+        private float lr;
         private Random random = new Random();
         private long seed;
-        private float lr;
         private double loss;
-        public final int NETWORKSIZE;//Total layers not including the input layer
-        private transient BiFunction<float[][], float[][], Object[]> lossFunction;
-        private transient BiFunction<Float, float[][], Function<float[][][], float[][][][]>> optimizer;
+        private long sessions = 0;
+        private BiFunction<float[][], float[][], Object[]> lossFunction;
+        private TriFunction<Float, float[][], float[][][], float[][][][]> optimizer;
 
-        NN(String networkName, long seed, double learningRate, BiFunction<float[][], float[][], Object[]> lossFunction, BiFunction<Float, float[][], Function<float[][][], float[][][][]>> optimizer, Layer... layers) {
+        NN(String networkName, long seed, double learningRate, BiFunction<float[][], float[][], Object[]> lossFunction, TriFunction<Float, float[][], float[][][], float[][][][]> optimizer, Layer... layers) {
             NAME = networkName;
             this.seed = seed;
             lr = (float) learningRate;
@@ -89,10 +98,6 @@ public class NNLib extends Application implements Serializable {
 
         public Layer getNetworkLayer(int layerIndex) {//0 returns the layer after the inputs (first hidden layer). Holds weights between itself and the layer before.
             return network[layerIndex];
-        }
-
-        public int getNetworkSize() {
-            return network.length;
         }
 
         public Random getRandom() {
@@ -157,15 +162,17 @@ public class NNLib extends Application implements Serializable {
 
         /**
          *
-         * @param optimizer The first two function parameters are strictly for
-         * the learning rate and the gradients respectively. The third parameter
-         * is storage for info such as previous moments of the optimizer's
-         * operations on the gradients. The return value is an 4D array where
-         * the gradient update is the held in arr[0][0] and the storage of info
-         * is held in arr[1] which is passed back into the third parameter in
-         * the next iteration.
+         * @param optimizer A function that takes in three parameters. The first
+         * two function parameters are strictly for the learning rate and the
+         * gradients. The third parameter is an array of matrices to store info
+         * like previous moments. The layers initialize the matrices of the
+         * first two elements of the storage to zeroes. If more than two
+         * matrices are needed to be stored, then add zeroed matrices to the
+         * initialize method of the Layer classes.
+         * @return An array of two elements maximum to fit both the gradient
+         * update and the storage array.
          */
-        public void setOptimizer(BiFunction<Float, float[][], Function<float[][][], float[][][][]>> optimizer) {
+        public void setOptimizer(TriFunction<Float, float[][], float[][][], float[][][][]> optimizer) {
             this.optimizer = optimizer;
         }
     }
@@ -181,7 +188,7 @@ public class NNLib extends Application implements Serializable {
 
         abstract float[][] forwardBack(float[][] in);
 
-        abstract float[][] back(float[][] dG, float[][] dZ_dA, float lr, BiFunction<Float, float[][], Function<float[][][], float[][][][]>> optimizer, boolean outputLayer);
+        abstract float[][] back(float[][] dG, float[][] dZ_dA, float lr, TriFunction<Float, float[][], float[][][], float[][][][]> optimizer, boolean outputLayer);
 
         abstract void randomize(float range);
 
@@ -198,7 +205,7 @@ public class NNLib extends Application implements Serializable {
         float[][] biases;
         float[][][] updateStorageW;
         float[][][] updateStorageB;
-        transient BiFunction<float[][], Boolean, float[][]> activation;
+        BiFunction<float[][], Boolean, float[][]> activation;
         BiFunction<float[][], Integer, float[][]> initializer;
         float[][] Z;
         float[][] prevA;
@@ -234,14 +241,14 @@ public class NNLib extends Application implements Serializable {
         }
 
         @Override
-        float[][] back(float[][] dG, float[][] dZ_dA, float lr, BiFunction<Float, float[][], Function<float[][][], float[][][][]>> optimizer, boolean outputLayer) {//dG = The running gradient from the previous backpropagated layer
+        float[][] back(float[][] dG, float[][] dZ_dA, float lr, TriFunction<Float, float[][], float[][][], float[][][][]> optimizer, boolean outputLayer) {//dG = The running gradient from the previous backpropagated layer
             if (!outputLayer) {
                 float[][] dA_dZ = activation.apply(Z, true);
                 float[][] dC_dA = dotProduct.apply(dG, transpose(dZ_dA));
                 float[][] dC_dZ = multiply(dC_dA, dA_dZ);
                 float[][] dC_dW = dotProduct.apply(transpose(prevA), dC_dZ);//prevA = dZ_dW;
-                float[][][][] updateW = optimizer.apply(lr, dC_dW).apply(updateStorageW);
-                float[][][][] updateB = optimizer.apply(lr, dC_dZ).apply(updateStorageB);
+                float[][][][] updateW = optimizer.apply(lr, dC_dW, updateStorageW);
+                float[][][][] updateB = optimizer.apply(lr, dC_dZ, updateStorageB);
                 float[][] gradientsW = updateW[0][0];
                 float[][] gradientsB = updateB[0][0];
                 updateStorageW = updateW[1];
@@ -251,10 +258,15 @@ public class NNLib extends Application implements Serializable {
                 return dC_dZ;
             }
             float[][] dA_dZ = activation.apply(Z, true);
-            float[][] dC_dZ = multiply(dG, dA_dZ);
+            float[][] dC_dZ;
+            if (dA_dZ.length == 1) {
+                dC_dZ = multiply(dG, dA_dZ);
+            } else {
+                dC_dZ = dotProduct.apply(dG, dA_dZ);//For jacobian matrices
+            }
             float[][] dC_dW = dotProduct.apply(transpose(prevA), dC_dZ);//prevA = dZ_dW;
-            float[][][][] updateW = optimizer.apply(lr, dC_dW).apply(updateStorageW);
-            float[][][][] updateB = optimizer.apply(lr, dC_dZ).apply(updateStorageB);
+            float[][][][] updateW = optimizer.apply(lr, dC_dW, updateStorageW);
+            float[][][][] updateB = optimizer.apply(lr, dC_dZ, updateStorageB);
             float[][] gradientsW = updateW[0][0];
             float[][] gradientsB = updateB[0][0];
             updateStorageW = updateW[1];
@@ -282,7 +294,6 @@ public class NNLib extends Application implements Serializable {
 
         @Override
         void mutate(float range, float mutateRate) {
-//            weights = add(weights, NNLib.randomize(weight range, -range / 2));//values on interval [-1,1]
             for (int i = 0; i < nodesIn; i++) {
                 for (int j = 0; j < nodesOut; j++) {
                     if (Math.random() < mutateRate) {
@@ -325,12 +336,22 @@ public class NNLib extends Application implements Serializable {
                 return softmax(matrix);
             }
             float[][] softmax = softmax(matrix);
-            float[][] ones = create(matrix.length, matrix[0].length, 1);
-            return multiply(softmax, subtract(ones, softmax));
+            int columns = matrix[0].length;
+            float[][] jacobian = new float[columns][columns];
+            for (int i = 0; i < columns; i++) {
+                for (int j = 0; j < columns; j++) {
+                    if (i == j) {
+                        jacobian[i][j] = softmax[0][i] * (1 - softmax[0][j]);
+                    } else {
+                        jacobian[i][j] = softmax[0][i] * -softmax[0][j];
+                    }
+                }
+            }
+            return jacobian;//Not sure if it should be transposed for my transposed style of a neural network, but the matrix is the same transposed in the xor classification example
         };
     }
 
-    public static class LossFunction {
+    public static class LossFunction {//Not sure if the sums should be divided by the number of outputs of the network
 
         /**
          *
@@ -338,8 +359,7 @@ public class NNLib extends Application implements Serializable {
          */
         static final BiFunction<float[][], float[][], Object[]> QUADRATIC(float steepness) {
             return (outputs, targets) -> {
-                int columns = outputs[0].length;
-                double loss = sum(scale(steepness, square(subtract(outputs, targets)))) / columns;//m(f(x) - y)^2 where f(x) is the output of the network and y is the target output
+                double loss = sum(scale(steepness, square(subtract(outputs, targets))));//m(f(x) - y)^2 where f(x) is the output of the network and y is the target output
                 return new Object[]{loss, scale(2 * steepness, subtract(outputs, targets))};//Derivative of the loss function for each sample, 2m(f(x) - y)
             };
         }
@@ -392,10 +412,14 @@ public class NNLib extends Application implements Serializable {
             };
         }
 
-        static final BiFunction<float[][], float[][], Object[]> CROSSENTROPY() {
+        /**
+         *
+         * @param steepness default value is 1
+         */
+        static final BiFunction<float[][], float[][], Object[]> CROSSENTROPY(float steepness) {
             return (outputs, targets) -> {
-                double loss = -sum(multiply(targets, ln(outputs)));
-                return new Object[]{loss, subtract(outputs, targets)};
+                double loss = steepness * -sum(multiply(targets, ln(outputs)));
+                return new Object[]{loss, scale(-steepness, divide(targets, outputs))};
             };
         }
     }
@@ -406,19 +430,19 @@ public class NNLib extends Application implements Serializable {
         public static final float beta = .9f;
         public static final float beta2 = .999f;
         public static final float e = .00000001f;
-        static final BiFunction<Float, float[][], Function<float[][][], float[][][][]>> VANILLA = (lr, gradients) -> storage -> {
+        static final TriFunction<Float, float[][], float[][][], float[][][][]> VANILLA = (lr, gradients, storage) -> {
             return new float[][][][]{{scale(lr, gradients)}, null};
         };
-        static final BiFunction<Float, float[][], Function<float[][][], float[][][][]>> MOMENTUM = (lr, gradients) -> storage -> {
+        static final TriFunction<Float, float[][], float[][][], float[][][][]> MOMENTUM = (lr, gradients, storage) -> {
             float[][] update = add(scale(beta, storage[0]), scale(lr, gradients));
             return new float[][][][]{{update}, {update}};
         };
-        static final BiFunction<Float, float[][], Function<float[][][], float[][][][]>> RMSPROP = (lr, gradients) -> storage -> {
+        static final TriFunction<Float, float[][], float[][][], float[][][][]> RMSPROP = (lr, gradients, storage) -> {
             float[][] s = add(scale(beta, storage[0]), scale(1 - beta, square(gradients)));
             float[][] update = divide(scale(lr, gradients), add(sqrt(s), create(s.length, s[0].length, e)));
             return new float[][][][]{{update}, {s}};
         };
-        static final BiFunction<Float, float[][], Function<float[][][], float[][][][]>> ADAM = (lr, gradients) -> storage -> {
+        static final TriFunction<Float, float[][], float[][][], float[][][][]> ADAM = (lr, gradients, storage) -> {
             float[][] m = add(scale((1 - beta), gradients), scale(beta, storage[0]));
             float[][] v = add(scale((1 - beta2), square(gradients)), scale(beta2, storage[1]));
             float[][] m_ = scale(1 / (1 - beta), m);//debiasing
@@ -426,15 +450,15 @@ public class NNLib extends Application implements Serializable {
             float[][] update = divide(scale(lr, m_), add(sqrt(v_), create(v_.length, v_[0].length, e)));
             return new float[][][][]{{update}, {m, v}};
         };
-        static final BiFunction<Float, float[][], Function<float[][][], float[][][][]>> ADAMAX = (lr, gradients) -> storage -> {
-            float[][] m = add(scale((1 - beta), gradients), scale(beta, storage[0]));
-            float[][] v = add(scale((1 - beta2), square(gradients)), scale(beta2, storage[1]));
-            float[][] m_ = scale(1 / (1 - beta), m);
+        static final TriFunction<Float, float[][], float[][][], float[][][][]> ADAMAX = (lr, gradients, storage) -> {
+            float[][] m = add(scale(beta, storage[0]), scale(1 - beta, gradients));
+            float[][] v = add(scale(beta2, storage[1]), scale(1 - beta2, square(gradients)));
+            float[][] m_ = scale(m, 1 / (1 - beta));
             float[][] u = max(scale(beta2, storage[1]), abs(gradients));
-            float[][] update = divide(scale(lr, m_), u);
+            float[][] update = divide(scale(lr, m_), add(u, create(u.length, u[0].length, e)));
             return new float[][][][]{{update}, {m, v}};
         };
-        static final BiFunction<Float, float[][], Function<float[][][], float[][][][]>> NADAM = (lr, gradients) -> storage -> {
+        static final TriFunction<Float, float[][], float[][][], float[][][][]> NADAM = (lr, gradients, storage) -> {
             int rows = gradients.length;
             int columns = gradients[0].length;
             float[][] m = add(scale((1 - beta), gradients), scale(beta, storage[0]));
@@ -444,13 +468,86 @@ public class NNLib extends Application implements Serializable {
             float[][] update = multiply(divide(create(rows, columns, lr), add(sqrt(v_), create(rows, columns, e))), add(scale(beta, m_), scale(scale(1 - beta, gradients), 1 / (1 - beta))));
             return new float[][][][]{{update}, {m, v}};
         };
-        static final BiFunction<Float, float[][], Function<float[][][], float[][][][]>> AMSGRAD = (lr, gradients) -> storage -> {
+        static final TriFunction<Float, float[][], float[][][], float[][][][]> AMSGRAD = (lr, gradients, storage) -> {
             float[][] m = add(scale((1 - beta), gradients), scale(beta, storage[0]));
             float[][] v = add(scale((1 - beta2), square(gradients)), scale(beta2, storage[1]));
             float[][] v_ = max(storage[1], v);
             float[][] update = divide(scale(lr, m), add(sqrt(v_), create(v_.length, v_[0].length, e)));
             return new float[][][][]{{update}, {m, v}};
         };
+    }
+
+    public static float[][] normalTanh(float[][] inputs) {
+        int elements = inputs[0].length;
+        float[][] result = new float[1][elements];
+        float mean = sum(inputs) / elements;
+        float deviation = (float) (Math.sqrt(sum(square(subtract(inputs, create(1, elements, mean)))) / mean));
+        for (int i = 0; i < inputs[0].length; i++) {
+            result[0][i] = (.5f * (tanh((.01f * ((inputs[0][i] - mean) / (deviation))), false) + 1));//Tanh estimator normalization
+        }
+        return result;
+    }
+
+    public static float[][] normalZScore(float[][] inputs) {
+        int elements = inputs[0].length;
+        float mean = sum(inputs) / elements;
+        float deviation = (float) (Math.sqrt(sum(square(subtract(inputs, create(1, elements, mean)))) / (mean)));
+        return divide(subtract(inputs, create(1, elements, mean)), create(1, elements, deviation));
+    }
+
+    public static float sigmoid(float x, boolean derivative) {
+        if (!derivative) {
+            return 1 / (1 + (float) Math.exp(-x));//sigmoid(x)
+        }
+        return sigmoid(x, false) * (1 - sigmoid(x, false));//sigmoid'(x)
+    }
+
+    public static float tanh(float x, boolean derivative) {
+        if (!derivative) {
+            return (2 / (1 + (float) Math.exp(-2 * x))) - 1;//tanh(x)
+        }
+        float val = tanh(x, false);
+        return 1 - val * val;//tanh'(x)
+    }
+
+    public static float relu(float x, boolean derivative) {
+        if (!derivative) {
+            return Math.max(0, x);
+        }
+        if (x < 0) {
+            return 0;
+        }
+        return 1;
+    }
+
+    public static float leakyrelu(float x, boolean derivative) {
+        if (derivative) {
+            return Math.max(.001f * x, x);
+        }
+        if (x < 0) {
+            return .001f;
+        }
+        return 1;
+    }
+
+    public static float swish(float x, boolean derivative) {
+        if (!derivative) {
+            return x * sigmoid(x, false);
+        }
+        return x * sigmoid(x, true) + sigmoid(x, false);
+    }
+
+    public static float mish(float x, boolean derivative) {
+        if (!derivative) {
+            return (x * tanh((float) Math.log(1 + Math.exp(x)), false));
+        }
+        double x_ = (double) x;
+        return (float) ((Math.exp(x_) * ((4 * (x_ + 1)) + (4 * Math.exp(2 * x_)) + (Math.exp(3 * x_)) + (Math.exp(x_) * (4 * x_ + 6)))) / ((2 * Math.exp(2 * x_)) + (Math.exp(2 * x_)) + 2));
+    }
+
+    public static float[][] softmax(float[][] matrix) {
+        float[][] e = exp(matrix);
+        return scale(1 / sum(e), e);
     }
 
     public static void setThreads(int numberOfThreads) {
@@ -705,22 +802,23 @@ public class NNLib extends Application implements Serializable {
         return result;
     }
 
-    public static float[][] max(float[][] matrix1, float[][] matrix2) {//Size must match
-        int rows = matrix1.length;
-        int columns = matrix1[0].length;
-        float[][] result = new float[rows][columns];
+    public static float[][] max(float[][] matrix1, float[][] matrix2) {
+        return bifunction(matrix1, matrix2, (val1, val2) -> Math.max(val1, val2));
+    }
+
+    public static float max(float[][] matrix) {
+        int rows = matrix.length;
+        int columns = matrix[0].length;
+        float max = Float.MIN_VALUE;
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < columns; j++) {
-                float val1 = matrix1[i][j];
-                float val2 = matrix2[i][j];
-                if (val1 > val2) {
-                    result[i][j] = val1;
-                } else {
-                    result[i][j] = val2;
+                float val = matrix[i][j];
+                if (val < max) {
+                    max = val;
                 }
             }
         }
-        return result;
+        return max;
     }
 
     public static int argmax(float[][] oneRowMatrix) {
@@ -758,80 +856,6 @@ public class NNLib extends Application implements Serializable {
             result[0][i + length1] = oneRow2[0][i];
         }
         return result;
-    }
-
-    public static float[][] normalTanh(float[][] inputs) {
-        int elements = inputs[0].length;
-        float[][] result = new float[1][elements];
-        float mean = sum(inputs) / elements;
-        float deviation = (float) (Math.sqrt(sum(square(subtract(inputs, create(1, elements, mean)))) / mean));
-        for (int i = 0; i < inputs[0].length; i++) {
-            result[0][i] = (float) (.5 * (tanh((float) (.01 * ((inputs[0][i] - mean) / (deviation))), false) + 1));//Tanh estimator normalization
-        }
-        return result;
-    }
-
-    public static float[][] normalZScore(float[][] inputs) {
-        int elements = inputs[0].length;
-        float mean = sum(inputs) / elements;
-        float deviation = (float) (Math.sqrt(sum(square(subtract(inputs, create(1, elements, mean)))) / (mean)));
-        return divide(subtract(inputs, create(1, elements, mean)), create(1, elements, deviation));
-    }
-
-    public static float sigmoid(float x, boolean derivative) {
-        if (derivative) {
-            return sigmoid(x, false) * (1 - sigmoid(x, false));//sigmoid'(x)
-        }
-        return 1 / (1 + (float) Math.exp(-x));//sigmoid(x)
-    }
-
-    public static float tanh(float x, boolean derivative) {
-        if (derivative == true) {
-            float val = tanh(x, false);
-            return 1 - val * val;//tanh'(x)
-        }
-        return (2 / (1 + (float) Math.exp(-2 * x))) - 1;//tanh(x)
-    }
-
-    public static float relu(float x, boolean derivative) {
-        if (derivative) {
-            if (x < 0) {
-                return 0;
-            }
-            return 1;
-        }
-        return Math.max(0, x);
-    }
-
-    public static float leakyrelu(float x, boolean derivative) {
-        if (derivative == true) {
-            if (x < 0) {
-                return .001f;
-            }
-            return 1;
-        }
-        return Math.max(.001f * x, x);
-    }
-
-    public static float swish(float x, boolean derivative) {
-        if (!derivative) {
-            return x * sigmoid(x, false);
-        }
-        return x * sigmoid(x, true) + sigmoid(x, false);
-    }
-
-    public static float mish(float x, boolean derivative) {
-        if (!derivative) {
-            return (float) (x * tanh((float) Math.log(1 + Math.exp(x)), false));
-        }
-        double x_ = (double) x;
-        return (float) ((Math.exp(x_) * ((4 * (x_ + 1)) + (4 * Math.exp(2 * x_)) + (Math.exp(3 * x_)) + (Math.exp(x_) * (4 * x_ + 6)))) / ((2 * Math.exp(2 * x_)) + (Math.exp(2 * x_)) + 2));
-    }
-
-    public static float[][] softmax(float[][] matrix) {
-        float[][] e = exp(matrix);
-        float inverseSum = 1 / sum(e);
-        return scale(inverseSum, e);
     }
 
     public static float[][] function(float[][] matrix, Function<Float, Float> function) {
