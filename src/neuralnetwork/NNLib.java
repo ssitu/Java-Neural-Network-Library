@@ -437,6 +437,11 @@ public class NNLib extends Application implements Serializable {
             float[][] update = add(scale(beta, storage[0]), scale(lr, gradients));
             return new float[][][][]{{update}, {update}};
         };
+        static final TriFunction<Float, float[][], float[][][], float[][][][]> NESTEROV = (lr, gradients, storage) -> {//Dozat's modification because calculating two gradients would take a lot of recoding
+            float[][] m = add(scale(beta, storage[0]), scale(lr, gradients));
+            float[][] update = add(scale(beta, m), scale(lr, gradients));
+            return new float[][][][]{{update}, {m}};
+        };
         static final TriFunction<Float, float[][], float[][][], float[][][][]> RMSPROP = (lr, gradients, storage) -> {
             float[][] s = add(scale(beta, storage[0]), scale(1 - beta, square(gradients)));
             float[][] update = divide(scale(lr, gradients), add(sqrt(s), create(s.length, s[0].length, e)));
