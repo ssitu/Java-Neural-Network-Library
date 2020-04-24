@@ -30,7 +30,7 @@ public class XOR_Classification {
         NN nn = new NNLib().new NN(
                 "xor_classification",//Name for Saving & Graph Title
                 777,//Seed For Reproducibility
-                .001,//Learning Rate for Optimizer
+                .0001,//Learning Rate for Optimizer
                 LossFunction.CROSSENTROPY(1),//Loss/Cost/Error Function
                 Optimizer.VANILLA,//Stochastic Gradient Descent Optimizer
                 new LayerDense(2, 2, CUSTOM, Initializer.XAVIER),

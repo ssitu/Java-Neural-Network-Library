@@ -138,8 +138,7 @@ public class NNLib extends Application implements Serializable {
                 random = (Random) arr[1];
                 return true;
             } catch (IOException | ClassNotFoundException e) {
-                e.printStackTrace();
-                System.out.println("Could not load network settings.");
+                System.out.println("Could not load network settings for \"" + NAME + "\".");
                 return false;
             }
         }
@@ -357,7 +356,8 @@ public class NNLib extends Application implements Serializable {
          *
          * @param steepness default value is 0.5
          */
-        static final BiFunction<float[][], float[][], Object[]> QUADRATIC(float steepness) {
+        static final BiFunction<float[][], float[][], Object[]> QUADRATIC(double steepnessFactor) {
+            final float steepness = (float) steepnessFactor;
             return (outputs, targets) -> {
                 double loss = sum(scale(steepness, square(subtract(outputs, targets))));//m(f(x) - y)^2 where f(x) is the output of the network and y is the target output
                 return new Object[]{loss, scale(2 * steepness, subtract(outputs, targets))};//Derivative of the loss function for each sample, 2m(f(x) - y)
@@ -368,9 +368,10 @@ public class NNLib extends Application implements Serializable {
          *
          * @param steepness default value is 1
          */
-        static final BiFunction<float[][], float[][], Object[]> HUBER(float steepness) {
+        static final BiFunction<float[][], float[][], Object[]> HUBER(double steepnessFactor) {
+            final float steepness = (float) steepnessFactor;
+            final float deltaHalf = steepness / 2;
             return (outputs, targets) -> {
-                final float deltaHalf = steepness / 2;
                 int columns = outputs[0].length;
                 float[][] a = subtract(outputs, targets);
                 float sum = 0;
@@ -400,7 +401,8 @@ public class NNLib extends Application implements Serializable {
          *
          * @param steepness default value is 1
          */
-        static final BiFunction<float[][], float[][], Object[]> HUBERPSEUDO(float steepness) {
+        static final BiFunction<float[][], float[][], Object[]> HUBERPSEUDO(double steepnessFactor) {
+            final float steepness = (float) steepnessFactor;
             return (outputs, targets) -> {
                 int columns = outputs[0].length;
                 final float deltaSquared = steepness * steepness;
@@ -416,7 +418,8 @@ public class NNLib extends Application implements Serializable {
          *
          * @param steepness default value is 1
          */
-        static final BiFunction<float[][], float[][], Object[]> CROSSENTROPY(float steepness) {
+        static final BiFunction<float[][], float[][], Object[]> CROSSENTROPY(double steepnessFactor) {
+            final float steepness = (float) steepnessFactor;
             return (outputs, targets) -> {
                 double loss = steepness * -sum(multiply(targets, ln(outputs)));
                 return new Object[]{loss, scale(-steepness, divide(targets, outputs))};
