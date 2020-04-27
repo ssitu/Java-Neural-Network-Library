@@ -13,8 +13,8 @@ public class XOR {
                 .01,//Learning Rate for Optimizer
                 LossFunction.QUADRATIC(.5),//Loss/Cost/Error Function
                 Optimizer.VANILLA,//Stochastic Gradient Descent Optimizer
-                new LayerDense(2, 2, ActivationFunction.SIGMOID, Initializer.VANILLA),//2 in, 2 out
-                new LayerDense(2, 1, ActivationFunction.SIGMOID, Initializer.VANILLA)//2 in from the previous layer, 1 out
+                new Layer.Dense(2, 2, ActivationFunction.SIGMOID, Initializer.VANILLA),//2 in, 2 out
+                new Layer.Dense(2, 1, ActivationFunction.SIGMOID, Initializer.VANILLA)//2 in from the previous layer, 1 out
         );
         System.out.println(nn.NETWORKSIZE);
         System.out.println(nn.toString());

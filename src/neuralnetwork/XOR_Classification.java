@@ -30,9 +30,9 @@ public class XOR_Classification {
         NN nn = new NNLib().new NN(
                 "xor_classification",//Name for Saving & Graph Title
                 777,//Seed For Reproducibility
-                .0001,//Learning Rate for Optimizer
+                .001,//Learning Rate for Optimizer
                 LossFunction.CROSSENTROPY(1),//Loss/Cost/Error Function
-                Optimizer.VANILLA,//Stochastic Gradient Descent Optimizer
+                Optimizer.RMSPROP,//Stochastic Gradient Descent Optimizer
                 new LayerDense(2, 2, CUSTOM, Initializer.XAVIER),
                 new LayerDense(2, 2, ActivationFunction.SOFTMAX, Initializer.XAVIER)
         );
@@ -46,7 +46,7 @@ public class XOR_Classification {
         data.add(new Data(new float[]{1, 0}, new float[]{1, 0}));
         data.add(new Data(new float[]{0, 0}, new float[]{0, 1}));
         NNLib.graph(false, nn);
-        for (int i = 0; i < 1_000_00000; i++) {
+        for (int i = 0; i < 1_000_00000; i--) {
             int index = nn.getRandom().nextInt(4);
             if (PRINT && i % 100000 == 0) {
                 NNLib.print(data.get(index).inputs, "inputs");

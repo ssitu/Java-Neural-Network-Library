@@ -80,7 +80,7 @@ public class NNLib extends Application implements Serializable {
             float[][] dC_dA = (float[][]) lossArr[1];
             float[][] dC_dZ = network[NETWORKSIZE - 1].back(dC_dA, null, lr, optimizer, true);
             for (int i = NETWORKSIZE - 2; i >= 0; i--) {
-                network[i].back(dC_dZ, ((LayerDense) network[i + 1]).weights, lr, optimizer, false);
+                network[i].back(dC_dZ, ((Layer.Dense) network[i + 1]).weights, lr, optimizer, false);
             }
             sessions++;
         }
@@ -196,55 +196,76 @@ public class NNLib extends Application implements Serializable {
         @Override
         protected abstract Layer clone();
 
-    }
+        public static class Dense extends Layer implements Serializable {
 
-    public static class LayerDense extends Layer implements Serializable {
+            float[][] weights;
+            float[][] biases;
+            float[][][] updateStorageW;
+            float[][][] updateStorageB;
+            BiFunction<float[][], Boolean, float[][]> activation;
+            BiFunction<float[][], Integer, float[][]> initializer;
+            float[][] Z;
+            float[][] prevA;
 
-        float[][] weights;
-        float[][] biases;
-        float[][][] updateStorageW;
-        float[][][] updateStorageB;
-        BiFunction<float[][], Boolean, float[][]> activation;
-        BiFunction<float[][], Integer, float[][]> initializer;
-        float[][] Z;
-        float[][] prevA;
+            Dense(int nodesIn, int nodesOut, BiFunction<float[][], Boolean, float[][]> activation, BiFunction<float[][], Integer, float[][]> initializer) {
+                this.nodesIn = nodesIn;
+                this.nodesOut = nodesOut;
+                this.activation = activation;
+                this.initializer = initializer;
+            }
 
-        LayerDense(int nodesIn, int nodesOut, BiFunction<float[][], Boolean, float[][]> activation, BiFunction<float[][], Integer, float[][]> initializer) {
-            this.nodesIn = nodesIn;
-            this.nodesOut = nodesOut;
-            this.activation = activation;
-            this.initializer = initializer;
-        }
+            @Override
+            void initialize(Random random) {
+                weights = create(nodesIn, nodesOut, 0);
+                biases = create(1, nodesOut, 0);
+                weights = NNLib.randomize(weights, 2, -1, random);//values on interval [-1,1]
+                biases = NNLib.randomize(biases, 2, -1, random);//values on interval [-1,1]
+                weights = initializer.apply(weights, nodesIn);
+                updateStorageW = new float[][][]{create(nodesIn, nodesOut, 0), create(nodesIn, nodesOut, 0)};
+                updateStorageB = new float[][][]{create(1, nodesOut, 0), create(1, nodesOut, 0)};
+            }
 
-        @Override
-        void initialize(Random random) {
-            weights = create(nodesIn, nodesOut, 0);
-            biases = create(1, nodesOut, 0);
-            weights = NNLib.randomize(weights, 2, -1, random);//values on interval [-1,1]
-            biases = NNLib.randomize(biases, 2, -1, random);//values on interval [-1,1]
-            weights = initializer.apply(weights, nodesIn);
-            updateStorageW = new float[][][]{create(nodesIn, nodesOut, 0), create(nodesIn, nodesOut, 0)};
-            updateStorageB = new float[][][]{create(1, nodesOut, 0), create(1, nodesOut, 0)};
-        }
+            @Override
+            float[][] forward(float[][] in) {
+                return activation.apply(add(dotProduct.apply(in, weights), biases), false);
+            }
 
-        @Override
-        float[][] forward(float[][] in) {
-            return activation.apply(add(dotProduct.apply(in, weights), biases), false);
-        }
+            @Override
+            float[][] forwardBack(float[][] in) {
+                prevA = in;
+                Z = add(dotProduct.apply(in, weights), biases);
+                return activation.apply(Z, false);
+            }
 
-        @Override
-        float[][] forwardBack(float[][] in) {
-            prevA = in;
-            Z = add(dotProduct.apply(in, weights), biases);
-            return activation.apply(Z, false);
-        }
-
-        @Override
-        float[][] back(float[][] dG, float[][] dZ_dA, float lr, TriFunction<Float, float[][], float[][][], float[][][][]> optimizer, boolean outputLayer) {//dG = The running gradient from the previous backpropagated layer
-            if (!outputLayer) {
+            @Override
+            float[][] back(float[][] dG, float[][] dZ_dA, float lr, TriFunction<Float, float[][], float[][][], float[][][][]> optimizer, boolean outputLayer) {//dG = The running gradient from the previous backpropagated layer or loss function
+                if (!outputLayer) {
+                    float[][] dA_dZ = activation.apply(Z, true);
+                    float[][] dC_dA = dotProduct.apply(dG, transpose(dZ_dA));
+                    float[][] dC_dZ;
+                    if (dA_dZ.length == 1) {
+                        dC_dZ = multiply(dC_dA, dA_dZ);
+                    } else {
+                        dC_dZ = dotProduct.apply(dC_dA, dA_dZ);//For jacobian matrices
+                    }
+                    float[][] dC_dW = dotProduct.apply(transpose(prevA), dC_dZ);//prevA = dZ_dW;
+                    float[][][][] updateW = optimizer.apply(lr, dC_dW, updateStorageW);
+                    float[][][][] updateB = optimizer.apply(lr, dC_dZ, updateStorageB);
+                    float[][] gradientsW = updateW[0][0];
+                    float[][] gradientsB = updateB[0][0];
+                    updateStorageW = updateW[1];
+                    updateStorageB = updateB[1];
+                    weights = subtract(weights, gradientsW);
+                    biases = subtract(biases, gradientsB);
+                    return dC_dZ;
+                }
                 float[][] dA_dZ = activation.apply(Z, true);
-                float[][] dC_dA = dotProduct.apply(dG, transpose(dZ_dA));
-                float[][] dC_dZ = multiply(dC_dA, dA_dZ);
+                float[][] dC_dZ;
+                if (dA_dZ.length == 1) {
+                    dC_dZ = multiply(dG, dA_dZ);
+                } else {
+                    dC_dZ = dotProduct.apply(dG, dA_dZ);//For jacobian matrices
+                }
                 float[][] dC_dW = dotProduct.apply(transpose(prevA), dC_dZ);//prevA = dZ_dW;
                 float[][][][] updateW = optimizer.apply(lr, dC_dW, updateStorageW);
                 float[][][][] updateB = optimizer.apply(lr, dC_dZ, updateStorageB);
@@ -256,99 +277,82 @@ public class NNLib extends Application implements Serializable {
                 biases = subtract(biases, gradientsB);
                 return dC_dZ;
             }
-            float[][] dA_dZ = activation.apply(Z, true);
-            float[][] dC_dZ;
-            if (dA_dZ.length == 1) {
-                dC_dZ = multiply(dG, dA_dZ);
-            } else {
-                dC_dZ = dotProduct.apply(dG, dA_dZ);//For jacobian matrices
+
+            @Override
+            public Dense clone() {
+                Dense copy = new Dense(weights.length, weights[0].length, activation, Initializer.VANILLA);
+                copy.weights = copy(weights);
+                copy.biases = copy(biases);
+                copy.updateStorageW = copy3d(updateStorageW);
+                copy.updateStorageB = copy3d(updateStorageB);
+                return copy;
             }
-            float[][] dC_dW = dotProduct.apply(transpose(prevA), dC_dZ);//prevA = dZ_dW;
-            float[][][][] updateW = optimizer.apply(lr, dC_dW, updateStorageW);
-            float[][][][] updateB = optimizer.apply(lr, dC_dZ, updateStorageB);
-            float[][] gradientsW = updateW[0][0];
-            float[][] gradientsB = updateB[0][0];
-            updateStorageW = updateW[1];
-            updateStorageB = updateB[1];
-            weights = subtract(weights, gradientsW);
-            biases = subtract(biases, gradientsB);
-            return dC_dZ;
-        }
 
-        @Override
-        public LayerDense clone() {
-            LayerDense copy = new LayerDense(weights.length, weights[0].length, activation, Initializer.VANILLA);
-            copy.weights = copy(weights);
-            copy.biases = copy(biases);
-            copy.updateStorageW = copy3d(updateStorageW);
-            copy.updateStorageB = copy3d(updateStorageB);
-            return copy;
-        }
+            @Override
+            void randomize(float range) {
+                weights = NNLib.randomize(weights, range, -range / 2);//values on interval [-1,1]
+                biases = NNLib.randomize(biases, range, -range / 2);//values on interval [-1,1]
+            }
 
-        @Override
-        void randomize(float range) {
-            weights = NNLib.randomize(weights, range, -range / 2);//values on interval [-1,1]
-            biases = NNLib.randomize(biases, range, -range / 2);//values on interval [-1,1]
-        }
-
-        @Override
-        void mutate(float range, float mutateRate) {
-            for (int i = 0; i < nodesIn; i++) {
-                for (int j = 0; j < nodesOut; j++) {
+            @Override
+            void mutate(float range, float mutateRate) {
+                for (int i = 0; i < nodesIn; i++) {
+                    for (int j = 0; j < nodesOut; j++) {
+                        if (Math.random() < mutateRate) {
+                            weights[i][j] += (float) (Math.random() * range - range / 2);
+                        }
+                    }
+                }
+                for (int i = 0; i < nodesOut; i++) {
                     if (Math.random() < mutateRate) {
-                        weights[i][j] += (float) (Math.random() * range - range / 2);
+                        biases[0][i] += (float) (Math.random() * range - range / 2);
                     }
                 }
             }
-            for (int i = 0; i < nodesOut; i++) {
-                if (Math.random() < mutateRate) {
-                    biases[0][i] += (float) (Math.random() * range - range / 2);
-                }
-            }
+        }}
+
+        public static class Initializer {
+
+            static final BiFunction<float[][], Integer, float[][]> VANILLA = (a, b) -> a;//No change
+            static final BiFunction<float[][], Integer, float[][]> XAVIER = (a, b) -> scale(a, (float) (1 / Math.sqrt(b)));
+            static final BiFunction<float[][], Integer, float[][]> HE = (a, b) -> scale(a, (float) Math.sqrt(2 / b));
         }
-    }
 
-    public static class Initializer {
+        public static class ActivationFunction {
 
-        static final BiFunction<float[][], Integer, float[][]> VANILLA = (a, b) -> a;//No change
-        static final BiFunction<float[][], Integer, float[][]> XAVIER = (a, b) -> scale(a, (float) (1 / Math.sqrt(b)));
-        static final BiFunction<float[][], Integer, float[][]> HE = (a, b) -> scale(a, (float) Math.sqrt(2 / b));
-    }
-
-    public static class ActivationFunction {
-
-        static final BiFunction<float[][], Boolean, float[][]> LINEAR = (matrix, derivative) -> {
-            if (!derivative) {
-                return matrix;
-            }
-            float[][] result = create(matrix.length, matrix[0].length, 1);
-            return result;
-        };
-        static final BiFunction<float[][], Boolean, float[][]> SIGMOID = (matrix, derivative) -> function(matrix, val -> sigmoid(val, derivative));
-        static final BiFunction<float[][], Boolean, float[][]> TANH = (matrix, derivative) -> function(matrix, val -> tanh(val, derivative));
-        static final BiFunction<float[][], Boolean, float[][]> RELU = (matrix, derivative) -> function(matrix, val -> relu(val, derivative));
-        static final BiFunction<float[][], Boolean, float[][]> LEAKYRELU = (matrix, derivative) -> function(matrix, val -> leakyrelu(val, derivative));
-        static final BiFunction<float[][], Boolean, float[][]> SWISH = (matrix, derivative) -> function(matrix, val -> swish(val, derivative));
-        static final BiFunction<float[][], Boolean, float[][]> MISH = (matrix, derivative) -> function(matrix, val -> mish(val, derivative));
-        static final BiFunction<float[][], Boolean, float[][]> SOFTMAX = (matrix, derivative) -> {
-            if (!derivative) {
-                return softmax(matrix);
-            }
-            float[][] softmax = softmax(matrix);
-            int columns = matrix[0].length;
-            float[][] jacobian = new float[columns][columns];
-            for (int i = 0; i < columns; i++) {
-                for (int j = 0; j < columns; j++) {
-                    if (i == j) {
-                        jacobian[i][j] = softmax[0][i] * (1 - softmax[0][j]);
-                    } else {
-                        jacobian[i][j] = softmax[0][i] * -softmax[0][j];
+            static final BiFunction<float[][], Boolean, float[][]> LINEAR = (matrix, derivative) -> {
+                if (!derivative) {
+                    return matrix;
+                }
+                float[][] result = create(matrix.length, matrix[0].length, 1);
+                return result;
+            };
+            static final BiFunction<float[][], Boolean, float[][]> SIGMOID = (matrix, derivative) -> function(matrix, val -> sigmoid(val, derivative));
+            static final BiFunction<float[][], Boolean, float[][]> TANH = (matrix, derivative) -> function(matrix, val -> tanh(val, derivative));
+            static final BiFunction<float[][], Boolean, float[][]> RELU = (matrix, derivative) -> function(matrix, val -> relu(val, derivative));
+            static final BiFunction<float[][], Boolean, float[][]> LEAKYRELU = (matrix, derivative) -> function(matrix, val -> leakyrelu(val, derivative));
+            static final BiFunction<float[][], Boolean, float[][]> SWISH = (matrix, derivative) -> function(matrix, val -> swish(val, derivative));
+            static final BiFunction<float[][], Boolean, float[][]> MISH = (matrix, derivative) -> function(matrix, val -> mish(val, derivative));
+            static final BiFunction<float[][], Boolean, float[][]> SOFTMAX = (matrix, derivative) -> {
+                if (!derivative) {
+                    return softmax(matrix);
+                }
+                float[][] softmax = softmax(matrix);
+                int columns = matrix[0].length;
+                float[][] jacobian = new float[columns][columns];
+                for (int i = 0; i < columns; i++) {
+                    for (int j = 0; j < columns; j++) {
+                        if (i == j) {
+                            jacobian[i][j] = softmax[0][i] * (1 - softmax[0][j]);
+                        } else {
+                            jacobian[i][j] = softmax[0][i] * -softmax[0][j];
+                        }
                     }
                 }
-            }
-            return jacobian;//Not sure if it should be transposed for my transposed style of a neural network, but the matrix is the same transposed in the xor classification example
-        };
-    }
+                return jacobian;//Not sure if it should be transposed for my transposed style of a neural network, but the matrix is the same transposed in the xor classification example
+            };
+        }
+    
 
     public static class LossFunction {//Not sure if the sums should be divided by the number of outputs of the network
 
@@ -903,7 +907,6 @@ public class NNLib extends Application implements Serializable {
             yAxis.setTickUnit(.05);
         }
         XYChart.Series<Number, Number> series = new XYChart.Series<>();
-        series.setName(yAxis.getLabel() + " over " + xAxis.getLabel());
         ScatterChart<Number, Number> chart = new ScatterChart<>(xAxis, yAxis);
         chart.setAnimated(false);
         chart.getData().add(series);
