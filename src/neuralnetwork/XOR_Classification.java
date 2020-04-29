@@ -33,8 +33,8 @@ public class XOR_Classification {
                 .001,//Learning Rate for Optimizer
                 LossFunction.CROSSENTROPY(1),//Loss/Cost/Error Function
                 Optimizer.RMSPROP,//Stochastic Gradient Descent Optimizer
-                new LayerDense(2, 2, CUSTOM, Initializer.XAVIER),
-                new LayerDense(2, 2, ActivationFunction.SOFTMAX, Initializer.XAVIER)
+                new Layer.Dense(2, 2, CUSTOM, Initializer.XAVIER),
+                new Layer.Dense(2, 2, ActivationFunction.SOFTMAX, Initializer.XAVIER)
         );
         System.out.println(nn.NETWORKSIZE);
         System.out.println(nn.toString());

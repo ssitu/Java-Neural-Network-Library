@@ -111,11 +111,12 @@ public class NNLib extends Application implements Serializable {
 
         @Override
         public NN clone() {
-            NN nnCopy = new NN(NAME, seed, lr, lossFunction, optimizer, network);
+            Layer[] layers = new Layer[NETWORKSIZE];
             for (int i = 0; i < NETWORKSIZE; i++) {
-                nnCopy.network[i] = network[i].clone();
+                layers[i] = network[i].clone();
             }
-            return nnCopy;
+            NN clone = new NN(NAME, seed, lr, lossFunction, optimizer, layers);
+            return clone;
         }
 
         public void save() {
@@ -193,7 +194,6 @@ public class NNLib extends Application implements Serializable {
 
         abstract void mutate(float range, float mutateRate);
 
-        @Override
         protected abstract Layer clone();
 
         public static class Dense extends Layer implements Serializable {
@@ -309,50 +309,50 @@ public class NNLib extends Application implements Serializable {
                     }
                 }
             }
-        }}
-
-        public static class Initializer {
-
-            static final BiFunction<float[][], Integer, float[][]> VANILLA = (a, b) -> a;//No change
-            static final BiFunction<float[][], Integer, float[][]> XAVIER = (a, b) -> scale(a, (float) (1 / Math.sqrt(b)));
-            static final BiFunction<float[][], Integer, float[][]> HE = (a, b) -> scale(a, (float) Math.sqrt(2 / b));
         }
+    }
 
-        public static class ActivationFunction {
+    public static class Initializer {
 
-            static final BiFunction<float[][], Boolean, float[][]> LINEAR = (matrix, derivative) -> {
-                if (!derivative) {
-                    return matrix;
-                }
-                float[][] result = create(matrix.length, matrix[0].length, 1);
-                return result;
-            };
-            static final BiFunction<float[][], Boolean, float[][]> SIGMOID = (matrix, derivative) -> function(matrix, val -> sigmoid(val, derivative));
-            static final BiFunction<float[][], Boolean, float[][]> TANH = (matrix, derivative) -> function(matrix, val -> tanh(val, derivative));
-            static final BiFunction<float[][], Boolean, float[][]> RELU = (matrix, derivative) -> function(matrix, val -> relu(val, derivative));
-            static final BiFunction<float[][], Boolean, float[][]> LEAKYRELU = (matrix, derivative) -> function(matrix, val -> leakyrelu(val, derivative));
-            static final BiFunction<float[][], Boolean, float[][]> SWISH = (matrix, derivative) -> function(matrix, val -> swish(val, derivative));
-            static final BiFunction<float[][], Boolean, float[][]> MISH = (matrix, derivative) -> function(matrix, val -> mish(val, derivative));
-            static final BiFunction<float[][], Boolean, float[][]> SOFTMAX = (matrix, derivative) -> {
-                if (!derivative) {
-                    return softmax(matrix);
-                }
-                float[][] softmax = softmax(matrix);
-                int columns = matrix[0].length;
-                float[][] jacobian = new float[columns][columns];
-                for (int i = 0; i < columns; i++) {
-                    for (int j = 0; j < columns; j++) {
-                        if (i == j) {
-                            jacobian[i][j] = softmax[0][i] * (1 - softmax[0][j]);
-                        } else {
-                            jacobian[i][j] = softmax[0][i] * -softmax[0][j];
-                        }
+        static final BiFunction<float[][], Integer, float[][]> VANILLA = (a, b) -> a;//No change
+        static final BiFunction<float[][], Integer, float[][]> XAVIER = (a, b) -> scale(a, (float) (1 / Math.sqrt(b)));
+        static final BiFunction<float[][], Integer, float[][]> HE = (a, b) -> scale(a, (float) Math.sqrt(2 / b));
+    }
+
+    public static class ActivationFunction {
+
+        static final BiFunction<float[][], Boolean, float[][]> LINEAR = (matrix, derivative) -> {
+            if (!derivative) {
+                return matrix;
+            }
+            float[][] result = create(matrix.length, matrix[0].length, 1);
+            return result;
+        };
+        static final BiFunction<float[][], Boolean, float[][]> SIGMOID = (matrix, derivative) -> function(matrix, val -> sigmoid(val, derivative));
+        static final BiFunction<float[][], Boolean, float[][]> TANH = (matrix, derivative) -> function(matrix, val -> tanh(val, derivative));
+        static final BiFunction<float[][], Boolean, float[][]> RELU = (matrix, derivative) -> function(matrix, val -> relu(val, derivative));
+        static final BiFunction<float[][], Boolean, float[][]> LEAKYRELU = (matrix, derivative) -> function(matrix, val -> leakyrelu(val, derivative));
+        static final BiFunction<float[][], Boolean, float[][]> SWISH = (matrix, derivative) -> function(matrix, val -> swish(val, derivative));
+        static final BiFunction<float[][], Boolean, float[][]> MISH = (matrix, derivative) -> function(matrix, val -> mish(val, derivative));
+        static final BiFunction<float[][], Boolean, float[][]> SOFTMAX = (matrix, derivative) -> {
+            if (!derivative) {
+                return softmax(matrix);
+            }
+            float[][] softmax = softmax(matrix);
+            int columns = matrix[0].length;
+            float[][] jacobian = new float[columns][columns];
+            for (int i = 0; i < columns; i++) {
+                for (int j = 0; j < columns; j++) {
+                    if (i == j) {
+                        jacobian[i][j] = softmax[0][i] * (1 - softmax[0][j]);
+                    } else {
+                        jacobian[i][j] = softmax[0][i] * -softmax[0][j];
                     }
                 }
-                return jacobian;//Not sure if it should be transposed for my transposed style of a neural network, but the matrix is the same transposed in the xor classification example
-            };
-        }
-    
+            }
+            return jacobian;//Not sure if it should be transposed for my transposed style of a neural network, but the matrix is the same transposed in the xor classification example
+        };
+    }
 
     public static class LossFunction {//Not sure if the sums should be divided by the number of outputs of the network
 
