@@ -10,7 +10,7 @@ public class XOR {
         NN nn = new NNLib().new NN(
                 "xor",//Name for Saving & Graph Title
                 777,//Seed For Reproducibility
-                .01,//Learning Rate for Optimizer
+                .001,//Learning Rate for Optimizer
                 LossFunction.QUADRATIC(.5),//Loss/Cost/Error Function
                 Optimizer.VANILLA,//Stochastic Gradient Descent Optimizer
                 new Layer.Dense(2, 2, ActivationFunction.SIGMOID, Initializer.VANILLA),//2 in, 2 out
@@ -25,12 +25,15 @@ public class XOR {
         data.add(new Data(new float[]{0, 1}, new float[]{1}));//False, True = True
         data.add(new Data(new float[]{1, 0}, new float[]{1}));//True, False = True
         data.add(new Data(new float[]{0, 0}, new float[]{0}));//False, False = False
-        NNLib.graph(false, nn);
+        NNLib.showInfo(NNLib.INFO_GRAPH(false), nn);
+        NNLib.showInfo(NNLib.INFO_GRAPH(true), nn);
         for (int i = 0; i < 1_000_000_000; i++) {
             int index = nn.getRandom().nextInt(4);
-            if (PRINT && i % 10000 == 0) {
-                NNLib.print(data.get(index).inputs, "inputs");
-                NNLib.print(nn.feedforward(data.get(index).inputs), "feedforward");
+            if (PRINT && i % 100000 == 0) {
+                System.out.println("Inputs:");
+                NNLib.print(data.get(index).inputs);
+                System.out.println("Outputs:");
+                NNLib.print(nn.feedforward(data.get(index).inputs));
                 System.out.println("");
             }
             nn.backpropagation(data.get(index).inputs, data.get(index).targets);

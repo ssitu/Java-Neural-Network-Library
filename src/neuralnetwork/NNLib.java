@@ -7,15 +7,20 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.Arrays;
+import java.util.LinkedList;
 import java.util.Random;
+import javafx.animation.Animation;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.application.Application;
 import static javafx.application.Application.launch;
-import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.scene.chart.NumberAxis;
 import javafx.scene.chart.ScatterChart;
 import javafx.scene.chart.XYChart;
+import javafx.stage.Screen;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 
 public class NNLib extends Application implements Serializable {
 
@@ -29,9 +34,6 @@ public class NNLib extends Application implements Serializable {
 
         R apply(T t, S s, U u);
     }
-
-    private static boolean graphMeasuresAccuracy;
-    private static NN nnForGraph;
     private static int threads;
     private static BiFunction<float[][], float[][], float[][]> dotProduct = (a, b) -> dot(a, b);
 
@@ -625,8 +627,7 @@ public class NNLib extends Application implements Serializable {
         return result;
     }
 
-    public static void print(float[][] matrix, String nameOfMatrix) {
-        System.out.println(nameOfMatrix + ": ");
+    public static void print(float[][] matrix) {
         int rows = matrix.length;
         int columns = matrix[0].length;
         for (int i = 0; i < rows; i++) {
@@ -893,58 +894,77 @@ public class NNLib extends Application implements Serializable {
         }
         return result;
     }
+    private static final LinkedList<Function<NN, Stage>> INFOLIST = new LinkedList<>();
+    private static final LinkedList<NN> NNLIST = new LinkedList<>();
+    private static int updateRate = 10;
 
-    private static void initGraph(Stage stage, NN nn) {
-        final NumberAxis xAxis = new NumberAxis();
-        final NumberAxis yAxis = new NumberAxis();
-        xAxis.setAnimated(false);
-        xAxis.setLabel("Training Sessions");
-        yAxis.setAnimated(false);
-        yAxis.setLabel(graphMeasuresAccuracy ? "Accuracy" : "Cost");
-        if (graphMeasuresAccuracy) {
-            yAxis.setAutoRanging(false);
-            yAxis.setUpperBound(1);
-            yAxis.setTickUnit(.05);
-        }
-        XYChart.Series<Number, Number> series = new XYChart.Series<>();
-        ScatterChart<Number, Number> chart = new ScatterChart<>(xAxis, yAxis);
-        chart.setAnimated(false);
-        chart.getData().add(series);
-        Scene scene = new Scene(chart, 600, 300);
-        stage.setScene(scene);
-        stage.show();
-        stage.setTitle(nn.NAME);
-        Thread updateThread = new Thread(() -> {
-            while (true) {
-                try {
-                    Thread.sleep(50);
-                    Platform.runLater(() -> series.getData().add(new XYChart.Data<>(nn.sessions, !graphMeasuresAccuracy ? nn.loss : 1 / Math.pow(10, nn.loss))));
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
+    public static void setUpdateRate(int millis) {
+        updateRate = millis;
+    }
+
+    public static final Function<NN, Stage> INFO_GRAPH(boolean mode) {
+        return (nn) -> {
+            NumberAxis xAxis = new NumberAxis();
+            NumberAxis yAxis = new NumberAxis();
+            xAxis.setAnimated(false);
+            xAxis.setLabel("Times Backpropagated");
+            yAxis.setAnimated(false);
+            yAxis.setLabel(mode ? "Accuracy" : "Loss");
+            if (mode) {
+                yAxis.setAutoRanging(false);
+                yAxis.setUpperBound(1);
+                yAxis.setTickUnit(.05);
+            }
+            XYChart.Series<Number, Number> series = new XYChart.Series<>();
+            ScatterChart<Number, Number> chart = new ScatterChart<>(xAxis, yAxis);
+            chart.setAnimated(false);
+            chart.getData().add(series);
+            Timeline loop = new Timeline(new KeyFrame(Duration.millis(updateRate), handler -> {
+                if (mode) {
+                    series.getData().add(new XYChart.Data<>(nn.sessions, 1 / Math.pow(10, nn.loss)));
+                } else {
+                    series.getData().add(new XYChart.Data<>(nn.sessions, nn.loss));
                 }
+            }));
+            loop.setCycleCount(Animation.INDEFINITE);
+            loop.play();
+            Stage stage = new Stage();
+            stage.setScene(new Scene(chart, 600, 300));
+            return stage;
+        };
+    }
+
+    public static void launch() {
+        Thread launchThread = new Thread(() -> {
+            try {
+                launch(NNLib.class);
+            } catch (IllegalStateException e) {
+
             }
         });
-        updateThread.setDaemon(true);
-        updateThread.start();
+        launchThread.setName("NNLib Launch Thread");
+        launchThread.start();
     }
 
-    public static void graphJFX(boolean graphMeasuresAccuracy, NN nnForGraph) {//Cost = false, Accuracy = true
-        NNLib.graphMeasuresAccuracy = graphMeasuresAccuracy;
-        Stage stage = new Stage();
-        initGraph(stage, nnForGraph);
-    }
-
-    public static void graph(boolean graphMeasuresAccuracy, NN nnForGraph) {
-        NNLib.graphMeasuresAccuracy = graphMeasuresAccuracy;
-        NNLib.nnForGraph = nnForGraph;
-        new Thread(() -> {
-            NNLib.launch(NNLib.class);
-        }).start();
+    public static void showInfo(Function<NN, Stage> info, NN nn) {
+        launch();
+        INFOLIST.add(info);
+        NNLIST.add(nn);
     }
 
     @Override
     public void start(Stage stage) {
-        initGraph(stage, nnForGraph);
+        Timeline uiUpdateLoop = new Timeline(new KeyFrame(Duration.millis(updateRate), handler -> {
+            if (INFOLIST.size() > 0) {
+                Stage infoWindow = INFOLIST.poll().apply(NNLIST.getFirst());
+                infoWindow.setTitle(NNLIST.poll().NAME);
+                infoWindow.setX(Screen.getPrimary().getBounds().getWidth() / 2 + (Math.random() * 500 - 250));
+                infoWindow.setY(Screen.getPrimary().getBounds().getHeight() / 2 + (Math.random() * 500 - 250));
+                infoWindow.show();
+            }
+        }));
+        uiUpdateLoop.setCycleCount(Animation.INDEFINITE);
+        uiUpdateLoop.play();
     }
 
     public static void main(String[] args) {
