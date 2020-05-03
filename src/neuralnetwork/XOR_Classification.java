@@ -36,7 +36,7 @@ public class XOR_Classification {
                 new Layer.Dense(2, 2, CUSTOM, Initializer.XAVIER),
                 new Layer.Dense(2, 2, ActivationFunction.SOFTMAX, Initializer.XAVIER)
         );
-        System.out.println(nn.NETWORKSIZE);
+        System.out.println(nn.length);
         System.out.println(nn.toString());
         ArrayList<Data> data = new ArrayList<>();
 
@@ -45,7 +45,7 @@ public class XOR_Classification {
         data.add(new Data(new float[]{0, 1}, new float[]{1, 0}));
         data.add(new Data(new float[]{1, 0}, new float[]{1, 0}));
         data.add(new Data(new float[]{0, 0}, new float[]{0, 1}));
-        NNLib.showInfo(NNLib.INFO_GRAPH(false), nn);
+        NNLib.showInfo(NNLib.infoGraph(false), nn);
         for (int i = 0; i < 1_000_00000; i--) {
             int index = nn.getRandom().nextInt(4);
             if (PRINT && i % 100000 == 0) {

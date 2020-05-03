@@ -9,7 +9,6 @@ import java.io.Serializable;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.Random;
-import javafx.animation.Animation;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Application;
@@ -18,6 +17,8 @@ import javafx.scene.Scene;
 import javafx.scene.chart.NumberAxis;
 import javafx.scene.chart.ScatterChart;
 import javafx.scene.chart.XYChart;
+import javafx.scene.layout.FlowPane;
+import javafx.scene.text.Text;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
 import javafx.util.Duration;
@@ -39,8 +40,8 @@ public class NNLib extends Application implements Serializable {
 
     public final class NN implements Serializable {
 
-        public final String NAME;
-        public final int NETWORKSIZE;//Counts only the hidden layers and yhe output layer, the input layer doesn't count.
+        public final String label;
+        public final int length;//Counts only the hidden layers and the output layer, so the input layer doesn't count.
         private Layer[] network;
         private float lr;
         private Random random = new Random();
@@ -51,22 +52,22 @@ public class NNLib extends Application implements Serializable {
         private TriFunction<Float, float[][], float[][][], float[][][][]> optimizer;
 
         NN(String networkName, long seed, double learningRate, BiFunction<float[][], float[][], Object[]> lossFunction, TriFunction<Float, float[][], float[][][], float[][][][]> optimizer, Layer... layers) {
-            NAME = networkName;
+            label = networkName;
             this.seed = seed;
             lr = (float) learningRate;
             this.lossFunction = lossFunction;
             this.optimizer = optimizer;
             network = layers;
-            NETWORKSIZE = network.length;
+            length = network.length;
             random.setSeed(seed);
-            for (int i = 0; i < NETWORKSIZE; i++) {
+            for (int i = 0; i < length; i++) {
                 network[i].initialize(random);
             }
         }
 
         public float[][] feedforward(float[][] inputs) {
             float[][] out = inputs;
-            for (int i = 0; i < NETWORKSIZE; i++) {
+            for (int i = 0; i < length; i++) {
                 out = network[i].forward(out);
             }
             return out;
@@ -74,14 +75,14 @@ public class NNLib extends Application implements Serializable {
 
         public void backpropagation(float[][] inputs, float[][] targets) {
             float[][] out = inputs;
-            for (int i = 0; i < NETWORKSIZE; i++) {
+            for (int i = 0; i < length; i++) {
                 out = network[i].forwardBack(out);
             }
             Object[] lossArr = lossFunction.apply(out, targets);
             loss = (double) lossArr[0];
             float[][] dC_dA = (float[][]) lossArr[1];
-            float[][] dC_dZ = network[NETWORKSIZE - 1].back(dC_dA, null, lr, optimizer, true);
-            for (int i = NETWORKSIZE - 2; i >= 0; i--) {
+            float[][] dC_dZ = network[length - 1].back(dC_dA, null, lr, optimizer, true);
+            for (int i = length - 2; i >= 0; i--) {
                 network[i].back(dC_dZ, ((Layer.Dense) network[i + 1]).weights, lr, optimizer, false);
             }
             sessions++;
@@ -91,14 +92,20 @@ public class NNLib extends Application implements Serializable {
         public String toString() {
             String networkLayers = "";
             networkLayers += network[0].nodesIn + ",";
-            for (int i = 0; i < NETWORKSIZE - 1; i++) {
+            for (int i = 0; i < length - 1; i++) {
                 networkLayers += network[i].nodesOut + ",";
             }
-            networkLayers += network[NETWORKSIZE - 1].nodesOut;
+            networkLayers += network[length - 1].nodesOut;
             return networkLayers;
         }
 
-        public Layer getNetworkLayer(int layerIndex) {//0 returns the layer after the inputs (first hidden layer). Holds weights between itself and the layer before.
+        /**
+         * @param layerIndex 0 refers to the first hidden layer following the
+         * inputs. Passing in one less than the length of the network would
+         * return the output layer.
+         * @return The corresponding layer.
+         */
+        public Layer getLayer(int layerIndex) {
             return network[layerIndex];
         }
 
@@ -113,17 +120,17 @@ public class NNLib extends Application implements Serializable {
 
         @Override
         public NN clone() {
-            Layer[] layers = new Layer[NETWORKSIZE];
-            for (int i = 0; i < NETWORKSIZE; i++) {
+            Layer[] layers = new Layer[length];
+            for (int i = 0; i < length; i++) {
                 layers[i] = network[i].clone();
             }
-            NN clone = new NN(NAME, seed, lr, lossFunction, optimizer, layers);
+            NN clone = new NN(label, seed, lr, lossFunction, optimizer, layers);
             return clone;
         }
 
         public void save() {
             try {
-                FileOutputStream fileOut = new FileOutputStream(System.getProperty("user.dir") + "/" + NAME + "_neuralnetwork(" + toString() + ")");
+                FileOutputStream fileOut = new FileOutputStream(System.getProperty("user.dir") + "/" + label + "_neuralnetwork(" + toString() + ")");
                 ObjectOutputStream out = new ObjectOutputStream(fileOut);
                 Object[] arr = {network, random};
                 out.writeObject(arr);
@@ -134,26 +141,26 @@ public class NNLib extends Application implements Serializable {
 
         public boolean load() {
             try {
-                FileInputStream fileIn = new FileInputStream(System.getProperty("user.dir") + "/" + NAME + "_neuralnetwork(" + toString() + ")");
+                FileInputStream fileIn = new FileInputStream(System.getProperty("user.dir") + "/" + label + "_neuralnetwork(" + toString() + ")");
                 ObjectInputStream in = new ObjectInputStream(fileIn);
                 Object[] arr = (Object[]) in.readObject();
                 network = (Layer[]) arr[0];
                 random = (Random) arr[1];
                 return true;
             } catch (IOException | ClassNotFoundException e) {
-                System.out.println("Could not load network settings for \"" + NAME + "\".");
+                System.out.println("Could not load network settings for \"" + label + "\".");
                 return false;
             }
         }
 
         public void randomize(float range) {
-            for (int i = 0; i < NETWORKSIZE; i++) {
+            for (int i = 0; i < length; i++) {
                 network[i].randomize(range);
             }
         }
 
         public void mutate(float range, float mutateRate) {
-            for (int i = 0; i < NETWORKSIZE; i++) {
+            for (int i = 0; i < length; i++) {
                 network[i].mutate(range, mutateRate);
             }
         }
@@ -163,16 +170,13 @@ public class NNLib extends Application implements Serializable {
         }
 
         /**
-         *
-         * @param optimizer A function that takes in three parameters. The first
-         * two function parameters are strictly for the learning rate and the
-         * gradients. The third parameter is an array of matrices to store info
-         * like previous moments. The layers initialize the matrices of the
-         * first two elements of the storage to zeroes. If more than two
-         * matrices are needed to be stored, then add zeroed matrices to the
-         * initialize method of the Layer classes.
-         * @return An array of two elements maximum to fit both the gradient
-         * update and the storage array.
+         * @param optimizer The first two parameters of the TriFunction are
+         * strictly for the learning rate and the gradients respectively. The
+         * third parameter is an array of matrices to store info such as
+         * previous updates, gradients, etc. The TriFunction returns an array
+         * where its first element is a array with one element to hold the
+         * gradient update matrix and its second element is the storage array
+         * that is passed into the next call of the optimizer
          */
         public void setOptimizer(TriFunction<Float, float[][], float[][][], float[][][][]> optimizer) {
             this.optimizer = optimizer;
@@ -197,6 +201,9 @@ public class NNLib extends Application implements Serializable {
         abstract void mutate(float range, float mutateRate);
 
         protected abstract Layer clone();
+
+        @Override
+        public abstract String toString();
 
         public static class Dense extends Layer implements Serializable {
 
@@ -223,8 +230,8 @@ public class NNLib extends Application implements Serializable {
                 weights = NNLib.randomize(weights, 2, -1, random);//values on interval [-1,1]
                 biases = NNLib.randomize(biases, 2, -1, random);//values on interval [-1,1]
                 weights = initializer.apply(weights, nodesIn);
-                updateStorageW = new float[][][]{create(nodesIn, nodesOut, 0), create(nodesIn, nodesOut, 0)};
-                updateStorageB = new float[][][]{create(1, nodesOut, 0), create(1, nodesOut, 0)};
+                updateStorageW = new float[][][]{create(nodesIn, nodesOut, 0)};
+                updateStorageB = new float[][][]{create(1, nodesOut, 0)};
             }
 
             @Override
@@ -241,35 +248,33 @@ public class NNLib extends Application implements Serializable {
 
             @Override
             float[][] back(float[][] dG, float[][] dZ_dA, float lr, TriFunction<Float, float[][], float[][][], float[][][][]> optimizer, boolean outputLayer) {//dG = The running gradient from the previous backpropagated layer or loss function
+                float[][] dA_dZ = activation.apply(Z, true);
+                float[][] dC_dZ;
                 if (!outputLayer) {
-                    float[][] dA_dZ = activation.apply(Z, true);
                     float[][] dC_dA = dotProduct.apply(dG, transpose(dZ_dA));
-                    float[][] dC_dZ;
                     if (dA_dZ.length == 1) {
                         dC_dZ = multiply(dC_dA, dA_dZ);
                     } else {
                         dC_dZ = dotProduct.apply(dC_dA, dA_dZ);//For jacobian matrices
                     }
-                    float[][] dC_dW = dotProduct.apply(transpose(prevA), dC_dZ);//prevA = dZ_dW;
-                    float[][][][] updateW = optimizer.apply(lr, dC_dW, updateStorageW);
-                    float[][][][] updateB = optimizer.apply(lr, dC_dZ, updateStorageB);
-                    float[][] gradientsW = updateW[0][0];
-                    float[][] gradientsB = updateB[0][0];
-                    updateStorageW = updateW[1];
-                    updateStorageB = updateB[1];
-                    weights = subtract(weights, gradientsW);
-                    biases = subtract(biases, gradientsB);
-                    return dC_dZ;
-                }
-                float[][] dA_dZ = activation.apply(Z, true);
-                float[][] dC_dZ;
-                if (dA_dZ.length == 1) {
-                    dC_dZ = multiply(dG, dA_dZ);
                 } else {
-                    dC_dZ = dotProduct.apply(dG, dA_dZ);//For jacobian matrices
+                    if (dA_dZ.length == 1) {
+                        dC_dZ = multiply(dG, dA_dZ);
+                    } else {
+                        dC_dZ = dotProduct.apply(dG, dA_dZ);//For jacobian matrices
+                    }
                 }
                 float[][] dC_dW = dotProduct.apply(transpose(prevA), dC_dZ);//prevA = dZ_dW;
-                float[][][][] updateW = optimizer.apply(lr, dC_dW, updateStorageW);
+                float[][][][] updateW = {};
+                while (true) {
+                    try {
+                        updateW = optimizer.apply(lr, dC_dW, updateStorageW);
+                        break;
+                    } catch (Exception e) {
+                        updateStorageW = append(updateStorageW, new float[][][]{create(nodesIn, nodesOut, 0)});
+                        updateStorageB = append(updateStorageB, new float[][][]{create(1, nodesOut, 0)});
+                    }
+                }
                 float[][][][] updateB = optimizer.apply(lr, dC_dZ, updateStorageB);
                 float[][] gradientsW = updateW[0][0];
                 float[][] gradientsB = updateB[0][0];
@@ -310,6 +315,11 @@ public class NNLib extends Application implements Serializable {
                         biases[0][i] += (float) (Math.random() * range - range / 2);
                     }
                 }
+            }
+
+            @Override
+            public String toString() {
+                return "Weights:\n" + matrixToString(weights) + "\nBiases:\n" + matrixToString(biases);
             }
         }
     }
@@ -359,7 +369,6 @@ public class NNLib extends Application implements Serializable {
     public static class LossFunction {//Not sure if the sums should be divided by the number of outputs of the network
 
         /**
-         *
          * @param steepness default value is 0.5
          */
         static final BiFunction<float[][], float[][], Object[]> QUADRATIC(double steepnessFactor) {
@@ -371,7 +380,6 @@ public class NNLib extends Application implements Serializable {
         }
 
         /**
-         *
          * @param steepness default value is 1
          */
         static final BiFunction<float[][], float[][], Object[]> HUBER(double steepnessFactor) {
@@ -404,7 +412,6 @@ public class NNLib extends Application implements Serializable {
         }
 
         /**
-         *
          * @param steepness default value is 1
          */
         static final BiFunction<float[][], float[][], Object[]> HUBERPSEUDO(double steepnessFactor) {
@@ -421,7 +428,6 @@ public class NNLib extends Application implements Serializable {
         }
 
         /**
-         *
          * @param steepness default value is 1
          */
         static final BiFunction<float[][], float[][], Object[]> CROSSENTROPY(double steepnessFactor) {
@@ -627,15 +633,21 @@ public class NNLib extends Application implements Serializable {
         return result;
     }
 
-    public static void print(float[][] matrix) {
+    public static String matrixToString(float[][] matrix) {
         int rows = matrix.length;
         int columns = matrix[0].length;
+        String string = "";
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < columns; j++) {
-                System.out.print("[" + matrix[i][j] + "] ");
+                string += "[" + matrix[i][j] + "] ";
             }
-            System.out.println("");
+            string += "\n";
         }
+        return string;
+    }
+
+    public static void print(float[][] matrix) {
+        System.out.print(matrixToString(matrix));
     }
 
     public static float[][] doubleToFloat(double[][] matrix) {
@@ -858,15 +870,16 @@ public class NNLib extends Application implements Serializable {
         return index;
     }
 
-    public static float[][] append(float[][] oneRow1, float[][] oneRow2) {
-        int length1 = oneRow1[0].length;
-        int length2 = oneRow2[0].length;
-        float[][] result = new float[1][length1 + length2];
-        for (int i = 0; i < length1; i++) {
-            result[0][i] = oneRow1[0][i];
+    public static float[][][] append(float[][][] a, float[][][] b) {//Not very general
+        int size1 = a.length;
+        int size2 = b.length;
+        int size3 = size1 + size2;
+        float[][][] result = new float[size3][][];
+        for (int i = 0; i < size1; i++) {
+            result[i] = a[i];
         }
-        for (int i = 0; i < length2; i++) {
-            result[0][i + length1] = oneRow2[0][i];
+        for (int i = 0; i < size2; i++) {
+            result[i + size1] = b[i];
         }
         return result;
     }
@@ -896,14 +909,14 @@ public class NNLib extends Application implements Serializable {
     }
     private static final LinkedList<Function<NN, Stage>> INFOLIST = new LinkedList<>();
     private static final LinkedList<NN> NNLIST = new LinkedList<>();
-    private static int updateRate = 10;
+    private static int FXUpdateRate = 10;
 
-    public static void setUpdateRate(int millis) {
-        updateRate = millis;
+    public static void setFXUpdateRate(int millis) {
+        FXUpdateRate = millis;
     }
 
-    public static final Function<NN, Stage> INFO_GRAPH(boolean mode) {
-        return (nn) -> {
+    public static Function<NN, Stage> infoGraph(boolean mode) {
+        return nn -> {
             NumberAxis xAxis = new NumberAxis();
             NumberAxis yAxis = new NumberAxis();
             xAxis.setAnimated(false);
@@ -919,20 +932,39 @@ public class NNLib extends Application implements Serializable {
             ScatterChart<Number, Number> chart = new ScatterChart<>(xAxis, yAxis);
             chart.setAnimated(false);
             chart.getData().add(series);
-            Timeline loop = new Timeline(new KeyFrame(Duration.millis(updateRate), handler -> {
+            Timeline loop = new Timeline(new KeyFrame(Duration.millis(FXUpdateRate), handler -> {
                 if (mode) {
                     series.getData().add(new XYChart.Data<>(nn.sessions, 1 / Math.pow(10, nn.loss)));
                 } else {
                     series.getData().add(new XYChart.Data<>(nn.sessions, nn.loss));
                 }
             }));
-            loop.setCycleCount(Animation.INDEFINITE);
+            loop.setCycleCount(-1);
             loop.play();
             Stage stage = new Stage();
             stage.setScene(new Scene(chart, 600, 300));
             return stage;
         };
     }
+
+    public static Function<NN, Stage> infoLayers = nn -> {
+        FlowPane network = new FlowPane();
+        int size = nn.length;
+        Text[] parameters = new Text[size];
+        Timeline loop = new Timeline(new KeyFrame(Duration.millis(FXUpdateRate), handler -> {
+            for (int i = 0; i < size; i++) {
+                parameters[i] = new Text("Layer " + (i + 1) + ":\n" + nn.network[i].toString());
+            }
+            network.getChildren().clear();
+            network.getChildren().addAll(parameters);
+        }));
+        loop.setCycleCount(-1);
+        loop.play();
+        Scene scene = new Scene(network);
+        Stage stage = new Stage();
+        stage.setScene(scene);
+        return stage;
+    };
 
     public static void launch() {
         Thread launchThread = new Thread(() -> {
@@ -954,16 +986,15 @@ public class NNLib extends Application implements Serializable {
 
     @Override
     public void start(Stage stage) {
-        Timeline uiUpdateLoop = new Timeline(new KeyFrame(Duration.millis(updateRate), handler -> {
+        Timeline uiUpdateLoop = new Timeline(new KeyFrame(Duration.millis(FXUpdateRate), handler -> {
             if (INFOLIST.size() > 0) {
                 Stage infoWindow = INFOLIST.poll().apply(NNLIST.getFirst());
-                infoWindow.setTitle(NNLIST.poll().NAME);
-                infoWindow.setX(Screen.getPrimary().getBounds().getWidth() / 2 + (Math.random() * 500 - 250));
-                infoWindow.setY(Screen.getPrimary().getBounds().getHeight() / 2 + (Math.random() * 500 - 250));
+                infoWindow.setTitle(NNLIST.poll().label);
+                infoWindow.setX((Screen.getPrimary().getBounds().getWidth() / 5) + (Math.random() * Screen.getPrimary().getBounds().getWidth() / 5));
                 infoWindow.show();
             }
         }));
-        uiUpdateLoop.setCycleCount(Animation.INDEFINITE);
+        uiUpdateLoop.setCycleCount(-1);
         uiUpdateLoop.play();
     }
 
