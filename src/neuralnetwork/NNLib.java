@@ -13,10 +13,12 @@ import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Application;
 import static javafx.application.Application.launch;
+import javafx.event.EventHandler;
 import javafx.scene.Scene;
 import javafx.scene.chart.NumberAxis;
 import javafx.scene.chart.ScatterChart;
 import javafx.scene.chart.XYChart;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.text.Text;
 import javafx.stage.Screen;
@@ -50,6 +52,7 @@ public class NNLib extends Application implements Serializable {
         private long sessions = 0;
         private BiFunction<float[][], float[][], Object[]> lossFunction;
         private TriFunction<Float, float[][], float[][][], float[][][][]> optimizer;
+        private boolean forwardPass = false;
 
         NN(String networkName, long seed, double learningRate, BiFunction<float[][], float[][], Object[]> lossFunction, TriFunction<Float, float[][], float[][][], float[][][][]> optimizer, Layer... layers) {
             label = networkName;
@@ -70,13 +73,20 @@ public class NNLib extends Application implements Serializable {
             for (int i = 0; i < length; i++) {
                 out = network[i].forward(out);
             }
+            forwardPass = true;
             return out;
         }
 
         public void backpropagation(float[][] inputs, float[][] targets) {
-            float[][] out = inputs;
-            for (int i = 0; i < length; i++) {
-                out = network[i].forwardBack(out);
+            float[][] out;
+            if (forwardPass) {
+                out = network[length - 1].A;
+                forwardPass = false;
+            } else {
+                out = inputs;
+                for (int i = 0; i < length; i++) {
+                    out = network[i].forward(out);
+                }
             }
             Object[] lossArr = lossFunction.apply(out, targets);
             loss = (double) lossArr[0];
@@ -187,12 +197,13 @@ public class NNLib extends Application implements Serializable {
 
         int nodesIn;
         int nodesOut;
+        float[][] prevA;
+        float[][] Z;
+        float[][] A;
 
         abstract void initialize(Random random);
 
         abstract float[][] forward(float[][] in);
-
-        abstract float[][] forwardBack(float[][] in);
 
         abstract float[][] back(float[][] dG, float[][] dZ_dA, float lr, TriFunction<Float, float[][], float[][][], float[][][][]> optimizer, boolean outputLayer);
 
@@ -213,8 +224,6 @@ public class NNLib extends Application implements Serializable {
             float[][][] updateStorageB;
             BiFunction<float[][], Boolean, float[][]> activation;
             BiFunction<float[][], Integer, float[][]> initializer;
-            float[][] Z;
-            float[][] prevA;
 
             Dense(int nodesIn, int nodesOut, BiFunction<float[][], Boolean, float[][]> activation, BiFunction<float[][], Integer, float[][]> initializer) {
                 this.nodesIn = nodesIn;
@@ -236,14 +245,10 @@ public class NNLib extends Application implements Serializable {
 
             @Override
             float[][] forward(float[][] in) {
-                return activation.apply(add(dotProduct.apply(in, weights), biases), false);
-            }
-
-            @Override
-            float[][] forwardBack(float[][] in) {
                 prevA = in;
                 Z = add(dotProduct.apply(in, weights), biases);
-                return activation.apply(Z, false);
+                A = activation.apply(Z, false);
+                return A;
             }
 
             @Override
@@ -362,11 +367,11 @@ public class NNLib extends Application implements Serializable {
                     }
                 }
             }
-            return jacobian;//Not sure if it should be transposed for my transposed style of a neural network, but the matrix is the same transposed in the xor classification example
+            return jacobian;//Should be transposed?
         };
     }
 
-    public static class LossFunction {//Not sure if the sums should be divided by the number of outputs of the network
+    public static class LossFunction {//Should sums be divided by the number of outputs of the network?
 
         /**
          * @param steepness default value is 0.5
@@ -392,19 +397,19 @@ public class NNLib extends Application implements Serializable {
                 for (int j = 0; j < columns; j++) {
                     float val = a[0][j];
                     if (Math.abs(val) < steepness) {
-                        sum += val * val / 2;
+                        sum += (val * val) / 2;
                     } else {
                         sum += steepness * (Math.abs(a[0][j]) - deltaHalf);
                     }
                 }
-                double loss = sum / columns;
+                double loss = sum;
                 float[][] deriv = new float[1][columns];
                 for (int j = 0; j < columns; j++) {
                     float val = a[0][j];
                     if (Math.abs(val) < steepness) {
                         deriv[0][j] = a[0][j];
                     } else {
-                        deriv[0][j] = steepness * (a[0][j] / Math.abs(a[0][j])) - steepness;
+                        deriv[0][j] = steepness * (a[0][j] / Math.abs(a[0][j]));
                     }
                 }
                 return new Object[]{loss, deriv};
@@ -441,7 +446,7 @@ public class NNLib extends Application implements Serializable {
 
     public static class Optimizer {
 
-        //Not sure if these should be final
+        //Should be final?
         public static final float beta = .9f;
         public static final float beta2 = .999f;
         public static final float e = .00000001f;
@@ -497,7 +502,7 @@ public class NNLib extends Application implements Serializable {
         };
     }
 
-    public static float[][] normalTanh(float[][] inputs) {
+    public static float[][] normalizeTanh(float[][] inputs) {
         int elements = inputs[0].length;
         float[][] result = new float[1][elements];
         float mean = sum(inputs) / elements;
@@ -508,7 +513,7 @@ public class NNLib extends Application implements Serializable {
         return result;
     }
 
-    public static float[][] normalZScore(float[][] inputs) {
+    public static float[][] normalizeZScore(float[][] inputs) {
         int elements = inputs[0].length;
         float mean = sum(inputs) / elements;
         float deviation = (float) (Math.sqrt(sum(square(subtract(inputs, create(1, elements, mean)))) / (mean)));
@@ -721,7 +726,7 @@ public class NNLib extends Application implements Serializable {
         int columns1 = m1[0].length;
         int columns2 = m2[0].length;
         float[][] result = new float[rows1][columns2];
-        if (columns1 % 4 == 0) {
+        if (columns1 % 4 == 0) {//Loop unrolling increases speed
             for (int i = 0; i < rows1; i++) {
                 for (int k = 0; k < columns1; k += 4) {
                     for (int j = 0; j < columns2; j++) {
@@ -909,10 +914,24 @@ public class NNLib extends Application implements Serializable {
     }
     private static final LinkedList<Function<NN, Stage>> INFOLIST = new LinkedList<>();
     private static final LinkedList<NN> NNLIST = new LinkedList<>();
-    private static int FXUpdateRate = 10;
+    private static int updateRate = 50;
+    private static final Timeline UPDATER = new Timeline(new KeyFrame(Duration.millis(updateRate), handler -> {
+        if (INFOLIST.size() > 0) {
+            Stage infoWindow = INFOLIST.poll().apply(NNLIST.getFirst());
+            infoWindow.setTitle(NNLIST.poll().label);
+            infoWindow.setX((Screen.getPrimary().getBounds().getWidth() / 5) + (Math.random() * Screen.getPrimary().getBounds().getWidth() / 5));
+            infoWindow.show();
+        }
+    }));
 
-    public static void setFXUpdateRate(int millis) {
-        FXUpdateRate = millis;
+    public static void setInfoUpdateRate(int millis) {
+        updateRate = millis;
+    }
+
+    private static void updaterBuilder(EventHandler handler) {
+        Timeline updater = new Timeline(new KeyFrame(Duration.millis(updateRate), handler));
+        updater.setCycleCount(-1);//Indefinite
+        updater.play();
     }
 
     public static Function<NN, Stage> infoGraph(boolean mode) {
@@ -924,23 +943,19 @@ public class NNLib extends Application implements Serializable {
             yAxis.setAnimated(false);
             yAxis.setLabel(mode ? "Accuracy" : "Loss");
             if (mode) {
-                yAxis.setAutoRanging(false);
-                yAxis.setUpperBound(1);
-                yAxis.setTickUnit(.05);
+                yAxis.setForceZeroInRange(false);
             }
             XYChart.Series<Number, Number> series = new XYChart.Series<>();
             ScatterChart<Number, Number> chart = new ScatterChart<>(xAxis, yAxis);
             chart.setAnimated(false);
             chart.getData().add(series);
-            Timeline loop = new Timeline(new KeyFrame(Duration.millis(FXUpdateRate), handler -> {
+            updaterBuilder(handler -> {
                 if (mode) {
-                    series.getData().add(new XYChart.Data<>(nn.sessions, 1 / Math.pow(10, nn.loss)));
+                    series.getData().add(new XYChart.Data<>(nn.sessions, 1 / Math.pow(100 * Math.E, nn.loss)));
                 } else {
                     series.getData().add(new XYChart.Data<>(nn.sessions, nn.loss));
                 }
-            }));
-            loop.setCycleCount(-1);
-            loop.play();
+            });
             Stage stage = new Stage();
             stage.setScene(new Scene(chart, 600, 300));
             return stage;
@@ -948,25 +963,25 @@ public class NNLib extends Application implements Serializable {
     }
 
     public static Function<NN, Stage> infoLayers = nn -> {
+        ScrollPane scroll = new ScrollPane();
         FlowPane network = new FlowPane();
+        scroll.setContent(network);
         int size = nn.length;
         Text[] parameters = new Text[size];
-        Timeline loop = new Timeline(new KeyFrame(Duration.millis(FXUpdateRate), handler -> {
+        updaterBuilder(handler -> {
             for (int i = 0; i < size; i++) {
                 parameters[i] = new Text("Layer " + (i + 1) + ":\n" + nn.network[i].toString());
             }
             network.getChildren().clear();
             network.getChildren().addAll(parameters);
-        }));
-        loop.setCycleCount(-1);
-        loop.play();
-        Scene scene = new Scene(network);
+        });
+        Scene scene = new Scene(scroll, 600, 300);
         Stage stage = new Stage();
         stage.setScene(scene);
         return stage;
     };
 
-    public static void launch() {
+    public static void showInfo(Function<NN, Stage> info, NN nn) {
         Thread launchThread = new Thread(() -> {
             try {
                 launch(NNLib.class);
@@ -976,29 +991,13 @@ public class NNLib extends Application implements Serializable {
         });
         launchThread.setName("NNLib Launch Thread");
         launchThread.start();
-    }
-
-    public static void showInfo(Function<NN, Stage> info, NN nn) {
-        launch();
         INFOLIST.add(info);
         NNLIST.add(nn);
     }
 
     @Override
     public void start(Stage stage) {
-        Timeline uiUpdateLoop = new Timeline(new KeyFrame(Duration.millis(FXUpdateRate), handler -> {
-            if (INFOLIST.size() > 0) {
-                Stage infoWindow = INFOLIST.poll().apply(NNLIST.getFirst());
-                infoWindow.setTitle(NNLIST.poll().label);
-                infoWindow.setX((Screen.getPrimary().getBounds().getWidth() / 5) + (Math.random() * Screen.getPrimary().getBounds().getWidth() / 5));
-                infoWindow.show();
-            }
-        }));
-        uiUpdateLoop.setCycleCount(-1);
-        uiUpdateLoop.play();
-    }
-
-    public static void main(String[] args) {
-        launch(args);
+        UPDATER.setCycleCount(-1);
+        UPDATER.play();
     }
 }

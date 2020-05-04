@@ -9,8 +9,8 @@ public class XOR {
         final boolean PRINT = true;
         NN nn = new NNLib().new NN(
                 "xor",//Name for Saving & Graph Title
-                (long) (Math.random() * 1000000000),//Seed For Reproducibility
-                .001,//Learning Rate for Optimizer
+                777,//Seed For Reproducibility
+                .1,//Learning Rate for Optimizer
                 LossFunction.QUADRATIC(.5),//Loss/Cost/Error Function
                 Optimizer.VANILLA,//Stochastic Gradient Descent Optimizer
                 new Layer.Dense(2, 2, ActivationFunction.SIGMOID, Initializer.VANILLA),//2 in, 2 out
@@ -25,11 +25,13 @@ public class XOR {
         data.add(new Data(new float[]{0, 1}, new float[]{1}));//False, True = True
         data.add(new Data(new float[]{1, 0}, new float[]{1}));//True, False = True
         data.add(new Data(new float[]{0, 0}, new float[]{0}));//False, False = False
-        NNLib.showInfo(NNLib.infoGraph(false), nn);
+        NNLib.setInfoUpdateRate(10);
         NNLib.showInfo(NNLib.infoLayers, nn);
-        for (int i = 0; i < 1_000_000_000; i++) {
+        NNLib.showInfo(NNLib.infoGraph(true), nn);
+        NNLib.showInfo(NNLib.infoGraph(false), nn);
+        for (int i = 0; i < 100_000_000; i++) {
             int index = nn.getRandom().nextInt(4);
-            if (PRINT && i % 100000 == 0) {
+            if (PRINT && i % 10_000 == 0) {
                 System.out.println("Inputs:");
                 NNLib.print(data.get(index).inputs);
                 System.out.println("Outputs:");

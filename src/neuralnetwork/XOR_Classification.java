@@ -7,7 +7,7 @@ public class XOR_Classification {
 
     public static void main(String[] args) {
         final boolean PRINT = true;
-        final BiFunction<float[][], Boolean, float[][]> CUSTOM = (matrix, derivative) -> {//Custom activation function
+        final BiFunction<float[][], Boolean, float[][]> CUSTOM = (matrix, derivative) -> {//Custom activation function -> max(tanh(x),x)
             int rows = matrix.length;
             int columns = matrix[0].length;
             if (!derivative) {
@@ -32,7 +32,7 @@ public class XOR_Classification {
                 777,//Seed For Reproducibility
                 .001,//Learning Rate for Optimizer
                 LossFunction.CROSSENTROPY(1),//Loss/Cost/Error Function
-                Optimizer.RMSPROP,//Stochastic Gradient Descent Optimizer
+                Optimizer.NESTEROV,//Stochastic Gradient Descent Optimizer
                 new Layer.Dense(2, 2, CUSTOM, Initializer.XAVIER),
                 new Layer.Dense(2, 2, ActivationFunction.SOFTMAX, Initializer.XAVIER)
         );
@@ -46,9 +46,10 @@ public class XOR_Classification {
         data.add(new Data(new float[]{1, 0}, new float[]{1, 0}));
         data.add(new Data(new float[]{0, 0}, new float[]{0, 1}));
         NNLib.showInfo(NNLib.infoGraph(false), nn);
-        for (int i = 0; i < 1_000_00000; i--) {
+        NNLib.showInfo(NNLib.infoLayers, nn);
+        for (int i = 0; i < 100_000_000; i++) {
             int index = nn.getRandom().nextInt(4);
-            if (PRINT && i % 100000 == 0) {
+            if (PRINT && i % 100_000 == 0) {
                 System.out.println("Inputs:");
                 NNLib.print(data.get(index).inputs);
                 System.out.println("Outputs:");
