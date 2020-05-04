@@ -33,9 +33,9 @@ public class NNLib extends Application implements Serializable {
     public interface BiFunction<T, S, R> extends java.util.function.BiFunction<T, S, R>, Serializable {
     }
 
-    public interface TriFunction<T, S, U, R> extends Serializable {
+    public interface QuadFunction<T, S, U, V, R> extends Serializable {
 
-        R apply(T t, S s, U u);
+        R apply(T t, S s, U u, V v);
     }
     private static int threads;
     private static BiFunction<float[][], float[][], float[][]> dotProduct = (a, b) -> dot(a, b);
@@ -51,10 +51,11 @@ public class NNLib extends Application implements Serializable {
         private double loss;
         private long sessions = 0;
         private BiFunction<float[][], float[][], Object[]> lossFunction;
-        private TriFunction<Float, float[][], float[][][], float[][][][]> optimizer;
+        private QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> optimizer;
         private boolean forwardPass = false;
+        private int step = 1;
 
-        NN(String networkName, long seed, double learningRate, BiFunction<float[][], float[][], Object[]> lossFunction, TriFunction<Float, float[][], float[][][], float[][][][]> optimizer, Layer... layers) {
+        NN(String networkName, long seed, double learningRate, BiFunction<float[][], float[][], Object[]> lossFunction, QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> optimizer, Layer... layers) {
             label = networkName;
             this.seed = seed;
             lr = (float) learningRate;
@@ -91,10 +92,11 @@ public class NNLib extends Application implements Serializable {
             Object[] lossArr = lossFunction.apply(out, targets);
             loss = (double) lossArr[0];
             float[][] dC_dA = (float[][]) lossArr[1];
-            float[][] dC_dZ = network[length - 1].back(dC_dA, null, lr, optimizer, true);
+            float[][] dC_dZ = network[length - 1].back(dC_dA, null, lr, optimizer, true, step);
             for (int i = length - 2; i >= 0; i--) {
-                network[i].back(dC_dZ, ((Layer.Dense) network[i + 1]).weights, lr, optimizer, false);
+                network[i].back(dC_dZ, ((Layer.Dense) network[i + 1]).weights, lr, optimizer, false, step);
             }
+            step++;
             sessions++;
         }
 
@@ -142,7 +144,7 @@ public class NNLib extends Application implements Serializable {
             try {
                 FileOutputStream fileOut = new FileOutputStream(System.getProperty("user.dir") + "/" + label + "_neuralnetwork(" + toString() + ")");
                 ObjectOutputStream out = new ObjectOutputStream(fileOut);
-                Object[] arr = {network, random};
+                Object[] arr = {network, random, step};
                 out.writeObject(arr);
             } catch (IOException e) {
                 e.printStackTrace();
@@ -156,6 +158,7 @@ public class NNLib extends Application implements Serializable {
                 Object[] arr = (Object[]) in.readObject();
                 network = (Layer[]) arr[0];
                 random = (Random) arr[1];
+                step = (Integer) arr[2];
                 return true;
             } catch (IOException | ClassNotFoundException e) {
                 System.out.println("Could not load network settings for \"" + label + "\".");
@@ -175,21 +178,26 @@ public class NNLib extends Application implements Serializable {
             }
         }
 
+        public void setLearningRate(double learningRate) {
+            lr = (float) learningRate;
+        }
+
         public void setLossFunction(BiFunction<float[][], float[][], Object[]> lossFunction) {
             this.lossFunction = lossFunction;
         }
 
         /**
-         * @param optimizer The first two parameters of the TriFunction are
-         * strictly for the learning rate and the gradients respectively. The
-         * third parameter is an array of matrices to store info such as
-         * previous updates, gradients, etc. The TriFunction returns an array
-         * where its first element is a array with one element to hold the
-         * gradient update matrix and its second element is the storage array
-         * that is passed into the next call of the optimizer
+         * @param optimizer The first three parameters of the QuadFunction are
+         * strictly for the time step, learning rate, and the gradients
+         * respectively. The third parameter is an array of matrices to store
+         * info such as previous updates, gradients, etc. The QuadFunction
+         * returns an array where its first element is a array with one element
+         * to hold the gradient update matrix and its second element is the
+         * storage array that is passed into the next call of the optimizer.
          */
-        public void setOptimizer(TriFunction<Float, float[][], float[][][], float[][][][]> optimizer) {
+        public void setOptimizer(QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> optimizer) {
             this.optimizer = optimizer;
+            step = 1;
         }
     }
 
@@ -200,12 +208,13 @@ public class NNLib extends Application implements Serializable {
         float[][] prevA;
         float[][] Z;
         float[][] A;
+        int step = 1;
 
         abstract void initialize(Random random);
 
         abstract float[][] forward(float[][] in);
 
-        abstract float[][] back(float[][] dG, float[][] dZ_dA, float lr, TriFunction<Float, float[][], float[][][], float[][][][]> optimizer, boolean outputLayer);
+        abstract float[][] back(float[][] dG, float[][] dZ_dA, float lr, QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> optimizer, boolean outputLayer, int step);
 
         abstract void randomize(float range);
 
@@ -252,7 +261,7 @@ public class NNLib extends Application implements Serializable {
             }
 
             @Override
-            float[][] back(float[][] dG, float[][] dZ_dA, float lr, TriFunction<Float, float[][], float[][][], float[][][][]> optimizer, boolean outputLayer) {//dG = The running gradient from the previous backpropagated layer or loss function
+            float[][] back(float[][] dG, float[][] dZ_dA, float lr, QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> optimizer, boolean outputLayer, int step) {//dG = The running gradient from the previous backpropagated layer or loss function
                 float[][] dA_dZ = activation.apply(Z, true);
                 float[][] dC_dZ;
                 if (!outputLayer) {
@@ -270,17 +279,17 @@ public class NNLib extends Application implements Serializable {
                     }
                 }
                 float[][] dC_dW = dotProduct.apply(transpose(prevA), dC_dZ);//prevA = dZ_dW;
-                float[][][][] updateW = {};
+                float[][][][] updateW = null;
                 while (true) {
                     try {
-                        updateW = optimizer.apply(lr, dC_dW, updateStorageW);
+                        updateW = optimizer.apply(step, lr, dC_dW, updateStorageW);
                         break;
                     } catch (Exception e) {
                         updateStorageW = append(updateStorageW, new float[][][]{create(nodesIn, nodesOut, 0)});
                         updateStorageB = append(updateStorageB, new float[][][]{create(1, nodesOut, 0)});
                     }
                 }
-                float[][][][] updateB = optimizer.apply(lr, dC_dZ, updateStorageB);
+                float[][][][] updateB = optimizer.apply(step, lr, dC_dZ, updateStorageB);
                 float[][] gradientsW = updateW[0][0];
                 float[][] gradientsB = updateB[0][0];
                 updateStorageW = updateW[1];
@@ -450,52 +459,76 @@ public class NNLib extends Application implements Serializable {
         public static final float beta = .9f;
         public static final float beta2 = .999f;
         public static final float e = .00000001f;
-        static final TriFunction<Float, float[][], float[][][], float[][][][]> VANILLA = (lr, gradients, storage) -> {
+
+        private static float[][] EWMA(float beta, float[][] prevStep, float[][] currentStep) {
+            return add(scale(beta, prevStep), scale(1 - beta, currentStep));
+        }
+        static final QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> VANILLA = (step, lr, gradients, storage) -> {
             return new float[][][][]{{scale(lr, gradients)}, null};
         };
-        static final TriFunction<Float, float[][], float[][][], float[][][][]> MOMENTUM = (lr, gradients, storage) -> {
+        static final QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> MOMENTUM = (step, lr, gradients, storage) -> {
             float[][] update = add(scale(beta, storage[0]), scale(lr, gradients));
             return new float[][][][]{{update}, {update}};
         };
-        static final TriFunction<Float, float[][], float[][][], float[][][][]> NESTEROV = (lr, gradients, storage) -> {//Dozat's modification because calculating two gradients would take a lot of recoding
+        static final QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> NESTEROV = (step, lr, gradients, storage) -> {//Dozat's modification because calculating two gradients would take a lot of recoding
             float[][] m = add(scale(beta, storage[0]), scale(lr, gradients));
             float[][] update = add(scale(beta, m), scale(lr, gradients));
             return new float[][][][]{{update}, {m}};
         };
-        static final TriFunction<Float, float[][], float[][][], float[][][][]> RMSPROP = (lr, gradients, storage) -> {
-            float[][] s = add(scale(beta, storage[0]), scale(1 - beta, square(gradients)));
-            float[][] update = divide(scale(lr, gradients), add(sqrt(s), create(s.length, s[0].length, e)));
+        static final QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> ADAGRAD = (step, lr, gradients, storage) -> {
+            int rows = gradients.length;
+            float val = (1 / (float) Math.sqrt(sum(storage[0]) + e));
+            float[][] G = create(rows, rows, 0);
+            for (int i = 0; i < rows; i++) {
+                G[i][i] = val;
+            }
+            float[][] update = dotProduct.apply(scale(lr, G), gradients);
+            return new float[][][][]{{update}, {square(gradients)}};
+        };
+        static final QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> ADADELTA = (step, lr, gradients, storage) -> {
+            float[][] epsilon = create(gradients.length, gradients[0].length, e);
+            float[][] gradientsE = EWMA(beta, storage[0], square(gradients));
+            float[][] gradientsRMS = sqrt(add(gradientsE, epsilon));
+            float[][] deltaRMS = sqrt(add(storage[1], epsilon));
+            float[][] update = multiply(divide(deltaRMS, gradientsRMS), gradients);
+            float[][] deltaE = EWMA(beta, storage[1], square(update));
+            return new float[][][][]{{update}, {gradientsE, deltaE}};
+        };
+        static final QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> RMSPROP = (step, lr, gradients, storage) -> {
+            float[][] s = EWMA(beta, storage[0], square(gradients));
+            float[][] s_ = scale(1 / (1 - (float) Math.pow((double) beta, step)), s);//Bias correction
+            float[][] update = divide(scale(lr, gradients), add(sqrt(s_), create(s.length, s[0].length, e)));
             return new float[][][][]{{update}, {s}};
         };
-        static final TriFunction<Float, float[][], float[][][], float[][][][]> ADAM = (lr, gradients, storage) -> {
-            float[][] m = add(scale((1 - beta), gradients), scale(beta, storage[0]));
-            float[][] v = add(scale((1 - beta2), square(gradients)), scale(beta2, storage[1]));
-            float[][] m_ = scale(1 / (1 - beta), m);//debiasing
-            float[][] v_ = scale(1 / (1 - beta2), v);//debiasing
+        static final QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> ADAM = (step, lr, gradients, storage) -> {
+            float[][] m = EWMA(beta, storage[0], gradients);
+            float[][] v = EWMA(beta2, storage[1], square(gradients));
+            float[][] m_ = scale(1 / (1 - (float) Math.pow((double) beta, step)), m);
+            float[][] v_ = scale(1 / (1 - (float) Math.pow((double) beta2, step)), v);
             float[][] update = divide(scale(lr, m_), add(sqrt(v_), create(v_.length, v_[0].length, e)));
             return new float[][][][]{{update}, {m, v}};
         };
-        static final TriFunction<Float, float[][], float[][][], float[][][][]> ADAMAX = (lr, gradients, storage) -> {
-            float[][] m = add(scale(beta, storage[0]), scale(1 - beta, gradients));
-            float[][] v = add(scale(beta2, storage[1]), scale(1 - beta2, square(gradients)));
-            float[][] m_ = scale(m, 1 / (1 - beta));
+        static final QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> ADAMAX = (step, lr, gradients, storage) -> {
+            float[][] m = EWMA(beta, storage[0], gradients);
+            float[][] v = EWMA(beta2, storage[1], square(gradients));
+            float[][] m_ = scale(m, 1 / (1 - (float) Math.pow((double) beta, step)));
             float[][] u = max(scale(beta2, storage[1]), abs(gradients));
             float[][] update = divide(scale(lr, m_), add(u, create(u.length, u[0].length, e)));
             return new float[][][][]{{update}, {m, v}};
         };
-        static final TriFunction<Float, float[][], float[][][], float[][][][]> NADAM = (lr, gradients, storage) -> {
+        static final QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> NADAM = (step, lr, gradients, storage) -> {
             int rows = gradients.length;
             int columns = gradients[0].length;
-            float[][] m = add(scale((1 - beta), gradients), scale(beta, storage[0]));
-            float[][] v = add(scale((1 - beta2), square(gradients)), scale(beta2, storage[1]));
-            float[][] m_ = scale(1 / (1 - beta), m);
-            float[][] v_ = scale(1 / (1 - beta2), v);
+            float[][] m = EWMA(beta, storage[0], gradients);
+            float[][] v = EWMA(beta2, storage[1], square(gradients));
+            float[][] m_ = scale(1 / (1 - (float) Math.pow((double) beta, step)), m);
+            float[][] v_ = scale(1 / (1 - (float) Math.pow((double) beta2, step)), v);
             float[][] update = multiply(divide(create(rows, columns, lr), add(sqrt(v_), create(rows, columns, e))), add(scale(beta, m_), scale(scale(1 - beta, gradients), 1 / (1 - beta))));
             return new float[][][][]{{update}, {m, v}};
         };
-        static final TriFunction<Float, float[][], float[][][], float[][][][]> AMSGRAD = (lr, gradients, storage) -> {
-            float[][] m = add(scale((1 - beta), gradients), scale(beta, storage[0]));
-            float[][] v = add(scale((1 - beta2), square(gradients)), scale(beta2, storage[1]));
+        static final QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> AMSGRAD = (step, lr, gradients, storage) -> {
+            float[][] m = EWMA(beta, storage[0], gradients);
+            float[][] v = EWMA(beta2, storage[1], square(gradients));
             float[][] v_ = max(storage[1], v);
             float[][] update = divide(scale(lr, m), add(sqrt(v_), create(v_.length, v_[0].length, e)));
             return new float[][][][]{{update}, {m, v}};
@@ -778,6 +811,10 @@ public class NNLib extends Application implements Serializable {
 
     public static float[][] sqrt(float[][] matrix) {
         return function(matrix, val -> (float) Math.sqrt(val));
+    }
+
+    public static float[][] inv(float[][] matrix) {
+        return function(matrix, val -> 1 / val);
     }
 
     public static float sum(float[][] matrix) {
