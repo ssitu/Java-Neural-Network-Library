@@ -17,10 +17,10 @@ public class XOR {
                 Optimizer.VANILLA,//Stochastic Gradient Descent Optimizer
                 new Layer.Dense(2, 2, ActivationFunction.SIGMOID, Initializer.VANILLA),//2 in, 2 out
                 new Layer.Dense(2, 1, ActivationFunction.SIGMOID, Initializer.VANILLA)//2 in from the previous layer, 1 out
-        );//Converges most of the time
+        );//Minimalistic network gets stuck a lot
         System.out.println("Seed: " + seed);
-        System.out.println(nn.length);
-        System.out.println(nn.toString());
+        System.out.println("Network Length: " + nn.length);
+        System.out.println("Network Architecture: " + nn.toString());
         ArrayList<Data> data = new ArrayList<>();
 
         //XOR truth table
@@ -43,7 +43,7 @@ public class XOR {
             }
             nn.backpropagation(data.get(index).inputs, data.get(index).targets);
         }
-        System.exit(0);
+//        System.exit(0);
     }
 
     static class Data {

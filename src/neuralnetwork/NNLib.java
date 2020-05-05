@@ -341,8 +341,8 @@ public class NNLib extends Application implements Serializable {
     public static class Initializer {
 
         static final BiFunction<float[][], Integer, float[][]> VANILLA = (a, b) -> a;//No change
-        static final BiFunction<float[][], Integer, float[][]> XAVIER = (a, b) -> scale(a, (float) (1 / Math.sqrt(b)));
-        static final BiFunction<float[][], Integer, float[][]> HE = (a, b) -> scale(a, (float) Math.sqrt(2 / b));
+        static final BiFunction<float[][], Integer, float[][]> XAVIER = (a, b) -> scale(a, (float) Math.sqrt(1.0 / b));
+        static final BiFunction<float[][], Integer, float[][]> HE = (a, b) -> scale(a, (float) Math.sqrt(2.0 / b));
     }
 
     public static class ActivationFunction {
@@ -952,7 +952,7 @@ public class NNLib extends Application implements Serializable {
     private static final LinkedList<Function<NN, Stage>> INFOLIST = new LinkedList<>();
     private static final LinkedList<NN> NNLIST = new LinkedList<>();
     private static int updateRate = 50;
-    private static final Timeline UPDATER = new Timeline(new KeyFrame(Duration.millis(updateRate), handler -> {
+    private static Timeline infoUpdater = new Timeline(new KeyFrame(Duration.millis(updateRate), handler -> {
         if (INFOLIST.size() > 0) {
             Stage infoWindow = INFOLIST.poll().apply(NNLIST.getFirst());
             infoWindow.setTitle(NNLIST.poll().label);
@@ -960,6 +960,7 @@ public class NNLib extends Application implements Serializable {
             infoWindow.show();
         }
     }));
+    private static boolean running = false;
 
     public static void setInfoUpdateRate(int millis) {
         updateRate = millis;
@@ -1019,22 +1020,27 @@ public class NNLib extends Application implements Serializable {
     };
 
     public static void showInfo(Function<NN, Stage> info, NN nn) {
-        Thread launchThread = new Thread(() -> {
-            try {
-                launch(NNLib.class);
-            } catch (IllegalStateException e) {
-
-            }
-        });
-        launchThread.setName("NNLib Launch Thread");
-        launchThread.start();
+        if (!running) {
+            Thread launchThread = new Thread(() -> {
+                try {
+                    running = true;
+                    launch(NNLib.class);
+                } catch (IllegalStateException e) {
+                    infoUpdater.setCycleCount(-1);
+                    infoUpdater.play();
+                    running = true;
+                }
+            });
+            launchThread.setName("NNLib Launch Thread");
+            launchThread.start();
+        }
         INFOLIST.add(info);
         NNLIST.add(nn);
     }
 
     @Override
     public void start(Stage stage) {
-        UPDATER.setCycleCount(-1);
-        UPDATER.play();
+        infoUpdater.setCycleCount(-1);
+        infoUpdater.play();
     }
 }
