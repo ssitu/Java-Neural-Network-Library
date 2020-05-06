@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.lang.reflect.Array;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.Random;
@@ -123,6 +124,12 @@ public class NNLib extends Application implements Serializable {
             }
             NN clone = new NN(label, seed, lr, lossFunction, optimizer, layers);
             return clone;
+        }
+
+        public void copyParameters(NN nn) {
+            for (int i = 0; i < nn.length; i++) {
+                network[i] = nn.network[i].clone();
+            }
         }
 
         public void save() {
@@ -299,8 +306,11 @@ public class NNLib extends Application implements Serializable {
                 Dense copy = new Dense(weights.length, weights[0].length, activation, Initializer.VANILLA);
                 copy.weights = copy(weights);
                 copy.biases = copy(biases);
-                copy.updateStorageW = copy3d(updateStorageW);
-                copy.updateStorageB = copy3d(updateStorageB);
+                try {
+                    copy.updateStorageW = copy3d(updateStorageW);
+                    copy.updateStorageB = copy3d(updateStorageB);
+                } catch (Exception e) {
+                }
                 return copy;
             }
 
@@ -530,22 +540,33 @@ public class NNLib extends Application implements Serializable {
         };
     }
 
-    public static float[][] normalizeTanh(float[][] inputs) {
-        int elements = inputs[0].length;
+    public static float[][] normalizeMinMax(float[][] oneRow) {
+        int elements = oneRow[0].length;
         float[][] result = new float[1][elements];
-        float mean = sum(inputs) / elements;
-        float deviation = (float) (Math.sqrt(sum(square(subtract(inputs, create(1, elements, mean)))) / mean));
-        for (int i = 0; i < inputs[0].length; i++) {
-            result[0][i] = (.5f * (tanh((.01f * ((inputs[0][i] - mean) / (deviation))), false) + 1));//Tanh estimator normalization
+        float min = min(oneRow);
+        float max = max(oneRow);
+        for (int i = 0; i < elements; i++) {
+            result[0][i] = (oneRow[0][i] - min) / (max - min);
         }
         return result;
     }
 
-    public static float[][] normalizeZScore(float[][] inputs) {
-        int elements = inputs[0].length;
-        float mean = sum(inputs) / elements;
-        float deviation = (float) (Math.sqrt(sum(square(subtract(inputs, create(1, elements, mean)))) / (mean)));
-        return divide(subtract(inputs, create(1, elements, mean)), create(1, elements, deviation));
+    public static float[][] normalizeZScore(float[][] oneRow) {
+        int elements = oneRow[0].length;
+        float mean = sum(oneRow) / elements;
+        float deviation = (float) (Math.sqrt(sum(square(subtract(oneRow, create(1, elements, mean)))) / (mean)));
+        return divide(subtract(oneRow, create(1, elements, mean)), create(1, elements, deviation));
+    }
+
+    public static float[][] normalizeTanh(float[][] oneRow) {
+        int elements = oneRow[0].length;
+        float[][] result = new float[1][elements];
+        float mean = sum(oneRow) / elements;
+        float deviation = (float) (Math.sqrt(sum(square(subtract(oneRow, create(1, elements, mean)))) / mean));
+        for (int i = 0; i < elements; i++) {
+            result[0][i] = (.5f * (tanh((.01f * ((oneRow[0][i] - mean) / (deviation))), false) + 1));//Tanh estimator normalization
+        }
+        return result;
     }
 
     public static float sigmoid(float x, boolean derivative) {
@@ -864,8 +885,27 @@ public class NNLib extends Application implements Serializable {
         return result;
     }
 
+    public static float[][] min(float[][] matrix1, float[][] matrix2) {
+        return bifunction(matrix1, matrix2, (val1, val2) -> Math.min(val1, val2));
+    }
+
     public static float[][] max(float[][] matrix1, float[][] matrix2) {
         return bifunction(matrix1, matrix2, (val1, val2) -> Math.max(val1, val2));
+    }
+
+    public static float min(float[][] matrix) {
+        int rows = matrix.length;
+        int columns = matrix[0].length;
+        float min = Float.MAX_VALUE;
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < columns; j++) {
+                float val = matrix[i][j];
+                if (val < min) {
+                    min = val;
+                }
+            }
+        }
+        return min;
     }
 
     public static float max(float[][] matrix) {
@@ -875,7 +915,7 @@ public class NNLib extends Application implements Serializable {
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < columns; j++) {
                 float val = matrix[i][j];
-                if (val < max) {
+                if (val > max) {
                     max = val;
                 }
             }
@@ -907,11 +947,11 @@ public class NNLib extends Application implements Serializable {
         return index;
     }
 
-    public static float[][][] append(float[][][] a, float[][][] b) {//Not very general
+    public static <T> T[] append(T[] a, T[] b) {
         int size1 = a.length;
         int size2 = b.length;
         int size3 = size1 + size2;
-        float[][][] result = new float[size3][][];
+        T[] result = (T[]) Array.newInstance(a[0].getClass(), size3);
         for (int i = 0; i < size1; i++) {
             result[i] = a[i];
         }
