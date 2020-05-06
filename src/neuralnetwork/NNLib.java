@@ -42,7 +42,7 @@ public class NNLib extends Application implements Serializable {
 
     public final class NN implements Serializable {
 
-        public final String label;
+        public String label;
         public final int length;//Counts only the hidden layers and the output layer, so the input layer doesn't count.
         private Layer[] network;
         private float lr;
@@ -52,11 +52,10 @@ public class NNLib extends Application implements Serializable {
         private long sessions = 0;
         private BiFunction<float[][], float[][], Object[]> lossFunction;
         private QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> optimizer;
-        private boolean forwardPass = false;
         private int step = 1;
 
-        NN(String networkName, long seed, double learningRate, BiFunction<float[][], float[][], Object[]> lossFunction, QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> optimizer, Layer... layers) {
-            label = networkName;
+        NN(String label, long seed, double learningRate, BiFunction<float[][], float[][], Object[]> lossFunction, QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> optimizer, Layer... layers) {
+            this.label = label;
             this.seed = seed;
             lr = (float) learningRate;
             this.lossFunction = lossFunction;
@@ -74,20 +73,13 @@ public class NNLib extends Application implements Serializable {
             for (int i = 0; i < length; i++) {
                 out = network[i].forward(out);
             }
-            forwardPass = true;
             return out;
         }
 
         public void backpropagation(float[][] inputs, float[][] targets) {
-            float[][] out;
-            if (forwardPass) {
-                out = network[length - 1].A;
-                forwardPass = false;
-            } else {
-                out = inputs;
-                for (int i = 0; i < length; i++) {
-                    out = network[i].forward(out);
-                }
+            float[][] out = inputs;
+            for (int i = 0; i < length; i++) {
+                out = network[i].forward(out);
             }
             Object[] lossArr = lossFunction.apply(out, targets);
             loss = (double) lossArr[0];
@@ -100,6 +92,18 @@ public class NNLib extends Application implements Serializable {
             sessions++;
         }
 
+        public void randomize(float range) {
+            for (int i = 0; i < length; i++) {
+                network[i].randomize(range);
+            }
+        }
+
+        public void mutate(float range, float mutateRate) {
+            for (int i = 0; i < length; i++) {
+                network[i].mutate(range, mutateRate);
+            }
+        }
+
         @Override
         public String toString() {
             String networkLayers = "";
@@ -109,25 +113,6 @@ public class NNLib extends Application implements Serializable {
             }
             networkLayers += network[length - 1].nodesOut;
             return networkLayers;
-        }
-
-        /**
-         * @param layerIndex 0 refers to the first hidden layer following the
-         * inputs. Passing in one less than the length of the network would
-         * return the output layer.
-         * @return The corresponding layer.
-         */
-        public Layer getLayer(int layerIndex) {
-            return network[layerIndex];
-        }
-
-        public Random getRandom() {
-            return random;
-        }
-
-        public void setSeed(long seed) {
-            this.seed = seed;
-            random.setSeed(seed);
         }
 
         @Override
@@ -166,16 +151,27 @@ public class NNLib extends Application implements Serializable {
             }
         }
 
-        public void randomize(float range) {
-            for (int i = 0; i < length; i++) {
-                network[i].randomize(range);
-            }
+        /**
+         * @param layerIndex 0 refers to the first hidden layer following the
+         * inputs. Passing in one less than the length of the network would
+         * return the output layer.
+         * @return The corresponding layer.
+         */
+        public Layer getLayer(int layerIndex) {
+            return network[layerIndex];
         }
 
-        public void mutate(float range, float mutateRate) {
-            for (int i = 0; i < length; i++) {
-                network[i].mutate(range, mutateRate);
-            }
+        public Random getRandom() {
+            return random;
+        }
+
+        public void setLabel(String label) {
+            this.label = label;
+        }
+
+        public void setSeed(long seed) {
+            this.seed = seed;
+            random.setSeed(seed);
         }
 
         public void setLearningRate(double learningRate) {
@@ -256,8 +252,7 @@ public class NNLib extends Application implements Serializable {
             float[][] forward(float[][] in) {
                 prevA = in;
                 Z = add(dotProduct.apply(in, weights), biases);
-                A = activation.apply(Z, false);
-                return A;
+                return activation.apply(Z, false);
             }
 
             @Override
@@ -952,7 +947,7 @@ public class NNLib extends Application implements Serializable {
     private static final LinkedList<Function<NN, Stage>> INFOLIST = new LinkedList<>();
     private static final LinkedList<NN> NNLIST = new LinkedList<>();
     private static int updateRate = 50;
-    private static Timeline infoUpdater = new Timeline(new KeyFrame(Duration.millis(updateRate), handler -> {
+    private static Timeline infoUpdater = new Timeline(new KeyFrame(Duration.millis(100), handler -> {
         if (INFOLIST.size() > 0) {
             Stage infoWindow = INFOLIST.poll().apply(NNLIST.getFirst());
             infoWindow.setTitle(NNLIST.poll().label);

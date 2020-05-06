@@ -10,7 +10,7 @@ public class XOR {
         final boolean PRINT = true;
         long seed = new Random().nextLong();
         NN nn = new NNLib().new NN(
-                "xor",//Name for Saving & Graph Title
+                "XOR",//Name for Saving & Graph Title
                 seed,//Seed For Reproducibility
                 .1,//Learning Rate for Optimizer
                 LossFunction.QUADRATIC(.5),//Loss/Cost/Error Function
