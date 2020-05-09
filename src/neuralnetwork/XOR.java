@@ -12,16 +12,17 @@ public class XOR {
         NN nn = new NNLib().new NN(
                 "XOR",//Name for Saving & Graph Title
                 seed,//Seed For Reproducibility
-                .1,//Learning Rate for Optimizer
+                .01,//Learning Rate for Optimizer
                 LossFunction.QUADRATIC(.5),//Loss/Cost/Error Function
                 Optimizer.VANILLA,//Stochastic Gradient Descent Optimizer
-                new Layer.Dense(2, 2, ActivationFunction.SIGMOID, Initializer.VANILLA),//2 in, 2 out
-                new Layer.Dense(2, 1, ActivationFunction.SIGMOID, Initializer.VANILLA)//2 in from the previous layer, 1 out
+                new Layer.Dense(2, 3, ActivationFunction.SIGMOID, Initializer.VANILLA),//2 in, 3 out, using 3 nodes in the hidden layer for guaranteed convergence
+                new Layer.Dense(3, 1, ActivationFunction.SIGMOID, Initializer.VANILLA)//3 in from the previous layer, 1 out
         );//Minimalistic network gets stuck a lot
         System.out.println("Seed: " + seed);
         System.out.println("Network Length: " + nn.length);
         System.out.println("Network Architecture: " + nn.toString());
         ArrayList<Data> data = new ArrayList<>();
+        nn.load();
 
         //XOR truth table
         data.add(new Data(new float[]{1, 1}, new float[]{0}));//True, True = False
@@ -40,6 +41,7 @@ public class XOR {
                 System.out.println("Outputs:");
                 NNLib.print(nn.feedforward(data.get(index).inputs));
                 System.out.println("");
+                nn.save();
             }
             nn.backpropagation(data.get(index).inputs, data.get(index).targets);
         }

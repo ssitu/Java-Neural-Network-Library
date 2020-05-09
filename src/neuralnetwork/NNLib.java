@@ -1,5 +1,6 @@
 package neuralnetwork;
 
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -108,9 +109,8 @@ public class NNLib extends Application implements Serializable {
         @Override
         public String toString() {
             String networkLayers = "";
-            networkLayers += network[0].nodesIn + ",";
             for (int i = 0; i < length - 1; i++) {
-                networkLayers += network[i].nodesOut + ",";
+                networkLayers += network[i].nodesOut + "_";
             }
             networkLayers += network[length - 1].nodesOut;
             return networkLayers;
@@ -132,9 +132,18 @@ public class NNLib extends Application implements Serializable {
             }
         }
 
+        /**
+         * Saves a serialized array of important information of this NN instance
+         * into a file located in either the folder where the IDE runs the code
+         * (The build folder for NetBeans), or where the .jar file is located.
+         * Only the layers of the network, the random class, and the iterations
+         * of the SGD optimizer is saved.
+         */
         public void save() {
             try {
-                FileOutputStream fileOut = new FileOutputStream(System.getProperty("user.dir") + "/" + label + "_neuralnetwork(" + toString() + ")");
+                String path = new File(this.getClass().getProtectionDomain().getCodeSource().getLocation().getPath()).getParentFile().getAbsolutePath();
+                System.out.println(path);
+                FileOutputStream fileOut = new FileOutputStream(path + File.separator + label + "_neuralnetwork-" + toString());
                 ObjectOutputStream out = new ObjectOutputStream(fileOut);
                 Object[] arr = {network, random, step};
                 out.writeObject(arr);
@@ -143,9 +152,17 @@ public class NNLib extends Application implements Serializable {
             }
         }
 
+        /**
+         * Loads a serialized version of the NN instance created by the
+         * {@link #save() save} method. Will search for the file with the same
+         * NN label and layer architecture in the name.
+         *
+         * @return True if the load was successful and false if unsuccessful.
+         */
         public boolean load() {
             try {
-                FileInputStream fileIn = new FileInputStream(System.getProperty("user.dir") + "/" + label + "_neuralnetwork(" + toString() + ")");
+                String path = new File(this.getClass().getProtectionDomain().getCodeSource().getLocation().getPath()).getParentFile().getAbsolutePath();//For jar files
+                FileInputStream fileIn = new FileInputStream(path + File.separator + label + "_neuralnetwork-" + toString());
                 ObjectInputStream in = new ObjectInputStream(fileIn);
                 Object[] arr = (Object[]) in.readObject();
                 network = (Layer[]) arr[0];
@@ -869,7 +886,7 @@ public class NNLib extends Application implements Serializable {
         int rows = matrix.length;
         int columns = matrix[0].length;
         float[][] result = create(rows, columns, 0);
-        float max = Float.NEGATIVE_INFINITY;
+        float max = matrix[0][0];
         int x = 0;
         int y = 0;
         for (int i = 0; i < rows; i++) {
@@ -896,7 +913,7 @@ public class NNLib extends Application implements Serializable {
     public static float min(float[][] matrix) {
         int rows = matrix.length;
         int columns = matrix[0].length;
-        float min = Float.MAX_VALUE;
+        float min = matrix[0][0];
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < columns; j++) {
                 float val = matrix[i][j];
@@ -911,7 +928,7 @@ public class NNLib extends Application implements Serializable {
     public static float max(float[][] matrix) {
         int rows = matrix.length;
         int columns = matrix[0].length;
-        float max = Float.MIN_VALUE;
+        float max = matrix[0][0];
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < columns; j++) {
                 float val = matrix[i][j];
