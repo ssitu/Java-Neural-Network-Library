@@ -29,7 +29,7 @@ public class XOR_Classification {
             }
         };
         long seed = new Random().nextLong();
-        NN nn = new NNLib().new NN(
+        NN nn = new NN(
                 "xor_classification",//Name for Saving & Graph Title
                 seed,//Seed For Reproducibility
                 .001,//Learning Rate for Optimizer

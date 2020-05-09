@@ -35,6 +35,15 @@ public class NNLib extends Application implements Serializable {
     public interface BiFunction<T, S, R> extends java.util.function.BiFunction<T, S, R>, Serializable {
     }
 
+    /**
+     * Just like java's Function and BiFunction but only with the apply method
+     *
+     * @param <T> First type
+     * @param <S> Second type
+     * @param <U> Third type
+     * @param <V> Fourth type
+     * @param <R> Return type
+     */
     public interface QuadFunction<T, S, U, V, R> extends Serializable {
 
         R apply(T t, S s, U u, V v);
@@ -42,10 +51,23 @@ public class NNLib extends Application implements Serializable {
     private static int threads;
     private static BiFunction<float[][], float[][], float[][]> dotProduct = (a, b) -> dot(a, b);
 
-    public final class NN implements Serializable {
+    /**
+     * The neural network class. This manages all the layers that are put inside
+     * the constructor for easy operations. Having a NN instance is optional for
+     * a neural network since all the operations can be done with the Layers
+     * instances.
+     */
+    public static class NN implements Serializable {
 
+        /**
+         * The name of this NN instance. Can be changed but be aware that saving
+         * and loading the NN uses this field.
+         */
         public String label;
-        public final int length;//Counts only the hidden layers and the output layer, so the input layer doesn't count.
+        /**
+         * The number of layers in the network, not including the input layer.
+         */
+        public final int length;
         private Layer[] network;
         private float lr;
         private Random random = new Random();
@@ -56,6 +78,15 @@ public class NNLib extends Application implements Serializable {
         private QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> optimizer;
         private int step = 1;
 
+        /**
+         * @param label The name for the NN
+         * @param seed A seed for repeatable Layer initialization
+         * @param learningRate A value 0 to 1 for training layer parameters
+         * @param lossFunction Measures the error between two one row matrices
+         * @param optimizer An algorithm that speeds up SGD
+         * @param layers An array or list of layers to be used in the network
+         * @see NNLib#LossFunction
+         */
         NN(String label, long seed, double learningRate, BiFunction<float[][], float[][], Object[]> lossFunction, QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> optimizer, Layer... layers) {
             this.label = label;
             this.seed = seed;
@@ -401,7 +432,7 @@ public class NNLib extends Application implements Serializable {
             return jacobian;//Should be transposed?
         };
     }
-
+    
     public static class LossFunction {//Should sums be divided by the number of outputs of the network?
 
         /**
