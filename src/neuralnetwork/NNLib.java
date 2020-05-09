@@ -143,7 +143,6 @@ public class NNLib extends Application implements Serializable {
         public void save() {
             try {
                 String path = new File(this.getClass().getProtectionDomain().getCodeSource().getLocation().getPath()).getParentFile().getAbsolutePath();
-                System.out.println(path);
                 FileOutputStream fileOut = new FileOutputStream(path + File.separator + label + "_neuralnetwork-" + toString());
                 ObjectOutputStream out = new ObjectOutputStream(fileOut);
                 Object[] arr = {network, random, step};
