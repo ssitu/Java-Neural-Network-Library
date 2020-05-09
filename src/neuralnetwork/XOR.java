@@ -22,7 +22,6 @@ public class XOR {
         System.out.println("Network Length: " + nn.length);
         System.out.println("Network Architecture: " + nn.toString());
         ArrayList<Data> data = new ArrayList<>();
-        nn.load();
 
         //XOR truth table
         data.add(new Data(new float[]{1, 1}, new float[]{0}));//True, True = False
@@ -41,7 +40,6 @@ public class XOR {
                 System.out.println("Outputs:");
                 NNLib.print(nn.feedforward(data.get(index).inputs));
                 System.out.println("");
-                nn.save();
             }
             nn.backpropagation(data.get(index).inputs, data.get(index).targets);
         }

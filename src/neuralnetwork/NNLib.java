@@ -109,6 +109,7 @@ public class NNLib extends Application implements Serializable {
         @Override
         public String toString() {
             String networkLayers = "";
+            networkLayers += network[0].nodesIn + "_";
             for (int i = 0; i < length - 1; i++) {
                 networkLayers += network[i].nodesOut + "_";
             }
