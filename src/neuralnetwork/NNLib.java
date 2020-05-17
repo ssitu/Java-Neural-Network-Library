@@ -27,16 +27,30 @@ import javafx.stage.Screen;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 
-public class NNLib extends Application implements Serializable {
+public class NNLib extends Application {
 
+    /**
+     * A serializable version of java's Function class
+     *
+     * @param <T> First type
+     * @param <R> Second type
+     */
     public interface Function<T, R> extends java.util.function.Function<T, R>, Serializable {
     }
 
+    /**
+     * A serializable version of java's BiFunction class
+     *
+     * @param <T> First type
+     * @param <S> Second type
+     * @param <R> Third type
+     */
     public interface BiFunction<T, S, R> extends java.util.function.BiFunction<T, S, R>, Serializable {
     }
 
     /**
      * Just like java's Function and BiFunction but only with the apply method
+     * and 4 parameters.
      *
      * @param <T> First type
      * @param <S> Second type
@@ -56,12 +70,13 @@ public class NNLib extends Application implements Serializable {
      * the constructor for easy operations. Having a NN instance is optional for
      * a neural network since all the operations can be done with the Layers
      * instances.
+     *
      */
     public static class NN implements Serializable {
 
         /**
-         * The name of this NN instance. Can be changed but be aware that saving
-         * and loading the NN uses this field.
+         * The name of this NN instance. Used in saving, loading, and info
+         * panels.
          */
         public String label;
         /**
@@ -79,15 +94,17 @@ public class NNLib extends Application implements Serializable {
         private int step = 1;
 
         /**
-         * @param label The name for the NN
-         * @param seed A seed for repeatable Layer initialization
-         * @param learningRate A value 0 to 1 for training layer parameters
-         * @param lossFunction Measures the error between two one row matrices
-         * @param optimizer An algorithm that speeds up SGD
-         * @param layers An array or list of layers to be used in the network
-         * @see NNLib#LossFunction
+         * @param label The name for the NN.
+         * @param seed A seed for repeatable Layer initialization.
+         * @param learningRate A value 0 to 1 for training layer parameters.
+         * @param lossFunction Measures the error between two one row matrices.
+         * @param optimizer An algorithm that speeds up SGD.
+         * @param layers An array or list of layers to be used in the network.
+         * @see NNLib.LossFunction
+         * @see NNLib.Optimizer
+         * @see NNLib.Layer
          */
-        NN(String label, long seed, double learningRate, BiFunction<float[][], float[][], Object[]> lossFunction, QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> optimizer, Layer... layers) {
+        public NN(String label, long seed, double learningRate, BiFunction<float[][], float[][], Object[]> lossFunction, QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> optimizer, Layer... layers) {
             this.label = label;
             this.seed = seed;
             lr = (float) learningRate;
@@ -101,6 +118,14 @@ public class NNLib extends Application implements Serializable {
             }
         }
 
+        /**
+         * Feed inputs into the network for an output.
+         *
+         * @param inputs A 2D array to be fed into the network. The shape of the
+         * matrix depends on the input layer.
+         * @return A 2D array with one 1D array representing the output of the
+         * network.
+         */
         public float[][] feedforward(float[][] inputs) {
             float[][] out = inputs;
             for (int i = 0; i < length; i++) {
@@ -109,11 +134,17 @@ public class NNLib extends Application implements Serializable {
             return out;
         }
 
+        /**
+         * The backpropagation algorithm for tuning weights.
+         *
+         * @param inputs
+         * {@link NN#feedforward(float[][]) Passed into the feedforward method}
+         * @param targets The desired output for the network to fit to. Must
+         * match the shape of the outputs or either an ArrayOutOfBoundsException
+         * will be thrown or some of the targets will be ignored.
+         */
         public void backpropagation(float[][] inputs, float[][] targets) {
-            float[][] out = inputs;
-            for (int i = 0; i < length; i++) {
-                out = network[i].forward(out);
-            }
+            float[][] out = feedforward(inputs);
             Object[] lossArr = lossFunction.apply(out, targets);
             loss = (double) lossArr[0];
             float[][] dC_dA = (float[][]) lossArr[1];
@@ -125,12 +156,24 @@ public class NNLib extends Application implements Serializable {
             sessions++;
         }
 
+        /**
+         * Randomizes network parameters based on the given range.
+         *
+         * @param range The range of random values centered at 0.
+         */
         public void randomize(float range) {
             for (int i = 0; i < length; i++) {
                 network[i].randomize(range);
             }
         }
 
+        /**
+         * Modify network parameters based on the given range.
+         *
+         * @param range The range of random numbers centered at 0.
+         * @param mutateRate Number between 0 and 1 representing the probability
+         * that a parameter is altered.
+         */
         public void mutate(float range, float mutateRate) {
             for (int i = 0; i < length; i++) {
                 network[i].mutate(range, mutateRate);
@@ -166,15 +209,11 @@ public class NNLib extends Application implements Serializable {
 
         /**
          * Saves a serialized array of important information of this NN instance
-         * into a file located in either the folder where the IDE runs the code
-         * (The build folder for NetBeans), or where the .jar file is located.
-         * Only the layers of the network, the random class, and the iterations
-         * of the SGD optimizer is saved.
+         * into a new file inside the current directory.
          */
         public void save() {
             try {
-                String path = new File(this.getClass().getProtectionDomain().getCodeSource().getLocation().getPath()).getParentFile().getAbsolutePath();
-                FileOutputStream fileOut = new FileOutputStream(path + File.separator + label + "_neuralnetwork-" + toString());
+                FileOutputStream fileOut = new FileOutputStream(System.getProperty("user.dir") + File.separator + label + "_neuralnetwork-" + toString());
                 ObjectOutputStream out = new ObjectOutputStream(fileOut);
                 Object[] arr = {network, random, step};
                 out.writeObject(arr);
@@ -184,13 +223,12 @@ public class NNLib extends Application implements Serializable {
         }
 
         /**
-         * Loads a serialized version of the NN instance created by the
-         * {@link #save() save} method. Will search for the file with the same
-         * NN label and layer architecture in the name.
+         * Same as {@link #load()} method but instead will look outside of the
+         * .jar instead of inside.
          *
          * @return True if the load was successful and false if unsuccessful.
          */
-        public boolean load() {
+        public boolean loadFromJar() {
             try {
                 String path = new File(this.getClass().getProtectionDomain().getCodeSource().getLocation().getPath()).getParentFile().getAbsolutePath();//For jar files
                 FileInputStream fileIn = new FileInputStream(path + File.separator + label + "_neuralnetwork-" + toString());
@@ -207,6 +245,31 @@ public class NNLib extends Application implements Serializable {
         }
 
         /**
+         * Loads a serialized version of the NN instance created by
+         * {@link #save()}. Will search for the file with the same NN label and
+         * layer architecture in the name. Careful loading after changing the NN
+         * hyper parameters.
+         *
+         * @return True if the load was successful and false if unsuccessful.
+         */
+        public boolean load() {
+            try {
+                FileInputStream fileIn = new FileInputStream(System.getProperty("user.dir") + File.separator + label + "_neuralnetwork-" + toString());
+                ObjectInputStream in = new ObjectInputStream(fileIn);
+                Object[] arr = (Object[]) in.readObject();
+                network = (Layer[]) arr[0];
+                random = (Random) arr[1];
+                step = (Integer) arr[2];
+                return true;
+            } catch (IOException | ClassNotFoundException e) {
+                System.out.println("Could not load network settings for \"" + label + "\".");
+                return false;
+            }
+        }
+
+        /**
+         * Get a specific layer of the NN.
+         *
          * @param layerIndex 0 refers to the first hidden layer following the
          * inputs. Passing in one less than the length of the network would
          * return the output layer.
@@ -216,10 +279,20 @@ public class NNLib extends Application implements Serializable {
             return network[layerIndex];
         }
 
+        /**
+         * Get the random class used by the NN with the set seed.
+         *
+         * @return The random class.
+         */
         public Random getRandom() {
             return random;
         }
 
+        /**
+         * Set the name of the NN which is used int
+         *
+         * @param label
+         */
         public void setLabel(String label) {
             this.label = label;
         }
@@ -233,18 +306,17 @@ public class NNLib extends Application implements Serializable {
             lr = (float) learningRate;
         }
 
+        /**
+         * @param lossFunction The loss/cost/error function
+         * @see NNLib.LossFunction
+         */
         public void setLossFunction(BiFunction<float[][], float[][], Object[]> lossFunction) {
             this.lossFunction = lossFunction;
         }
 
         /**
-         * @param optimizer The first three parameters of the QuadFunction are
-         * strictly for the time step, learning rate, and the gradients
-         * respectively. The third parameter is an array of matrices to store
-         * info such as previous updates, gradients, etc. The QuadFunction
-         * returns an array where its first element is a array with one element
-         * to hold the gradient update matrix and its second element is the
-         * storage array that is passed into the next call of the optimizer.
+         * @param optimizer The SGD optimizer
+         * @see NNLib.Optimizer
          */
         public void setOptimizer(QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> optimizer) {
             this.optimizer = optimizer;
@@ -285,7 +357,7 @@ public class NNLib extends Application implements Serializable {
             BiFunction<float[][], Boolean, float[][]> activation;
             BiFunction<float[][], Integer, float[][]> initializer;
 
-            Dense(int nodesIn, int nodesOut, BiFunction<float[][], Boolean, float[][]> activation, BiFunction<float[][], Integer, float[][]> initializer) {
+            public Dense(int nodesIn, int nodesOut, BiFunction<float[][], Boolean, float[][]> activation, BiFunction<float[][], Integer, float[][]> initializer) {
                 this.nodesIn = nodesIn;
                 this.nodesOut = nodesOut;
                 this.activation = activation;
@@ -364,8 +436,8 @@ public class NNLib extends Application implements Serializable {
 
             @Override
             void randomize(float range) {
-                weights = NNLib.randomize(weights, range, -range / 2);//values on interval [-1,1]
-                biases = NNLib.randomize(biases, range, -range / 2);//values on interval [-1,1]
+                weights = NNLib.randomize(weights, range, -range / 2);
+                biases = NNLib.randomize(biases, range, -range / 2);
             }
 
             @Override
@@ -393,27 +465,27 @@ public class NNLib extends Application implements Serializable {
 
     public static class Initializer {
 
-        static final BiFunction<float[][], Integer, float[][]> VANILLA = (a, b) -> a;//No change
-        static final BiFunction<float[][], Integer, float[][]> XAVIER = (a, b) -> scale(a, (float) Math.sqrt(1.0 / b));
-        static final BiFunction<float[][], Integer, float[][]> HE = (a, b) -> scale(a, (float) Math.sqrt(2.0 / b));
+        public static final BiFunction<float[][], Integer, float[][]> VANILLA = (a, b) -> a;//No change
+        public static final BiFunction<float[][], Integer, float[][]> XAVIER = (a, b) -> scale(a, (float) Math.sqrt(1.0 / b));
+        public static final BiFunction<float[][], Integer, float[][]> HE = (a, b) -> scale(a, (float) Math.sqrt(2.0 / b));
     }
 
     public static class ActivationFunction {
 
-        static final BiFunction<float[][], Boolean, float[][]> LINEAR = (matrix, derivative) -> {
+        public static final BiFunction<float[][], Boolean, float[][]> LINEAR = (matrix, derivative) -> {
             if (!derivative) {
                 return matrix;
             }
             float[][] result = create(matrix.length, matrix[0].length, 1);
             return result;
         };
-        static final BiFunction<float[][], Boolean, float[][]> SIGMOID = (matrix, derivative) -> function(matrix, val -> sigmoid(val, derivative));
-        static final BiFunction<float[][], Boolean, float[][]> TANH = (matrix, derivative) -> function(matrix, val -> tanh(val, derivative));
-        static final BiFunction<float[][], Boolean, float[][]> RELU = (matrix, derivative) -> function(matrix, val -> relu(val, derivative));
-        static final BiFunction<float[][], Boolean, float[][]> LEAKYRELU = (matrix, derivative) -> function(matrix, val -> leakyrelu(val, derivative));
-        static final BiFunction<float[][], Boolean, float[][]> SWISH = (matrix, derivative) -> function(matrix, val -> swish(val, derivative));
-        static final BiFunction<float[][], Boolean, float[][]> MISH = (matrix, derivative) -> function(matrix, val -> mish(val, derivative));
-        static final BiFunction<float[][], Boolean, float[][]> SOFTMAX = (matrix, derivative) -> {
+        public static final BiFunction<float[][], Boolean, float[][]> SIGMOID = (matrix, derivative) -> function(matrix, val -> sigmoid(val, derivative));
+        public static final BiFunction<float[][], Boolean, float[][]> TANH = (matrix, derivative) -> function(matrix, val -> tanh(val, derivative));
+        public static final BiFunction<float[][], Boolean, float[][]> RELU = (matrix, derivative) -> function(matrix, val -> relu(val, derivative));
+        public static final BiFunction<float[][], Boolean, float[][]> LEAKYRELU = (matrix, derivative) -> function(matrix, val -> leakyrelu(val, derivative));
+        public static final BiFunction<float[][], Boolean, float[][]> SWISH = (matrix, derivative) -> function(matrix, val -> swish(val, derivative));
+        public static final BiFunction<float[][], Boolean, float[][]> MISH = (matrix, derivative) -> function(matrix, val -> mish(val, derivative));
+        public static final BiFunction<float[][], Boolean, float[][]> SOFTMAX = (matrix, derivative) -> {
             if (!derivative) {
                 return softmax(matrix);
             }
@@ -432,13 +504,14 @@ public class NNLib extends Application implements Serializable {
             return jacobian;//Should be transposed?
         };
     }
-    
+
     public static class LossFunction {//Should sums be divided by the number of outputs of the network?
 
         /**
-         * @param steepness default value is 0.5
+         * @param steepnessFactor Recommended value: .5
+         * @return Quadratic loss function.
          */
-        static final BiFunction<float[][], float[][], Object[]> QUADRATIC(double steepnessFactor) {
+        public static final BiFunction<float[][], float[][], Object[]> QUADRATIC(double steepnessFactor) {
             final float steepness = (float) steepnessFactor;
             return (outputs, targets) -> {
                 double loss = sum(scale(steepness, square(subtract(outputs, targets))));//m(f(x) - y)^2 where f(x) is the output of the network and y is the target output
@@ -447,9 +520,10 @@ public class NNLib extends Application implements Serializable {
         }
 
         /**
-         * @param steepness default value is 1
+         * @param steepnessFactor Recommended value: 1
+         * @return Huber loss function.
          */
-        static final BiFunction<float[][], float[][], Object[]> HUBER(double steepnessFactor) {
+        public static final BiFunction<float[][], float[][], Object[]> HUBER(double steepnessFactor) {
             final float steepness = (float) steepnessFactor;
             final float deltaHalf = steepness / 2;
             return (outputs, targets) -> {
@@ -479,9 +553,10 @@ public class NNLib extends Application implements Serializable {
         }
 
         /**
-         * @param steepness default value is 1
+         * @param steepnessFactor Recommended value: 1
+         * @return Pseudo Huber loss function.
          */
-        static final BiFunction<float[][], float[][], Object[]> HUBERPSEUDO(double steepnessFactor) {
+        public static final BiFunction<float[][], float[][], Object[]> HUBERPSEUDO(double steepnessFactor) {
             final float steepness = (float) steepnessFactor;
             return (outputs, targets) -> {
                 int columns = outputs[0].length;
@@ -495,9 +570,10 @@ public class NNLib extends Application implements Serializable {
         }
 
         /**
-         * @param steepness default value is 1
+         * @param steepnessFactor Recommended value: 1
+         * @return Cross entropy/log loss function.
          */
-        static final BiFunction<float[][], float[][], Object[]> CROSSENTROPY(double steepnessFactor) {
+        public static final BiFunction<float[][], float[][], Object[]> CROSSENTROPY(double steepnessFactor) {
             final float steepness = (float) steepnessFactor;
             return (outputs, targets) -> {
                 double loss = steepness * -sum(multiply(targets, ln(outputs)));
@@ -506,6 +582,15 @@ public class NNLib extends Application implements Serializable {
         }
     }
 
+    /**
+     * The first three parameters of the QuadFunction are strictly for the time
+     * step, learning rate, and the gradients respectively. The third parameter
+     * is an array of matrices to store info such as previous updates,
+     * gradients, etc. The QuadFunction returns an array where its first element
+     * is a array with one element to hold the gradient update matrix and its
+     * second element is the storage array that is passed into the next call of
+     * the optimizer.
+     */
     public static class Optimizer {
 
         //Should be final?
@@ -516,19 +601,19 @@ public class NNLib extends Application implements Serializable {
         private static float[][] EWMA(float beta, float[][] prevStep, float[][] currentStep) {
             return add(scale(beta, prevStep), scale(1 - beta, currentStep));
         }
-        static final QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> VANILLA = (step, lr, gradients, storage) -> {
+        public static final QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> VANILLA = (step, lr, gradients, storage) -> {
             return new float[][][][]{{scale(lr, gradients)}, null};
         };
-        static final QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> MOMENTUM = (step, lr, gradients, storage) -> {
+        public static final QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> MOMENTUM = (step, lr, gradients, storage) -> {
             float[][] update = add(scale(beta, storage[0]), scale(lr, gradients));
             return new float[][][][]{{update}, {update}};
         };
-        static final QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> NESTEROV = (step, lr, gradients, storage) -> {//Dozat's modification because calculating two gradients would take a lot of recoding
+        public static final QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> NESTEROV = (step, lr, gradients, storage) -> {//Dozat's modification because calculating two gradients would take a lot of recoding
             float[][] m = add(scale(beta, storage[0]), scale(lr, gradients));
             float[][] update = add(scale(beta, m), scale(lr, gradients));
             return new float[][][][]{{update}, {m}};
         };
-        static final QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> ADAGRAD = (step, lr, gradients, storage) -> {
+        public static final QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> ADAGRAD = (step, lr, gradients, storage) -> {
             int rows = gradients.length;
             float val = (1 / (float) Math.sqrt(sum(storage[0]) + e));
             float[][] G = create(rows, rows, 0);
@@ -538,7 +623,7 @@ public class NNLib extends Application implements Serializable {
             float[][] update = dotProduct.apply(scale(lr, G), gradients);
             return new float[][][][]{{update}, {square(gradients)}};
         };
-        static final QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> ADADELTA = (step, lr, gradients, storage) -> {
+        public static final QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> ADADELTA = (step, lr, gradients, storage) -> {
             float[][] epsilon = create(gradients.length, gradients[0].length, e);
             float[][] gradientsE = EWMA(beta, storage[0], square(gradients));
             float[][] gradientsRMS = sqrt(add(gradientsE, epsilon));
@@ -547,13 +632,13 @@ public class NNLib extends Application implements Serializable {
             float[][] deltaE = EWMA(beta, storage[1], square(update));
             return new float[][][][]{{update}, {gradientsE, deltaE}};
         };
-        static final QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> RMSPROP = (step, lr, gradients, storage) -> {
+        public static final QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> RMSPROP = (step, lr, gradients, storage) -> {
             float[][] s = EWMA(beta, storage[0], square(gradients));
             float[][] s_ = scale(1 / (1 - (float) Math.pow((double) beta, step)), s);//Bias correction
             float[][] update = divide(scale(lr, gradients), add(sqrt(s_), create(s.length, s[0].length, e)));
             return new float[][][][]{{update}, {s}};
         };
-        static final QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> ADAM = (step, lr, gradients, storage) -> {
+        public static final QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> ADAM = (step, lr, gradients, storage) -> {
             float[][] m = EWMA(beta, storage[0], gradients);
             float[][] v = EWMA(beta2, storage[1], square(gradients));
             float[][] m_ = scale(1 / (1 - (float) Math.pow((double) beta, step)), m);
@@ -561,7 +646,7 @@ public class NNLib extends Application implements Serializable {
             float[][] update = divide(scale(lr, m_), add(sqrt(v_), create(v_.length, v_[0].length, e)));
             return new float[][][][]{{update}, {m, v}};
         };
-        static final QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> ADAMAX = (step, lr, gradients, storage) -> {
+        public static final QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> ADAMAX = (step, lr, gradients, storage) -> {
             float[][] m = EWMA(beta, storage[0], gradients);
             float[][] v = EWMA(beta2, storage[1], square(gradients));
             float[][] m_ = scale(m, 1 / (1 - (float) Math.pow((double) beta, step)));
@@ -569,7 +654,7 @@ public class NNLib extends Application implements Serializable {
             float[][] update = divide(scale(lr, m_), add(u, create(u.length, u[0].length, e)));
             return new float[][][][]{{update}, {m, v}};
         };
-        static final QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> NADAM = (step, lr, gradients, storage) -> {
+        public static final QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> NADAM = (step, lr, gradients, storage) -> {
             int rows = gradients.length;
             int columns = gradients[0].length;
             float[][] m = EWMA(beta, storage[0], gradients);
@@ -579,7 +664,7 @@ public class NNLib extends Application implements Serializable {
             float[][] update = multiply(divide(create(rows, columns, lr), add(sqrt(v_), create(rows, columns, e))), add(scale(beta, m_), scale(scale(1 - beta, gradients), 1 / (1 - beta))));
             return new float[][][][]{{update}, {m, v}};
         };
-        static final QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> AMSGRAD = (step, lr, gradients, storage) -> {
+        public static final QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> AMSGRAD = (step, lr, gradients, storage) -> {
             float[][] m = EWMA(beta, storage[0], gradients);
             float[][] v = EWMA(beta2, storage[1], square(gradients));
             float[][] v_ = max(storage[1], v);
@@ -877,7 +962,7 @@ public class NNLib extends Application implements Serializable {
         return function(matrix, val -> (float) Math.sqrt(val));
     }
 
-    public static float[][] inv(float[][] matrix) {
+    public static float[][] inverse(float[][] matrix) {
         return function(matrix, val -> 1 / val);
     }
 

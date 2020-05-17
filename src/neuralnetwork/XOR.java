@@ -1,8 +1,8 @@
 package neuralnetwork;
 
+import neuralnetwork.NNLib.*;
 import java.util.ArrayList;
 import java.util.Random;
-import neuralnetwork.NNLib.*;
 
 public class XOR {
 
@@ -12,7 +12,7 @@ public class XOR {
         NN nn = new NN(
                 "XOR",//Name for Saving & Graph Title
                 seed,//Seed For Reproducibility
-                .01,//Learning Rate for Optimizer
+                .1,//Learning Rate for Optimizer
                 LossFunction.QUADRATIC(.5),//Loss/Cost/Error Function
                 Optimizer.VANILLA,//Stochastic Gradient Descent Optimizer
                 new Layer.Dense(2, 3, ActivationFunction.SIGMOID, Initializer.VANILLA),//2 in, 3 out
@@ -34,7 +34,7 @@ public class XOR {
         NNLib.showInfo(NNLib.infoGraph(false), nn);//Displays a cost over number of times backpropagated graph
         for (int i = 0; i < 100_000_000; i++) {
             int index = nn.getRandom().nextInt(4);//Get a random data pair
-            if (PRINT && i % 100_000 == 0) {
+            if (PRINT && i % 100000 == 0) {
                 System.out.println("Inputs:");
                 NNLib.print(data.get(index).inputs);
                 System.out.println("Outputs:");
