@@ -40,7 +40,7 @@ public class XOR_Classification {
         );
         System.out.println("Seed: " + seed);
         System.out.println(nn.length);
-        System.out.println(nn.toString());
+        System.out.println(nn);
         ArrayList<Data> data = new ArrayList<>();
 
         //First output = true, second output = false;
@@ -53,10 +53,8 @@ public class XOR_Classification {
         for (int i = 0; i < 100_000_000; i++) {
             int index = nn.getRandom().nextInt(4);
             if (PRINT && i % 100_000 == 0) {
-                System.out.println("Inputs:");
-                NNLib.print(data.get(index).inputs);
-                System.out.println("Outputs:");
-                NNLib.print(nn.feedforward(data.get(index).inputs));
+                NNLib.print(data.get(index).inputs, "Inputs");
+                NNLib.print(nn.feedforward(data.get(index).inputs), "Outputs");
                 System.out.println("");
             }
             nn.backpropagation(data.get(index).inputs, data.get(index).targets);

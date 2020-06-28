@@ -68,21 +68,13 @@ public class NNLib extends Application {
     /**
      * The neural network class. This manages all the layers that are put inside
      * the constructor for easy operations. Having a NN instance is optional for
-     * a neural network since all the operations can be done with the Layers
+     * a neural network since all the operations can be done with the Layer
      * instances.
      *
      */
     public static class NN implements Serializable {
 
-        /**
-         * The name of this NN instance. Used in saving, loading, and info
-         * panels.
-         */
-        public String label;
-        /**
-         * The number of layers in the network, not including the input layer.
-         */
-        public final int length;
+        private static final long serialVersionUID = 1;
         private Layer[] network;
         private float lr;
         private Random random = new Random();
@@ -92,6 +84,19 @@ public class NNLib extends Application {
         private BiFunction<float[][], float[][], Object[]> lossFunction;
         private QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> optimizer;
         private int step = 1;
+        /**
+         * The name of this NN instance. Used in saving, loading, and info
+         * panels.
+         */
+        public String label;
+        /**
+         * The number of layers in the network, not including the input layer.
+         */
+        public final int length;
+        /**
+         * The index of the last layer in the network
+         */
+        public final int lastIndex;
 
         /**
          * @param label The name for the NN.
@@ -112,6 +117,7 @@ public class NNLib extends Application {
             this.optimizer = optimizer;
             network = layers;
             length = network.length;
+            lastIndex = length - 1;
             random.setSeed(seed);
             for (int i = 0; i < length; i++) {
                 network[i].initialize(random);
@@ -148,9 +154,9 @@ public class NNLib extends Application {
             Object[] lossArr = lossFunction.apply(out, targets);
             loss = (double) lossArr[0];
             float[][] dC_dA = (float[][]) lossArr[1];
-            float[][] dC_dZ = network[length - 1].back(dC_dA, null, lr, optimizer, true, step);
-            for (int i = length - 2; i >= 0; i--) {
-                network[i].back(dC_dZ, ((Layer.Dense) network[i + 1]).weights, lr, optimizer, false, step);
+            float[][] dC_dZ = network[lastIndex].back(dC_dA, null, lr, optimizer, step);
+            for (int i = lastIndex - 1; i >= 0; i--) {
+                dC_dZ = network[i].back(dC_dZ, ((Layer.Dense) network[i + 1]).weights, lr, optimizer, step);
             }
             step++;
             sessions++;
@@ -168,7 +174,7 @@ public class NNLib extends Application {
         }
 
         /**
-         * Modify network parameters based on the given range.
+         * Adds noise to the network parameters based on the given range.
          *
          * @param range The range of random numbers centered at 0.
          * @param mutateRate Number between 0 and 1 representing the probability
@@ -182,15 +188,18 @@ public class NNLib extends Application {
 
         @Override
         public String toString() {
-            String networkLayers = "";
-            networkLayers += network[0].nodesIn + "_";
-            for (int i = 0; i < length - 1; i++) {
-                networkLayers += network[i].nodesOut + "_";
+            String networkLayers = "Layer 1: " + network[0].toString() + "\n";
+            for (int i = 1; i < length; i++) {
+                networkLayers += "Layer " + (i + 1) + ": " + network[i].toString() + "\n";
             }
-            networkLayers += network[length - 1].nodesOut;
             return networkLayers;
         }
 
+        /**
+         * Creates a deep copy of the NN.
+         *
+         * @return An NN with the same parameters and hyperparameters.
+         */
         @Override
         public NN clone() {
             Layer[] layers = new Layer[length];
@@ -201,6 +210,13 @@ public class NNLib extends Application {
             return clone;
         }
 
+        /**
+         * Copies the parameters from a NN to this NN instance, assuming the
+         * network architectures and hyperparameters of both NNs are identical
+         * for this to work properly.
+         *
+         * @param nn The neural network to copy from.
+         */
         public void copyParameters(NN nn) {
             for (int i = 0; i < nn.length; i++) {
                 network[i] = nn.network[i].clone();
@@ -240,6 +256,7 @@ public class NNLib extends Application {
                 return true;
             } catch (IOException | ClassNotFoundException e) {
                 System.out.println("Could not load network settings for \"" + label + "\".");
+                e.printStackTrace();
                 return false;
             }
         }
@@ -263,6 +280,7 @@ public class NNLib extends Application {
                 return true;
             } catch (IOException | ClassNotFoundException e) {
                 System.out.println("Could not load network settings for \"" + label + "\".");
+                e.printStackTrace();
                 return false;
             }
         }
@@ -289,24 +307,48 @@ public class NNLib extends Application {
         }
 
         /**
-         * Set the name of the NN which is used int
+         * Get the total amount of times the network has done backpropagation.
+         * This number resets everytime the optimizer is changed.
          *
-         * @param label
+         * @return Times the backpropagation method has been called with the
+         * current optimizer.
+         */
+        public int getSteps() {
+            return step;
+        }
+
+        /**
+         * Change the name of this NN instance.
+         *
+         * @param label A String to label the network with.
          */
         public void setLabel(String label) {
             this.label = label;
         }
 
+        /**
+         * Change the seed of this NN's Random class.
+         *
+         * @param seed A Long for the seed of the Random class.
+         */
         public void setSeed(long seed) {
             this.seed = seed;
             random.setSeed(seed);
         }
 
+        /**
+         * Change the learning rate of this NN instance.
+         *
+         * @param learningRate A double that is casted to a float to avoid
+         * having to work with floats.
+         */
         public void setLearningRate(double learningRate) {
             lr = (float) learningRate;
         }
 
         /**
+         * Change the loss function of this NN instance.
+         *
          * @param lossFunction The loss/cost/error function
          * @see NNLib.LossFunction
          */
@@ -315,6 +357,8 @@ public class NNLib extends Application {
         }
 
         /**
+         * Change the optimizer of this NN instance.
+         *
          * @param optimizer The SGD optimizer
          * @see NNLib.Optimizer
          */
@@ -324,38 +368,100 @@ public class NNLib extends Application {
         }
     }
 
-    public abstract static class Layer implements Serializable {
+    /**
+     * A set of layer types.
+     */
+    public static abstract class Layer implements Serializable {
 
-        int nodesIn;
-        int nodesOut;
-        float[][] prevA;
-        float[][] Z;
-        float[][] A;
-        int step = 1;
+        private float[][] prevA;
+        private float[][] Z;
 
-        abstract void initialize(Random random);
+        /**
+         * Initializes this Layer's parameters and storage of previous
+         * gradients.
+         *
+         * @param random A Random instance to create random values from.
+         */
+        public abstract void initialize(Random random);
 
-        abstract float[][] forward(float[][] in);
+        /**
+         * Feeds values into this Layer and outputs values.
+         *
+         * @param in Inputs into the network or outputs from the previous Layer.
+         * @return Outputs of the Layer.
+         */
+        public abstract float[][] forward(float[][] in);
 
-        abstract float[][] back(float[][] dG, float[][] dZ_dA, float lr, QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> optimizer, boolean outputLayer, int step);
+        /**
+         * Tune the parameters of this Layer with the given parameters.
+         *
+         * @param dC If this Layer is the last in the network, this should be
+         * the partial derivatives of the loss with respect to the values after
+         * the activation function. Otherwise, this should be the partial
+         * derivatives of the loss with respect to the values before the
+         * activation function of the Layer in front.
+         * @param dZ_dA The partial derivatives of the values before the
+         * activation function in the Layer in front with respect to the values
+         * of this Layer's values that have been passed into the activation
+         * function. Pass in null to indicate that this Layer is last in the
+         * network.
+         * @param lr The learning rate for the optimizer.
+         * @param optimizer The optimizer to be used to tune the parameters.
+         * @param step
+         * @return
+         */
+        public abstract float[][] back(float[][] dC, float[][] dZ_dA, float lr, QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> optimizer, int step);
 
-        abstract void randomize(float range);
+        /**
+         * Randomize parameters of this Layer.
+         *
+         * @param range The range of random values, centered around 0.
+         */
+        public abstract void randomize(float range);
 
-        abstract void mutate(float range, float mutateRate);
+        /**
+         * Adds noise to a portion of the parameters based on the mutate rate.
+         *
+         * @param range The range of random values, centered around 0.
+         * @param mutateRate Value between 0 and 1.
+         */
+        public abstract void mutate(float range, float mutateRate);
 
-        protected abstract Layer clone();
+        /**
+         * Organizes this Layer's parameters into a String.
+         *
+         * @return A String that summarizes Layer parameters.
+         */
+        public abstract String parametersToString();
 
+        /**
+         * Creates a deep copy of this Layer.
+         *
+         * @return A Layer with the same parameters and hyperparameters.
+         */
+        public abstract Layer clone();
+
+        /**
+         * Summarizes the details of this Layer into a String.
+         *
+         * @return A String with the important specifications of this Layer,
+         * leaving out the parameters.
+         */
         @Override
         public abstract String toString();
 
         public static class Dense extends Layer implements Serializable {
 
-            float[][] weights;
-            float[][] biases;
-            float[][][] updateStorageW;
-            float[][][] updateStorageB;
-            BiFunction<float[][], Boolean, float[][]> activation;
-            BiFunction<float[][], Integer, float[][]> initializer;
+            private float[][] weights;
+            private float[][] biases;
+            private float[][][] updateStorageW;
+            private float[][][] updateStorageB;
+            private BiFunction<float[][], Boolean, float[][]> activation;
+            private BiFunction<float[][], Integer, float[][]> initializer;
+            private float[][] prevA = super.prevA;
+            private float[][] Z = super.Z;
+            public final int nodesIn;
+            public final int nodesOut;
 
             public Dense(int nodesIn, int nodesOut, BiFunction<float[][], Boolean, float[][]> activation, BiFunction<float[][], Integer, float[][]> initializer) {
                 this.nodesIn = nodesIn;
@@ -364,8 +470,11 @@ public class NNLib extends Application {
                 this.initializer = initializer;
             }
 
+            /**
+             * @see #initialize(java.util.Random)
+             */
             @Override
-            void initialize(Random random) {
+            public void initialize(Random random) {
                 weights = create(nodesIn, nodesOut, 0);
                 biases = create(1, nodesOut, 0);
                 weights = NNLib.randomize(weights, 2, -1, random);//values on interval [-1,1]
@@ -375,19 +484,26 @@ public class NNLib extends Application {
                 updateStorageB = new float[][][]{create(1, nodesOut, 0)};
             }
 
+            /**
+             * @see #forward(float[][])
+             */
             @Override
-            float[][] forward(float[][] in) {
+            public float[][] forward(float[][] in) {
                 prevA = in;
                 Z = add(dotProduct.apply(in, weights), biases);
                 return activation.apply(Z, false);
             }
 
+            /**
+             * @see #back(float[][], float[][], float,
+             * neuralnetwork.NNLib.QuadFunction, int)
+             */
             @Override
-            float[][] back(float[][] dG, float[][] dZ_dA, float lr, QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> optimizer, boolean outputLayer, int step) {//dG = The running gradient from the previous backpropagated layer or loss function
+            public float[][] back(float[][] dC, float[][] dZ_dA, float lr, QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> optimizer, int step) {
                 float[][] dA_dZ = activation.apply(Z, true);
                 float[][] dC_dZ;
-                if (!outputLayer) {
-                    float[][] dC_dA = dotProduct.apply(dG, transpose(dZ_dA));
+                if (dZ_dA != null) {
+                    float[][] dC_dA = dotProduct.apply(dC, transpose(dZ_dA));
                     if (dA_dZ.length == 1) {
                         dC_dZ = multiply(dC_dA, dA_dZ);
                     } else {
@@ -395,9 +511,9 @@ public class NNLib extends Application {
                     }
                 } else {
                     if (dA_dZ.length == 1) {
-                        dC_dZ = multiply(dG, dA_dZ);
+                        dC_dZ = multiply(dC, dA_dZ);
                     } else {
-                        dC_dZ = dotProduct.apply(dG, dA_dZ);//For jacobian matrices
+                        dC_dZ = dotProduct.apply(dC, dA_dZ);//For jacobian matrices
                     }
                 }
                 float[][] dC_dW = dotProduct.apply(transpose(prevA), dC_dZ);//prevA = dZ_dW;
@@ -421,27 +537,20 @@ public class NNLib extends Application {
                 return dC_dZ;
             }
 
+            /**
+             * @see #randomize(float)
+             */
             @Override
-            public Dense clone() {
-                Dense copy = new Dense(weights.length, weights[0].length, activation, Initializer.VANILLA);
-                copy.weights = copy(weights);
-                copy.biases = copy(biases);
-                try {
-                    copy.updateStorageW = copy3d(updateStorageW);
-                    copy.updateStorageB = copy3d(updateStorageB);
-                } catch (Exception e) {
-                }
-                return copy;
-            }
-
-            @Override
-            void randomize(float range) {
+            public void randomize(float range) {
                 weights = NNLib.randomize(weights, range, -range / 2);
                 biases = NNLib.randomize(biases, range, -range / 2);
             }
 
+            /**
+             * @see #mutate(float, float)
+             */
             @Override
-            void mutate(float range, float mutateRate) {
+            public void mutate(float range, float mutateRate) {
                 for (int i = 0; i < nodesIn; i++) {
                     for (int j = 0; j < nodesOut; j++) {
                         if (Math.random() < mutateRate) {
@@ -456,13 +565,47 @@ public class NNLib extends Application {
                 }
             }
 
+            /**
+             * @see Layer#parametersToString()
+             */
+            @Override
+            public String parametersToString() {
+                return "Weights:\n" + arr2dToString(weights) + "\nBiases:\n" + arr2dToString(biases);
+            }
+
+            /**
+             * @see Layer#clone()
+             */
+            @Override
+            public Dense clone() {
+                Dense copy = new Dense(weights.length, weights[0].length, activation, Initializer.VANILLA);
+                copy.weights = copy(weights);
+                copy.biases = copy(biases);
+                try {
+                    copy.updateStorageW = copy3d(updateStorageW);
+                    copy.updateStorageB = copy3d(updateStorageB);
+                } catch (Exception e) {
+                }
+                return copy;
+            }
+
+            /**
+             * Format of the String: Dense(Nodes In: [nodesIn], Nodes Out:
+             * [nodesOut])
+             *
+             * @see Layer#toString()
+             */
             @Override
             public String toString() {
-                return "Weights:\n" + matrixToString(weights) + "\nBiases:\n" + matrixToString(biases);
+                return "Dense(Nodes In: " + nodesIn + ", Nodes Out: " + nodesOut + ")";
             }
         }
     }
 
+    /**
+     * A set of common weight initializers. Takes in weights of a layer and the
+     * number of nodes going into the layer ()
+     */
     public static class Initializer {
 
         public static final BiFunction<float[][], Integer, float[][]> VANILLA = (a, b) -> a;//No change
@@ -470,6 +613,12 @@ public class NNLib extends Application {
         public static final BiFunction<float[][], Integer, float[][]> HE = (a, b) -> scale(a, (float) Math.sqrt(2.0 / b));
     }
 
+    /**
+     * A set of common activation functions. The first parameter is a matrix of
+     * values to be passed through a desired function. If the second parameter
+     * is true, then the values are passed into the derivative of the desired
+     * function.
+     */
     public static class ActivationFunction {
 
         public static final BiFunction<float[][], Boolean, float[][]> LINEAR = (matrix, derivative) -> {
@@ -505,6 +654,15 @@ public class NNLib extends Application {
         };
     }
 
+    /**
+     * A set of common loss functions. First parameter takes in a matrix of
+     * outputs from the last layer of the network. The seconds parameter is a
+     * matrix of targets with the same shape of the outputs. The return value is
+     * an Object array where the first index is the result of the loss function
+     * given the outputs and targets and the second index is a matrix with the
+     * same shape as the outputs and targets with values from the derivative of
+     * the loss function with the outputs as inputs.
+     */
     public static class LossFunction {//Should sums be divided by the number of outputs of the network?
 
         /**
@@ -583,13 +741,13 @@ public class NNLib extends Application {
     }
 
     /**
-     * The first three parameters of the QuadFunction are strictly for the time
-     * step, learning rate, and the gradients respectively. The third parameter
-     * is an array of matrices to store info such as previous updates,
-     * gradients, etc. The QuadFunction returns an array where its first element
-     * is a array with one element to hold the gradient update matrix and its
-     * second element is the storage array that is passed into the next call of
-     * the optimizer.
+     * A set of common optimizers. The first three parameters of the
+     * QuadFunction are strictly for the time step, learning rate, and the
+     * gradients respectively. The third parameter is an array of matrices to
+     * store info such as previous updates, gradients, etc. The QuadFunction
+     * returns an array where its first element is a array with one element to
+     * hold the gradient update matrix and its second element is the storage
+     * array that is passed into the next call of the optimizer.
      */
     public static class Optimizer {
 
@@ -820,7 +978,7 @@ public class NNLib extends Application {
         return result;
     }
 
-    public static String matrixToString(float[][] matrix) {
+    public static String arr2dToString(float[][] matrix) {
         int rows = matrix.length;
         int columns = matrix[0].length;
         String string = "";
@@ -834,7 +992,16 @@ public class NNLib extends Application {
     }
 
     public static void print(float[][] matrix) {
-        System.out.print(matrixToString(matrix));
+        System.out.print(arr2dToString(matrix));
+    }
+
+    public static void print(float[][] matrix, String label) {
+        System.out.println(label + ":");
+        System.out.print(arr2dToString(matrix));
+    }
+
+    public static void printDimensions(float[][] matrix) {
+        System.out.println("Rows: " + matrix.length + " Columns: " + matrix[0].length);
     }
 
     public static float[][] doubleToFloat(double[][] matrix) {
@@ -889,6 +1056,18 @@ public class NNLib extends Application {
 
     public static float[][] add(float[][] matrix1, float[][] matrix2) {
         return bifunction(matrix1, matrix2, (val1, val2) -> val1 + val2);
+    }
+
+    public static float[][] matrixWithVectorAdd(float[][] matrix, float[][] vector) {
+        int rows = matrix.length;
+        int cols = matrix[0].length;
+        float[][] result = new float[rows][cols];
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < cols; j++) {
+                result[i][j] = matrix[i][j] + vector[0][j];
+            }
+        }
+        return result;
     }
 
     public static float[][] subtract(float[][] matrix1, float[][] matrix2) {
@@ -1084,7 +1263,12 @@ public class NNLib extends Application {
         int size1 = a.length;
         int size2 = b.length;
         int size3 = size1 + size2;
-        T[] result = (T[]) Array.newInstance(a[0].getClass(), size3);
+        T[] result;
+        try {
+            result = (T[]) Array.newInstance(a[0].getClass(), size3);
+        } catch (Exception e) {
+            result = (T[]) Array.newInstance(b[0].getClass(), size3);
+        }
         for (int i = 0; i < size1; i++) {
             result[i] = a[i];
         }
@@ -1130,6 +1314,11 @@ public class NNLib extends Application {
     }));
     private static boolean running = false;
 
+    /**
+     *
+     * @param millis Milliseconds between each update of all info panels.
+     * Default is 50 milliseconds
+     */
     public static void setInfoUpdateRate(int millis) {
         updateRate = millis;
     }
@@ -1145,7 +1334,7 @@ public class NNLib extends Application {
             NumberAxis xAxis = new NumberAxis();
             NumberAxis yAxis = new NumberAxis();
             xAxis.setAnimated(false);
-            xAxis.setLabel("Times Backpropagated");
+            xAxis.setLabel("Epochs");
             yAxis.setAnimated(false);
             yAxis.setLabel(mode ? "Accuracy" : "Loss");
             if (mode) {
@@ -1176,7 +1365,7 @@ public class NNLib extends Application {
         Text[] parameters = new Text[size];
         updaterBuilder(handler -> {
             for (int i = 0; i < size; i++) {
-                parameters[i] = new Text("Layer " + (i + 1) + ":\n" + nn.network[i].toString());
+                parameters[i] = new Text("Layer " + (i + 1) + ":\n" + nn.network[i].parametersToString());
             }
             network.getChildren().clear();
             network.getChildren().addAll(parameters);
