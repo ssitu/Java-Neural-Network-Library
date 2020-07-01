@@ -9,10 +9,10 @@ public class XOR {
     public static void main(String[] args) {
         final boolean PRINT = true;
         long seed = new Random().nextLong();
-        NN nn = new NN(//0.077241674
+        NN nn = new NN(
                 "XOR",//Name for Saving & Graph Title
                 seed,//Seed For Reproducibility
-                .01,//Learning Rate for Optimizer
+                .01f,//Learning Rate for Optimizer
                 LossFunction.QUADRATIC(.5),//Loss/Cost/Error Function
                 Optimizer.VANILLA,//Stochastic Gradient Descent Optimizer
                 new Layer.Dense(2, 3, ActivationFunction.SIGMOID, Initializer.VANILLA),//2 in, 3 out

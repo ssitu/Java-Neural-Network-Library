@@ -109,10 +109,10 @@ public class NNLib extends Application {
          * @see NNLib.Optimizer
          * @see NNLib.Layer
          */
-        public NN(String label, long seed, double learningRate, BiFunction<float[][], float[][], Object[]> lossFunction, QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> optimizer, Layer... layers) {
+        public NN(String label, long seed, float learningRate, BiFunction<float[][], float[][], Object[]> lossFunction, QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> optimizer, Layer... layers) {
             this.label = label;
             this.seed = seed;
-            lr = (float) learningRate;
+            lr = learningRate;
             this.lossFunction = lossFunction;
             this.optimizer = optimizer;
             network = layers;
@@ -154,9 +154,11 @@ public class NNLib extends Application {
             Object[] lossArr = lossFunction.apply(out, targets);
             loss = (double) lossArr[0];
             float[][] dC_dA = (float[][]) lossArr[1];
+//            System.out.println("Layer " + network.length);
             float[][] dC_dZ = network[lastIndex].back(dC_dA, null, lr, optimizer, step);
             for (int i = lastIndex - 1; i >= 0; i--) {
-                dC_dZ = network[i].back(dC_dZ, ((Layer.Dense) network[i + 1]).weights, lr, optimizer, step);
+//                System.out.println("Layer " + (i + 1));
+                dC_dZ = network[i].back(dC_dZ, network[i + 1].dZ_dA, lr, optimizer, step);
             }
             step++;
             sessions++;
@@ -342,8 +344,8 @@ public class NNLib extends Application {
          * @param learningRate A double that is casted to a float to avoid
          * having to work with floats.
          */
-        public void setLearningRate(double learningRate) {
-            lr = (float) learningRate;
+        public void setLearningRate(float learningRate) {
+            lr = learningRate;
         }
 
         /**
@@ -366,6 +368,18 @@ public class NNLib extends Application {
             this.optimizer = optimizer;
             step = 1;
         }
+
+        /**
+         * Set how many backpropagation steps for gradients to accumulate before
+         * tuning parameters. Must be at least 1.
+         *
+         * @param accumulationSteps The desired amount of steps.
+         */
+        public void setAccumulationSteps(int accumulationSteps) {
+            for (int i = 0; i < length; i++) {
+                network[i].setAccumulationSteps(accumulationSteps);
+            }
+        }
     }
 
     /**
@@ -375,6 +389,20 @@ public class NNLib extends Application {
 
         private float[][] prevA;
         private float[][] Z;
+        private int accumulationSteps = 1;
+        public float[][] dZ_dA;
+
+        /**
+         * Set how many backpropagation steps for gradients to accumulate before
+         * tuning parameters. Must be at least 1.
+         *
+         * @param accumulationSteps The desired amount of steps.
+         */
+        public void setAccumulationSteps(int accumulationSteps) {
+            if (accumulationSteps >= 1) {
+                this.accumulationSteps = accumulationSteps;
+            }
+        }
 
         /**
          * Initializes this Layer's parameters and storage of previous
@@ -403,12 +431,13 @@ public class NNLib extends Application {
          * @param dZ_dA The partial derivatives of the values before the
          * activation function in the Layer in front with respect to the values
          * of this Layer's values that have been passed into the activation
-         * function. Pass in null to indicate that this Layer is last in the
-         * network.
+         * function. Should be null if this Layer is the output layer so the
+         * parameters can be properly tuned.
          * @param lr The learning rate for the optimizer.
          * @param optimizer The optimizer to be used to tune the parameters.
          * @param step
-         * @return
+         * @return The partial derivatives of the loss with respect to the
+         * values before the activation function.
          */
         public abstract float[][] back(float[][] dC, float[][] dZ_dA, float lr, QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> optimizer, int step);
 
@@ -456,10 +485,9 @@ public class NNLib extends Application {
             private float[][] biases;
             private float[][][] updateStorageW;
             private float[][][] updateStorageB;
+            private float[][][] accumulated;//Even indeces are for weights, odd indeces are for biases
             private BiFunction<float[][], Boolean, float[][]> activation;
             private BiFunction<float[][], Integer, float[][]> initializer;
-            private float[][] prevA = super.prevA;
-            private float[][] Z = super.Z;
             public final int nodesIn;
             public final int nodesOut;
 
@@ -482,6 +510,8 @@ public class NNLib extends Application {
                 weights = initializer.apply(weights, nodesIn);
                 updateStorageW = new float[][][]{create(nodesIn, nodesOut, 0)};
                 updateStorageB = new float[][][]{create(1, nodesOut, 0)};
+                accumulated = new float[1][][];
+                super.dZ_dA = weights;
             }
 
             /**
@@ -489,9 +519,9 @@ public class NNLib extends Application {
              */
             @Override
             public float[][] forward(float[][] in) {
-                prevA = in;
-                Z = add(dotProduct.apply(in, weights), biases);
-                return activation.apply(Z, false);
+                super.prevA = in;
+                super.Z = add(dotProduct.apply(in, weights), biases);
+                return activation.apply(super.Z, false);
             }
 
             /**
@@ -500,7 +530,7 @@ public class NNLib extends Application {
              */
             @Override
             public float[][] back(float[][] dC, float[][] dZ_dA, float lr, QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> optimizer, int step) {
-                float[][] dA_dZ = activation.apply(Z, true);
+                float[][] dA_dZ = activation.apply(super.Z, true);
                 float[][] dC_dZ;
                 if (dZ_dA != null) {
                     float[][] dC_dA = dotProduct.apply(dC, transpose(dZ_dA));
@@ -516,7 +546,7 @@ public class NNLib extends Application {
                         dC_dZ = dotProduct.apply(dC, dA_dZ);//For jacobian matrices
                     }
                 }
-                float[][] dC_dW = dotProduct.apply(transpose(prevA), dC_dZ);//prevA = dZ_dW;
+                float[][] dC_dW = dotProduct.apply(transpose(super.prevA), dC_dZ);//prevA = dZ_dW;
                 float[][][][] updateW = null;
                 while (true) {
                     try {
@@ -532,8 +562,36 @@ public class NNLib extends Application {
                 float[][] gradientsB = updateB[0][0];
                 updateStorageW = updateW[1];
                 updateStorageB = updateB[1];
-                weights = subtract(weights, gradientsW);
-                biases = subtract(biases, gradientsB);
+                if (super.accumulationSteps > 1) {
+                    //Store gradients in batch
+                    if (accumulated[0] == null) {//If nothing is in the batch yet
+                        accumulated = new float[2][][];
+                        accumulated[0] = gradientsW;
+                        accumulated[1] = gradientsB;
+                    } else {//Can add gradients onto the already stored batches
+                        accumulated = append(accumulated, new float[][][]{gradientsW});
+                        accumulated = append(accumulated, new float[][][]{gradientsB});
+                    }
+                    int currentBatchSize = accumulated.length / 2;//Size is doubled due to storing gradients for weights and gradients for biases
+                    if (currentBatchSize >= super.accumulationSteps) {
+                        float[][] accumulatedW = accumulated[0];
+                        float[][] accumulatedB = accumulated[1];
+                        int size = accumulated.length;
+                        for (int i = 2; i < size; i++) {
+                            if (i % 2 == 0) {//Weights
+                                accumulatedW = add(accumulatedW, accumulated[i]);
+                            } else {//Biases
+                                accumulatedB = add(accumulatedB, accumulated[i]);
+                            }
+                        }
+                        weights = subtract(weights, accumulatedW);
+                        biases = subtract(biases, accumulatedB);
+                        accumulated = new float[1][][];
+                    }
+                } else {
+                    weights = subtract(weights, gradientsW);
+                    biases = subtract(biases, gradientsB);
+                }
                 return dC_dZ;
             }
 
@@ -1259,6 +1317,15 @@ public class NNLib extends Application {
         return index;
     }
 
+    /**
+     * Extends the first array with the second array. Both arrays must have at
+     * least one element.
+     *
+     * @param <T> Object type.
+     * @param a First array.
+     * @param b Second array.
+     * @return The new extended array.
+     */
     public static <T> T[] append(T[] a, T[] b) {
         int size1 = a.length;
         int size2 = b.length;

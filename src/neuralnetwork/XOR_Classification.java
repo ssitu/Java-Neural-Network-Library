@@ -32,7 +32,7 @@ public class XOR_Classification {
         NN nn = new NN(
                 "xor_classification",//Name for Saving & Graph Title
                 seed,//Seed For Reproducibility
-                .001,//Learning Rate for Optimizer
+                .001f,//Learning Rate for Optimizer
                 LossFunction.CROSSENTROPY(1),//Loss/Cost/Error Function
                 Optimizer.NESTEROV,//Stochastic Gradient Descent Optimizer
                 new Layer.Dense(2, 3, CUSTOM, Initializer.XAVIER),
