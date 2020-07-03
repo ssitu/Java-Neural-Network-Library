@@ -80,7 +80,7 @@ public class NNLib extends Application {
         private Random random = new Random();
         private long seed;
         private double loss;
-        private long sessions = 0;
+        private long epochs = 0;
         private BiFunction<float[][], float[][], Object[]> lossFunction;
         private QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> optimizer;
         private int step = 1;
@@ -154,14 +154,12 @@ public class NNLib extends Application {
             Object[] lossArr = lossFunction.apply(out, targets);
             loss = (double) lossArr[0];
             float[][] dC_dA = (float[][]) lossArr[1];
-//            System.out.println("Layer " + network.length);
             float[][] dC_dZ = network[lastIndex].back(dC_dA, null, lr, optimizer, step);
             for (int i = lastIndex - 1; i >= 0; i--) {
-//                System.out.println("Layer " + (i + 1));
                 dC_dZ = network[i].back(dC_dZ, network[i + 1].dZ_dA, lr, optimizer, step);
             }
             step++;
-            sessions++;
+            epochs++;
         }
 
         /**
@@ -387,8 +385,6 @@ public class NNLib extends Application {
      */
     public static abstract class Layer implements Serializable {
 
-        private float[][] prevA;
-        private float[][] Z;
         private int accumulationSteps = 1;
         public float[][] dZ_dA;
 
@@ -421,7 +417,9 @@ public class NNLib extends Application {
         public abstract float[][] forward(float[][] in);
 
         /**
-         * Tune the parameters of this Layer with the given parameters.
+         * Tune the parameters of this Layer with the given parameters. Must
+         * give super.dZ_dA a value within the method for Layers behind this one
+         * and should be set before making any changes to parameters.
          *
          * @param dC If this Layer is the last in the network, this should be
          * the partial derivatives of the loss with respect to the values after
@@ -483,6 +481,8 @@ public class NNLib extends Application {
 
             private float[][] weights;
             private float[][] biases;
+            private float[][] prevA;
+            private float[][] Z;
             private float[][][] updateStorageW;
             private float[][][] updateStorageB;
             private float[][][] accumulated;//Even indeces are for weights, odd indeces are for biases
@@ -511,7 +511,6 @@ public class NNLib extends Application {
                 updateStorageW = new float[][][]{create(nodesIn, nodesOut, 0)};
                 updateStorageB = new float[][][]{create(1, nodesOut, 0)};
                 accumulated = new float[1][][];
-                super.dZ_dA = weights;
             }
 
             /**
@@ -519,9 +518,9 @@ public class NNLib extends Application {
              */
             @Override
             public float[][] forward(float[][] in) {
-                super.prevA = in;
-                super.Z = add(dotProduct.apply(in, weights), biases);
-                return activation.apply(super.Z, false);
+                prevA = in;
+                Z = bifunctionMatrixVectors(dotProduct.apply(in, weights), biases[0], (a, b) -> add(a, b));
+                return activation.apply(Z, false);
             }
 
             /**
@@ -530,23 +529,24 @@ public class NNLib extends Application {
              */
             @Override
             public float[][] back(float[][] dC, float[][] dZ_dA, float lr, QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> optimizer, int step) {
-                float[][] dA_dZ = activation.apply(super.Z, true);
+                float[][] dA_dZ = activation.apply(Z, true);
                 float[][] dC_dZ;
-                if (dZ_dA != null) {
-                    float[][] dC_dA = dotProduct.apply(dC, transpose(dZ_dA));
-                    if (dA_dZ.length == 1) {
-                        dC_dZ = multiply(dC_dA, dA_dZ);
-                    } else {
-                        dC_dZ = dotProduct.apply(dC_dA, dA_dZ);//For jacobian matrices
-                    }
-                } else {
-                    if (dA_dZ.length == 1) {
+                if (dZ_dA == null) {//Output Layer
+                    if (dC.length == dA_dZ.length && dC[0].length == dA_dZ[0].length) {
                         dC_dZ = multiply(dC, dA_dZ);
                     } else {
                         dC_dZ = dotProduct.apply(dC, dA_dZ);//For jacobian matrices
                     }
+
+                } else {//Hidden Layer
+                    float[][] dC_dA = dotProduct.apply(dC, transpose(dZ_dA));
+                    if (dC_dA.length == dA_dZ.length && dC_dA[0].length == dA_dZ[0].length) {
+                        dC_dZ = multiply(dC_dA, dA_dZ);
+                    } else {
+                        dC_dZ = dotProduct.apply(dC_dA, dA_dZ);//For jacobian matrices
+                    }
                 }
-                float[][] dC_dW = dotProduct.apply(transpose(super.prevA), dC_dZ);//prevA = dZ_dW;
+                float[][] dC_dW = dotProduct.apply(transpose(prevA), dC_dZ);//prevA = dZ_dW;
                 float[][][][] updateW = null;
                 while (true) {
                     try {
@@ -562,6 +562,12 @@ public class NNLib extends Application {
                 float[][] gradientsB = updateB[0][0];
                 updateStorageW = updateW[1];
                 updateStorageB = updateB[1];
+                super.dZ_dA = copy2d(weights);
+                tuneParameters(gradientsW, gradientsB);
+                return dC_dZ;
+            }
+
+            private void tuneParameters(float[][] gradientsW, float[][] gradientsB) {
                 if (super.accumulationSteps > 1) {
                     //Store gradients in batch
                     if (accumulated[0] == null) {//If nothing is in the batch yet
@@ -592,7 +598,6 @@ public class NNLib extends Application {
                     weights = subtract(weights, gradientsW);
                     biases = subtract(biases, gradientsB);
                 }
-                return dC_dZ;
             }
 
             /**
@@ -637,8 +642,8 @@ public class NNLib extends Application {
             @Override
             public Dense clone() {
                 Dense copy = new Dense(weights.length, weights[0].length, activation, Initializer.VANILLA);
-                copy.weights = copy(weights);
-                copy.biases = copy(biases);
+                copy.weights = copy2d(weights);
+                copy.biases = copy2d(biases);
                 try {
                     copy.updateStorageW = copy3d(updateStorageW);
                     copy.updateStorageB = copy3d(updateStorageB);
@@ -682,9 +687,10 @@ public class NNLib extends Application {
         public static final BiFunction<float[][], Boolean, float[][]> LINEAR = (matrix, derivative) -> {
             if (!derivative) {
                 return matrix;
+            } else {
+                float[][] result = create(matrix.length, matrix[0].length, 1);
+                return result;
             }
-            float[][] result = create(matrix.length, matrix[0].length, 1);
-            return result;
         };
         public static final BiFunction<float[][], Boolean, float[][]> SIGMOID = (matrix, derivative) -> function(matrix, val -> sigmoid(val, derivative));
         public static final BiFunction<float[][], Boolean, float[][]> TANH = (matrix, derivative) -> function(matrix, val -> tanh(val, derivative));
@@ -693,22 +699,33 @@ public class NNLib extends Application {
         public static final BiFunction<float[][], Boolean, float[][]> SWISH = (matrix, derivative) -> function(matrix, val -> swish(val, derivative));
         public static final BiFunction<float[][], Boolean, float[][]> MISH = (matrix, derivative) -> function(matrix, val -> mish(val, derivative));
         public static final BiFunction<float[][], Boolean, float[][]> SOFTMAX = (matrix, derivative) -> {
-            if (!derivative) {
-                return softmax(matrix);
-            }
-            float[][] softmax = softmax(matrix);
+            int rows = matrix.length;
             int columns = matrix[0].length;
-            float[][] jacobian = new float[columns][columns];
-            for (int i = 0; i < columns; i++) {
-                for (int j = 0; j < columns; j++) {
-                    if (i == j) {
-                        jacobian[i][j] = softmax[0][i] * (1 - softmax[0][j]);
-                    } else {
-                        jacobian[i][j] = softmax[0][i] * -softmax[0][j];
+            if (!derivative) {
+                float[][] result = new float[rows][columns];
+                for (int i = 0; i < rows; i++) {
+                    result[i] = softmax(new float[][]{matrix[i]})[0];
+                }
+                return result;
+            } else {
+            float[][] softmax = softmax(matrix);
+
+//                float[][] softmax = new float[rows][columns];
+//                for (int i = 0; i < rows; i++) {
+//                    softmax[i] = softmax(new float[][]{matrix[i]})[0];
+//                }
+                float[][] jacobian = new float[columns][columns];
+                for (int i = 0; i < columns; i++) {
+                    for (int j = 0; j < columns; j++) {
+                        if (i == j) {
+                            jacobian[i][j] = softmax[0][i] * (1 - softmax[0][j]);
+                        } else {
+                            jacobian[i][j] = softmax[0][i] * -softmax[0][j];
+                        }
                     }
                 }
+                return jacobian;
             }
-            return jacobian;//Should be transposed?
         };
     }
 
@@ -721,7 +738,7 @@ public class NNLib extends Application {
      * same shape as the outputs and targets with values from the derivative of
      * the loss function with the outputs as inputs.
      */
-    public static class LossFunction {//Should sums be divided by the number of outputs of the network?
+    public static class LossFunction {
 
         /**
          * @param steepnessFactor Recommended value: .5
@@ -730,7 +747,7 @@ public class NNLib extends Application {
         public static final BiFunction<float[][], float[][], Object[]> QUADRATIC(double steepnessFactor) {
             final float steepness = (float) steepnessFactor;
             return (outputs, targets) -> {
-                double loss = sum(scale(steepness, square(subtract(outputs, targets))));//m(f(x) - y)^2 where f(x) is the output of the network and y is the target output
+                double loss = sum(scale(steepness, square(subtract(outputs, targets)))) / outputs.length;//m(f(x) - y)^2 where f(x) is the output of the network and y is the target output
                 return new Object[]{loss, scale(2 * steepness, subtract(outputs, targets))};//Derivative of the loss function for each sample, 2m(f(x) - y)
             };
         }
@@ -921,56 +938,75 @@ public class NNLib extends Application {
     public static float sigmoid(float x, boolean derivative) {
         if (!derivative) {
             return 1 / (1 + (float) Math.exp(-x));//sigmoid(x)
+        } else {
+            return sigmoid(x, false) * (1 - sigmoid(x, false));//sigmoid'(x)
         }
-        return sigmoid(x, false) * (1 - sigmoid(x, false));//sigmoid'(x)
     }
 
     public static float tanh(float x, boolean derivative) {
         if (!derivative) {
             return (2 / (1 + (float) Math.exp(-2 * x))) - 1;//tanh(x)
+        } else {
+            float val = tanh(x, false);
+            return 1 - val * val;//tanh'(x)
         }
-        float val = tanh(x, false);
-        return 1 - val * val;//tanh'(x)
     }
 
     public static float relu(float x, boolean derivative) {
         if (!derivative) {
             return Math.max(0, x);
+        } else {
+            if (x < 0) {
+                return 0;
+            }
+            return 1;
         }
-        if (x < 0) {
-            return 0;
-        }
-        return 1;
     }
 
     public static float leakyrelu(float x, boolean derivative) {
         if (derivative) {
             return Math.max(.001f * x, x);
+        } else {
+            if (x < 0) {
+                return .001f;
+            }
+            return 1;
         }
-        if (x < 0) {
-            return .001f;
-        }
-        return 1;
     }
 
     public static float swish(float x, boolean derivative) {
         if (!derivative) {
             return x * sigmoid(x, false);
+        } else {
+            return x * sigmoid(x, true) + sigmoid(x, false);
         }
-        return x * sigmoid(x, true) + sigmoid(x, false);
     }
 
     public static float mish(float x, boolean derivative) {
         if (!derivative) {
             return (x * tanh((float) Math.log(1 + Math.exp(x)), false));
+        } else {
+            double x_ = (double) x;
+            return (float) ((Math.exp(x_) * ((4 * (x_ + 1)) + (4 * Math.exp(2 * x_)) + (Math.exp(3 * x_)) + (Math.exp(x_) * (4 * x_ + 6)))) / ((2 * Math.exp(2 * x_)) + (Math.exp(2 * x_)) + 2));
         }
-        double x_ = (double) x;
-        return (float) ((Math.exp(x_) * ((4 * (x_ + 1)) + (4 * Math.exp(2 * x_)) + (Math.exp(3 * x_)) + (Math.exp(x_) * (4 * x_ + 6)))) / ((2 * Math.exp(2 * x_)) + (Math.exp(2 * x_)) + 2));
     }
 
+    /**
+     * Performs softmax on each of the rows of the given matrix. Includes
+     * numeric stability.
+     *
+     * @param matrix An array holding arrays of values where softmax is
+     * performed on each array of values within the array.
+     * @return The resulting matrix with the same shape as the given matrix.
+     */
     public static float[][] softmax(float[][] matrix) {
-        float[][] e = exp(matrix);
-        return scale(1 / sum(e), e);
+        int cols = matrix[0].length;
+        //Stabilize each row with the max of each row
+        float[][] result = functionMatrixVectors(matrix, vector -> subtract(vector, create(1, cols, max(vector))));
+        //Raise e to each value
+        result = exp(result);
+        //Divide by the sum of each row
+        return functionMatrixVectors(result, vector -> divide(vector, create(1, cols, sum(vector))));
     }
 
     public static void setThreads(int numberOfThreads) {
@@ -1116,18 +1152,6 @@ public class NNLib extends Application {
         return bifunction(matrix1, matrix2, (val1, val2) -> val1 + val2);
     }
 
-    public static float[][] matrixWithVectorAdd(float[][] matrix, float[][] vector) {
-        int rows = matrix.length;
-        int cols = matrix[0].length;
-        float[][] result = new float[rows][cols];
-        for (int i = 0; i < rows; i++) {
-            for (int j = 0; j < cols; j++) {
-                result[i][j] = matrix[i][j] + vector[0][j];
-            }
-        }
-        return result;
-    }
-
     public static float[][] subtract(float[][] matrix1, float[][] matrix2) {
         return bifunction(matrix1, matrix2, (val1, val2) -> val1 - val2);
     }
@@ -1227,14 +1251,6 @@ public class NNLib extends Application {
         return function(matrix, val -> (float) Math.log(val));
     }
 
-    public static float[][] copy(float[][] matrix) {
-        return Arrays.stream(matrix).map(el -> el.clone()).toArray(a -> matrix.clone());
-    }
-
-    public static float[][][] copy3d(float[][][] m3d) {
-        return Arrays.stream(m3d).map(m2d -> copy(m2d)).toArray(a -> m3d.clone());
-    }
-
     public static float[][] oneHot(float[][] matrix) {
         int rows = matrix.length;
         int columns = matrix[0].length;
@@ -1317,30 +1333,64 @@ public class NNLib extends Application {
         return index;
     }
 
+    public static float[] copy1d(float[] arr1d) {
+        int length = arr1d.length;
+        float[] result = new float[length];
+        System.arraycopy(arr1d, 0, result, 0, length);
+        return result;
+    }
+
+    public static float[][] copy2d(float[][] arr2d) {
+        return Arrays.stream(arr2d).map(el -> el.clone()).toArray(a -> arr2d.clone());
+    }
+
+    public static float[][][] copy3d(float[][][] arr3d) {
+        return Arrays.stream(arr3d).map(m2d -> copy2d(m2d)).toArray(a -> arr3d.clone());
+    }
+
     /**
-     * Extends the first array with the second array. Both arrays must have at
-     * least one element.
+     * Creates a new array with the elements inside the given arrays in their
+     * order. Arrays must have at least 1 element because empty arrays give a
+     * length of 1 and the Class of the generic is obtained from the first
+     * element from the first array given.
      *
      * @param <T> Object type.
-     * @param a First array.
-     * @param b Second array.
+     * @param arrays to be combined
      * @return The new extended array.
      */
-    public static <T> T[] append(T[] a, T[] b) {
-        int size1 = a.length;
-        int size2 = b.length;
-        int size3 = size1 + size2;
-        T[] result;
-        try {
-            result = (T[]) Array.newInstance(a[0].getClass(), size3);
-        } catch (Exception e) {
-            result = (T[]) Array.newInstance(b[0].getClass(), size3);
+    public static <T> T[] append(T[]... arrays) {
+        int totalLength = arrays[0].length;
+        int numOfArrays = arrays.length;
+        for (int i = 1; i < numOfArrays; i++) {
+            totalLength += arrays[i].length;
         }
-        for (int i = 0; i < size1; i++) {
-            result[i] = a[i];
+        T[] result = (T[]) Array.newInstance(arrays[0][0].getClass(), totalLength);
+        int index = 0;
+        for (int i = 0; i < numOfArrays; i++) {
+            T[] array = arrays[i];
+            int length = array.length;
+            for (int j = 0; j < length; j++) {
+                result[index] = array[j];
+                index++;
+            }
         }
-        for (int i = 0; i < size2; i++) {
-            result[i + size1] = b[i];
+        return result;
+    }
+
+    public static float[][] functionMatrixVectors(float[][] matrix, Function<float[][], float[][]> operation) {
+        int rows = matrix.length;
+        float[][] result = new float[rows][];
+        for (int i = 0; i < rows; i++) {
+            result[i] = operation.apply(new float[][]{matrix[i]})[0];
+        }
+        return result;
+    }
+
+    public static float[][] bifunctionMatrixVectors(float[][] matrix, float[] vector, BiFunction<float[][], float[][], float[][]> operation) {
+        int rows = matrix.length;
+        float[][] result = new float[rows][];
+        for (int i = 0; i < rows; i++) {
+            result[i] = operation.apply(new float[][]{matrix[i]}, new float[][]{vector})[0];
         }
         return result;
     }
@@ -1413,9 +1463,9 @@ public class NNLib extends Application {
             chart.getData().add(series);
             updaterBuilder(handler -> {
                 if (mode) {
-                    series.getData().add(new XYChart.Data<>(nn.sessions, 1 / Math.pow(100 * Math.E, nn.loss)));
+                    series.getData().add(new XYChart.Data<>(nn.epochs, 1 / Math.pow(100 * Math.E, nn.loss)));
                 } else {
-                    series.getData().add(new XYChart.Data<>(nn.sessions, nn.loss));
+                    series.getData().add(new XYChart.Data<>(nn.epochs, nn.loss));
                 }
             });
             Stage stage = new Stage();
