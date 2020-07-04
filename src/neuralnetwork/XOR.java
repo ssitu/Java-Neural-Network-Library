@@ -7,7 +7,7 @@ public class XOR {
 
     public static void main(String[] args) {
         final boolean PRINT = true;
-        final int MINIBATCHES = 4;//4 = Stochastic Gradient Descent, 2 = Minibatches with the dataset cut in half, 1 = Batch Gradient Descent
+        final int MINIBATCHES = 2;//4 = Stochastic Gradient Descent, 2 = Minibatches with the dataset cut in half, 1 = Batch Gradient Descent
         long seed = new Random().nextLong();
         NN nn = new NN(
                 "XOR",//Name for Saving & Graph Title
@@ -15,9 +15,10 @@ public class XOR {
                 .01f,//Learning Rate for Optimizer
                 LossFunction.QUADRATIC(.5),//Loss/Cost/Error Function
                 Optimizer.VANILLA,//Gradient Descent Optimizer
-                new Layer.Dense(2, 2, ActivationFunction.SIGMOID, Initializer.VANILLA),//2 in, 3 out
-                new Layer.Dense(2, 1, ActivationFunction.SIGMOID, Initializer.VANILLA)//3 in from the previous layer, 1 out
+                new Layer.Dense(2, 3, ActivationFunction.SIGMOID, Initializer.VANILLA),//2 in, 3 out
+                new Layer.Dense(3, 1, ActivationFunction.SIGMOID, Initializer.VANILLA)//3 in from the previous layer, 1 out
         );
+        nn.setAccumulationSteps(4000);
         System.out.println("Seed: " + seed);
         System.out.println("Network Length: " + nn.length);
         System.out.println("Network Architecture: \n" + nn);

@@ -485,7 +485,8 @@ public class NNLib extends Application {
             private float[][] Z;
             private float[][][] updateStorageW;
             private float[][][] updateStorageB;
-            private float[][][] accumulated;//Even indeces are for weights, odd indeces are for biases
+            private float[][][] accumulated;//First element are for weights, second element are for biases
+            private int stepsAccumulated = 0;
             private BiFunction<float[][], Boolean, float[][]> activation;
             private BiFunction<float[][], Integer, float[][]> initializer;
             public final int nodesIn;
@@ -510,7 +511,7 @@ public class NNLib extends Application {
                 weights = initializer.apply(weights, nodesIn);
                 updateStorageW = new float[][][]{create(nodesIn, nodesOut, 0)};
                 updateStorageB = new float[][][]{create(1, nodesOut, 0)};
-                accumulated = new float[1][][];
+                accumulated = new float[2][][];
             }
 
             /**
@@ -537,7 +538,6 @@ public class NNLib extends Application {
                     } else {
                         dC_dZ = dotProduct.apply(dC, dA_dZ);//For jacobian matrices
                     }
-
                 } else {//Hidden Layer
                     float[][] dC_dA = dotProduct.apply(dC, transpose(dZ_dA));
                     if (dC_dA.length == dA_dZ.length && dC_dA[0].length == dA_dZ[0].length) {
@@ -569,30 +569,20 @@ public class NNLib extends Application {
 
             private void tuneParameters(float[][] gradientsW, float[][] gradientsB) {
                 if (super.accumulationSteps > 1) {
-                    //Store gradients in batch
-                    if (accumulated[0] == null) {//If nothing is in the batch yet
-                        accumulated = new float[2][][];
+                    //Add to the accumulated gradients
+                    if (accumulated[0] == null) {
                         accumulated[0] = gradientsW;
                         accumulated[1] = gradientsB;
-                    } else {//Can add gradients onto the already stored batches
-                        accumulated = append(accumulated, new float[][][]{gradientsW});
-                        accumulated = append(accumulated, new float[][][]{gradientsB});
+                    } else {
+                        accumulated[0] = add(accumulated[0], gradientsW);
+                        accumulated[1] = add(accumulated[1], gradientsB);
                     }
-                    int currentBatchSize = accumulated.length / 2;//Size is doubled due to storing gradients for weights and gradients for biases
-                    if (currentBatchSize >= super.accumulationSteps) {
-                        float[][] accumulatedW = accumulated[0];
-                        float[][] accumulatedB = accumulated[1];
-                        int size = accumulated.length;
-                        for (int i = 2; i < size; i++) {
-                            if (i % 2 == 0) {//Weights
-                                accumulatedW = add(accumulatedW, accumulated[i]);
-                            } else {//Biases
-                                accumulatedB = add(accumulatedB, accumulated[i]);
-                            }
-                        }
-                        weights = subtract(weights, accumulatedW);
-                        biases = subtract(biases, accumulatedB);
-                        accumulated = new float[1][][];
+                    stepsAccumulated++;
+                    if (stepsAccumulated >= super.accumulationSteps) {
+                        weights = subtract(weights, accumulated[0]);
+                        biases = subtract(biases, accumulated[1]);
+                        accumulated = new float[2][][];
+                        stepsAccumulated = 0;
                     }
                 } else {
                     weights = subtract(weights, gradientsW);
@@ -699,29 +689,20 @@ public class NNLib extends Application {
         public static final BiFunction<float[][], Boolean, float[][]> SWISH = (matrix, derivative) -> function(matrix, val -> swish(val, derivative));
         public static final BiFunction<float[][], Boolean, float[][]> MISH = (matrix, derivative) -> function(matrix, val -> mish(val, derivative));
         public static final BiFunction<float[][], Boolean, float[][]> SOFTMAX = (matrix, derivative) -> {
-            int rows = matrix.length;
-            int columns = matrix[0].length;
             if (!derivative) {
-                float[][] result = new float[rows][columns];
-                for (int i = 0; i < rows; i++) {
-                    result[i] = softmax(new float[][]{matrix[i]})[0];
-                }
-                return result;
+                return softmax(matrix);
             } else {
-            float[][] softmax = softmax(matrix);
-
-//                float[][] softmax = new float[rows][columns];
-//                for (int i = 0; i < rows; i++) {
-//                    softmax[i] = softmax(new float[][]{matrix[i]})[0];
-//                }
+                int columns = matrix[0].length;
+                float[][] softmax = softmax(matrix);
                 float[][] jacobian = new float[columns][columns];
+                //Diagonal
                 for (int i = 0; i < columns; i++) {
-                    for (int j = 0; j < columns; j++) {
-                        if (i == j) {
-                            jacobian[i][j] = softmax[0][i] * (1 - softmax[0][j]);
-                        } else {
-                            jacobian[i][j] = softmax[0][i] * -softmax[0][j];
-                        }
+                    jacobian[i][i] = softmax[0][i] * (1 - softmax[0][i]);
+                    for (int j = 0; j < i; j++) {
+                        //Everywhere else are the same on both sides of the diagonal, or symmetric about the diagonal.
+                        float val = softmax[0][i] * -softmax[0][j];
+                        jacobian[i][j] = val;
+                        jacobian[j][i] = val;
                     }
                 }
                 return jacobian;
@@ -1001,11 +982,9 @@ public class NNLib extends Application {
      */
     public static float[][] softmax(float[][] matrix) {
         int cols = matrix[0].length;
-        //Stabilize each row with the max of each row
-        float[][] result = functionMatrixVectors(matrix, vector -> subtract(vector, create(1, cols, max(vector))));
-        //Raise e to each value
+        float[][] result = matrix;
+//        float[][] result = functionMatrixVectors(matrix, vector -> subtract(vector, create(1, cols, max(vector))));//Stabilizing
         result = exp(result);
-        //Divide by the sum of each row
         return functionMatrixVectors(result, vector -> divide(vector, create(1, cols, sum(vector))));
     }
 
