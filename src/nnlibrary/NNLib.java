@@ -1,4 +1,4 @@
-package neuralnetwork;
+package nnlibrary;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -80,10 +80,12 @@ public class NNLib extends Application {
         private Random random = new Random();
         private long seed;
         private double loss;
-        private long epochs = 0;
+        private double summedLoss = 0;
+        private long iterations = 0;
         private BiFunction<float[][], float[][], Object[]> lossFunction;
-        private QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> optimizer;
+        private QuadFunction<Integer, Float, float[][], float[][][], Object[]> optimizer;
         private int step = 1;
+        private int batchsize = 1;
         /**
          * The name of this NN instance. Used in saving, loading, and info
          * panels.
@@ -109,7 +111,7 @@ public class NNLib extends Application {
          * @see NNLib.Optimizer
          * @see NNLib.Layer
          */
-        public NN(String label, long seed, float learningRate, BiFunction<float[][], float[][], Object[]> lossFunction, QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> optimizer, Layer... layers) {
+        public NN(String label, long seed, float learningRate, BiFunction<float[][], float[][], Object[]> lossFunction, QuadFunction<Integer, Float, float[][], float[][][], Object[]> optimizer, Layer... layers) {
             this.label = label;
             this.seed = seed;
             lr = learningRate;
@@ -127,13 +129,13 @@ public class NNLib extends Application {
         /**
          * Feed inputs into the network for an output.
          *
-         * @param inputs A 2D array to be fed into the network. The shape of the
-         * matrix depends on the input layer.
-         * @return A 2D array with one 1D array representing the output of the
-         * network.
+         * @param inputs An 2D or 3D array to be fed into the network. The
+         * dimensions of the array depends on the input layer.
+         * @return A array with the same amount of dimensions as the input
+         * representing the output of the network.
          */
-        public float[][] feedforward(float[][] inputs) {
-            float[][] out = inputs;
+        public Object[] feedforward(Object[] inputs) {
+            Object[] out = inputs;
             for (int i = 0; i < length; i++) {
                 out = network[i].forward(out);
             }
@@ -144,22 +146,32 @@ public class NNLib extends Application {
          * The backpropagation algorithm for tuning weights.
          *
          * @param inputs
-         * {@link NN#feedforward(float[][]) Passed into the feedforward method}
+         * {@link NN#feedforward(java.lang.Object[]) Passed into the feedforward method}
          * @param targets The desired output for the network to fit to. Must
          * match the shape of the outputs or either an ArrayOutOfBoundsException
          * will be thrown or some of the targets will be ignored.
          */
-        public void backpropagation(float[][] inputs, float[][] targets) {
-            float[][] out = feedforward(inputs);
-            Object[] lossArr = lossFunction.apply(out, targets);
-            loss = (double) lossArr[0];
-            float[][] dC_dA = (float[][]) lossArr[1];
-            float[][] dC_dZ = network[lastIndex].back(dC_dA, null, lr, optimizer, step);
-            for (int i = lastIndex - 1; i >= 0; i--) {
-                dC_dZ = network[i].back(dC_dZ, network[i + 1].dZ_dA, lr, optimizer, step);
+        public void backpropagation(Object[] inputs, Object[] targets) {
+            final boolean update;
+            if (iterations % batchsize == 0) {
+                update = true;
+            } else {
+                update = false;
             }
-            step++;
-            epochs++;
+            float[][] out = (float[][]) feedforward(inputs);
+            Object[] lossArr = lossFunction.apply(out, (float[][]) targets);
+            summedLoss += (double) lossArr[0];
+            Object[] dC_dA = (Object[]) lossArr[1];
+            dC_dA = network[lastIndex].back(dC_dA, lr, optimizer, step, update);
+            for (int i = lastIndex - 1; i >= 0; i--) {
+                dC_dA = network[i].back(dC_dA, lr, optimizer, step, update);
+            }
+            if (update) {
+                step++;
+                loss = summedLoss / batchsize;
+                summedLoss = 0;
+            }
+            iterations++;
         }
 
         /**
@@ -362,20 +374,19 @@ public class NNLib extends Application {
          * @param optimizer The SGD optimizer
          * @see NNLib.Optimizer
          */
-        public void setOptimizer(QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> optimizer) {
+        public void setOptimizer(QuadFunction<Integer, Float, float[][], float[][][], Object[]> optimizer) {
             this.optimizer = optimizer;
-            step = 1;
         }
 
         /**
          * Set how many backpropagation steps for gradients to accumulate before
          * tuning parameters. Must be at least 1.
          *
-         * @param accumulationSteps The desired amount of steps.
+         * @param batchsize The desired amount of steps.
          */
-        public void setAccumulationSteps(int accumulationSteps) {
-            for (int i = 0; i < length; i++) {
-                network[i].setAccumulationSteps(accumulationSteps);
+        public void setBatchSize(int batchsize) {
+            if (batchsize >= 1) {
+                this.batchsize = batchsize;
             }
         }
     }
@@ -384,21 +395,6 @@ public class NNLib extends Application {
      * A set of layer types.
      */
     public static abstract class Layer implements Serializable {
-
-        private int accumulationSteps = 1;
-        public float[][] dZ_dA;
-
-        /**
-         * Set how many backpropagation steps for gradients to accumulate before
-         * tuning parameters. Must be at least 1.
-         *
-         * @param accumulationSteps The desired amount of steps.
-         */
-        public void setAccumulationSteps(int accumulationSteps) {
-            if (accumulationSteps >= 1) {
-                this.accumulationSteps = accumulationSteps;
-            }
-        }
 
         /**
          * Initializes this Layer's parameters and storage of previous
@@ -414,30 +410,23 @@ public class NNLib extends Application {
          * @param in Inputs into the network or outputs from the previous Layer.
          * @return Outputs of the Layer.
          */
-        public abstract float[][] forward(float[][] in);
+        public abstract Object[] forward(Object[] in);
 
         /**
-         * Tune the parameters of this Layer with the given parameters. Must
-         * give super.dZ_dA a value within the method for Layers behind this one
-         * and should be set before making any changes to parameters.
+         * Tune the parameters of this Layer with the given parameters.
          *
-         * @param dC If this Layer is the last in the network, this should be
-         * the partial derivatives of the loss with respect to the values after
-         * the activation function. Otherwise, this should be the partial
-         * derivatives of the loss with respect to the values before the
-         * activation function of the Layer in front.
-         * @param dZ_dA The partial derivatives of the values before the
-         * activation function in the Layer in front with respect to the values
-         * of this Layer's values that have been passed into the activation
-         * function. Should be null if this Layer is the output layer so the
-         * parameters can be properly tuned.
+         * @param dC_dA_uncasted The partial derivatives of the loss with
+         * respect to the activations of the current Layer.
          * @param lr The learning rate for the optimizer.
          * @param optimizer The optimizer to be used to tune the parameters.
-         * @param step
+         * @param step The number of times the parameters have been tuned. This
+         * can be set to 0 but will cause biased gradients.
+         * @param update Whether or not to tune the parameters after computing
+         * gradients.
          * @return The partial derivatives of the loss with respect to the
          * values before the activation function.
          */
-        public abstract float[][] back(float[][] dC, float[][] dZ_dA, float lr, QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> optimizer, int step);
+        public abstract Object[] back(Object[] dC_dA_uncasted, float lr, QuadFunction<Integer, Float, float[][], float[][][], Object[]> optimizer, int step, boolean update);
 
         /**
          * Randomize parameters of this Layer.
@@ -486,7 +475,6 @@ public class NNLib extends Application {
             private float[][][] updateStorageW;
             private float[][][] updateStorageB;
             private float[][][] accumulated;//First element are for weights, second element are for biases
-            private int stepsAccumulated = 0;
             private BiFunction<float[][], Boolean, float[][]> activation;
             private BiFunction<float[][], Integer, float[][]> initializer;
             public final int nodesIn;
@@ -500,93 +488,74 @@ public class NNLib extends Application {
             }
 
             /**
-             * @see #initialize(java.util.Random)
+             * @see Layer#initialize(java.util.Random)
              */
             @Override
             public void initialize(Random random) {
-                weights = create(nodesIn, nodesOut, 0);
-                biases = create(1, nodesOut, 0);
-                weights = NNLib.randomize(weights, 2, -1, random);//values on interval [-1,1]
-                biases = NNLib.randomize(biases, 2, -1, random);//values on interval [-1,1]
+                weights = NNLib.randomize(new float[nodesIn][nodesOut], 2, -1, random);//values on interval [-1,1]
+                biases = NNLib.randomize(new float[1][nodesOut], 2, -1, random);//values on interval [-1,1]
                 weights = initializer.apply(weights, nodesIn);
-                updateStorageW = new float[][][]{create(nodesIn, nodesOut, 0)};
-                updateStorageB = new float[][][]{create(1, nodesOut, 0)};
+                updateStorageW = new float[1][nodesIn][nodesOut];
+                updateStorageB = new float[1][1][nodesOut];
                 accumulated = new float[2][][];
             }
 
             /**
-             * @see #forward(float[][])
+             * @see Layer#forward(java.lang.Object[])
              */
             @Override
-            public float[][] forward(float[][] in) {
-                prevA = in;
-                Z = bifunctionMatrixVectors(dotProduct.apply(in, weights), biases[0], (a, b) -> add(a, b));
+            public Object[] forward(Object[] in) {
+                prevA = (float[][]) in;
+                Z = add(dotProduct.apply(prevA, weights), biases);
                 return activation.apply(Z, false);
             }
 
             /**
-             * @see #back(float[][], float[][], float,
-             * neuralnetwork.NNLib.QuadFunction, int)
+             * @see Layer#back(java.lang.Object[], float,
+             * neuralnetwork.NNLib.QuadFunction, int, boolean)
              */
             @Override
-            public float[][] back(float[][] dC, float[][] dZ_dA, float lr, QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> optimizer, int step) {
-                float[][] dA_dZ = activation.apply(Z, true);
-                float[][] dC_dZ;
-                if (dZ_dA == null) {//Output Layer
-                    if (dC.length == dA_dZ.length && dC[0].length == dA_dZ[0].length) {
-                        dC_dZ = multiply(dC, dA_dZ);
-                    } else {
-                        dC_dZ = dotProduct.apply(dC, dA_dZ);//For jacobian matrices
-                    }
-                } else {//Hidden Layer
-                    float[][] dC_dA = dotProduct.apply(dC, transpose(dZ_dA));
-                    if (dC_dA.length == dA_dZ.length && dC_dA[0].length == dA_dZ[0].length) {
-                        dC_dZ = multiply(dC_dA, dA_dZ);
-                    } else {
-                        dC_dZ = dotProduct.apply(dC_dA, dA_dZ);//For jacobian matrices
-                    }
+            public Object[] back(Object[] dC_dA_uncasted, float lr, QuadFunction<Integer, Float, float[][], float[][][], Object[]> optimizer, int step, boolean update) {
+                final float[][] dC_dA = (float[][]) dC_dA_uncasted;
+                final float[][] dA_dZ = activation.apply(Z, true);
+                final float[][] dC_dZ;
+                if (dC_dA.length == dA_dZ.length && dC_dA[0].length == dA_dZ[0].length) {
+                    dC_dZ = multiply(dC_dA, dA_dZ);
+                } else {
+                    dC_dZ = dotProduct.apply(dC_dA, dA_dZ);//For jacobian matrices
                 }
-                float[][] dC_dW = dotProduct.apply(transpose(prevA), dC_dZ);//prevA = dZ_dW;
-                float[][][][] updateW = null;
+                final float[][] dC_dW = dotProduct.apply(transpose(prevA), dC_dZ);//prevA = dZ_dW;
+                Object[] updateW;
                 while (true) {
                     try {
                         updateW = optimizer.apply(step, lr, dC_dW, updateStorageW);
                         break;
                     } catch (Exception e) {
-                        updateStorageW = append(updateStorageW, new float[][][]{create(nodesIn, nodesOut, 0)});
-                        updateStorageB = append(updateStorageB, new float[][][]{create(1, nodesOut, 0)});
+                        updateStorageW = append(updateStorageW, new float[1][nodesIn][nodesOut]);
+                        updateStorageB = append(updateStorageB, new float[1][1][nodesOut]);
                     }
                 }
-                float[][][][] updateB = optimizer.apply(step, lr, dC_dZ, updateStorageB);
-                float[][] gradientsW = updateW[0][0];
-                float[][] gradientsB = updateB[0][0];
-                updateStorageW = updateW[1];
-                updateStorageB = updateB[1];
-                super.dZ_dA = copy2d(weights);
-                tuneParameters(gradientsW, gradientsB);
-                return dC_dZ;
+                final Object[] updateB = optimizer.apply(step, lr, dC_dZ, updateStorageB);
+                updateStorageW = (float[][][]) updateW[1];
+                updateStorageB = (float[][][]) updateB[1];
+                final float[][] dC_dA_ = dotProduct.apply(dC_dZ, transpose(weights));
+                tuneParameters((float[][]) updateW[0], (float[][]) updateB[0], update);
+                return dC_dA_;
             }
 
-            private void tuneParameters(float[][] gradientsW, float[][] gradientsB) {
-                if (super.accumulationSteps > 1) {
-                    //Add to the accumulated gradients
-                    if (accumulated[0] == null) {
-                        accumulated[0] = gradientsW;
-                        accumulated[1] = gradientsB;
-                    } else {
-                        accumulated[0] = add(accumulated[0], gradientsW);
-                        accumulated[1] = add(accumulated[1], gradientsB);
-                    }
-                    stepsAccumulated++;
-                    if (stepsAccumulated >= super.accumulationSteps) {
-                        weights = subtract(weights, accumulated[0]);
-                        biases = subtract(biases, accumulated[1]);
-                        accumulated = new float[2][][];
-                        stepsAccumulated = 0;
-                    }
+            public void tuneParameters(float[][] gradientsW, float[][] gradientsB, boolean update) {
+                //Add to the accumulated gradients
+                if (accumulated[0] == null) {
+                    accumulated[0] = gradientsW;
+                    accumulated[1] = gradientsB;
                 } else {
-                    weights = subtract(weights, gradientsW);
-                    biases = subtract(biases, gradientsB);
+                    accumulated[0] = add(accumulated[0], gradientsW);
+                    accumulated[1] = add(accumulated[1], gradientsB);
+                }
+                if (update) {
+                    weights = subtract(weights, accumulated[0]);
+                    biases = subtract(biases, accumulated[1]);
+                    accumulated = new float[2][][];
                 }
             }
 
@@ -653,6 +622,262 @@ public class NNLib extends Application {
                 return "Dense(Nodes In: " + nodesIn + ", Nodes Out: " + nodesOut + ")";
             }
         }
+
+        public static class Conv extends Layer implements Serializable {
+
+            private float[][][][] filters;
+            private final int filterNum;
+            private final int filterChannels;
+            private final int filterHeight;
+            private final int filterWidth;
+            private float[] biases;
+            private final int padding;
+            private final int stride;
+            private BiFunction<float[][], Boolean, float[][]> activation;
+            private float[][][][][] updateStorageF;
+            private float[][][] updateStorageB;
+            private float[][][][] accumulatedF;
+            private float[] accumulatedB;
+            private float[][][] prevA;
+            private float[][][] Z;
+
+            public Conv(int numberOfFilters, int filterChannels, int filterHeight, int filterWidth, int padding, int stride, BiFunction<float[][], Boolean, float[][]> activation) {
+                filterNum = numberOfFilters;
+                this.filterChannels = filterChannels;
+                this.filterHeight = filterHeight;
+                this.filterWidth = filterWidth;
+                this.padding = padding;
+                this.stride = stride;
+                this.activation = activation;
+            }
+
+            /**
+             * @see Layer#initialize(java.util.Random)
+             */
+            @Override
+            public void initialize(Random random) {
+                filters = new float[filterNum][filterChannels][][];
+                biases = new float[filterNum];
+                for (int i = 0; i < filterNum; i++) {
+                    for (int j = 0; j < filterChannels; j++) {
+                        filters[i][j] = NNLib.randomize(new float[filterHeight][filterWidth], 2, -1, random);
+                    }
+                    biases[i] = random.nextFloat();
+                }
+                updateStorageF = new float[1][filterNum][filterChannels][filterHeight][filterWidth];
+                updateStorageB = new float[1][1][filterNum];
+                for (int i = 0; i < filterNum; i++) {
+                    System.out.print("[" + biases[i] + "] ");
+                }
+                System.out.println("");
+            }
+
+            /**
+             * @see Layer#forward(java.lang.Object[])
+             */
+            @Override
+            public Object[] forward(Object[] in) {
+                prevA = (float[][][]) in;
+                Z = NNLib.convolution3d(prevA, filters, biases, padding, stride);
+                return function2dOn3d(Z, a -> activation.apply(a, false));
+            }
+
+            /**
+             * @see Layer#back(java.lang.Object[], float,
+             * neuralnetwork.NNLib.QuadFunction, int, boolean)
+             */
+            @Override
+            public Object[] back(Object[] dC_dA_uncasted, float lr, QuadFunction<Integer, Float, float[][], float[][][], Object[]> optimizer, int step, boolean update) {
+                float[][][] dC_dA = (float[][][]) dC_dA_uncasted;
+                float[][][] dA_dZ = function2dOn3d(Z, a -> activation.apply(a, true));
+                float[][][][] dC_dZ = new float[1][][][];
+                if (dC_dA[0].length == dA_dZ[0].length && dC_dA[0][0].length == dA_dZ[0][0].length) {
+                    dC_dZ[0] = bifunction2dOn3d(dC_dA, dA_dZ, (a, b) -> multiply(a, b));
+                } else {
+                    dC_dZ[0] = bifunction2dOn3d(dC_dA, dA_dZ, (a, b) -> dotProduct.apply(a, b));
+                }
+                float[][][][] dC_dW = new float[filterNum][][][];
+                float[] dC_dB = new float[filterNum];
+                for (int i = 0; i < filterNum; i++) {
+                    dC_dW[i] = convolution3d(prevA, dC_dZ, new float[]{0}, 0, stride);
+                    dC_dB[i] = sum(dC_dZ[0][i]);
+                }
+
+                float[][][][] updateF = new float[filterNum][filterChannels][][];
+                for (int i = 0; i < filterNum; i++) {
+                    for (int j = 0; j < filterChannels; j++) {
+                        Object[] optimizedF;
+                        while (true) {
+                            try {
+                                optimizedF = optimizer.apply(step, lr, dC_dW[i][j], updateStorageF[i][j]);
+                                break;
+                            } catch (Exception e) {
+                                updateStorageF = append(updateStorageF, new float[1][filterNum][filterChannels][filterHeight][filterWidth]);
+                                updateStorageB = append(updateStorageB, new float[1][1][filterNum]);
+                            }
+                        }
+                        updateF[i][j] = (float[][]) optimizedF[0];
+                        updateStorageF[i][j] = (float[][][]) optimizedF[1];
+                    }
+                }
+
+                final Object[] optimizedB = optimizer.apply(step, lr, new float[][]{dC_dB}, updateStorageB);
+                float[][] updateB = (float[][]) optimizedB[0];
+                updateStorageB = (float[][][]) optimizedB[1];
+                for (int i = 0; i < filterNum; i++) {
+                    for (int j = 0; j < filterChannels; j++) {
+                        filters[i][j] = subtract(filters[i][j], updateF[i][j]);
+                    }
+                    biases[i] -= updateB[0][i];
+                }
+                return null;
+            }
+
+            /**
+             * @see Layer#randomize(float)
+             */
+            @Override
+            public void randomize(float range) {
+                throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+            }
+
+            /**
+             * @see Layer#mutate(float, float)
+             */
+            @Override
+            public void mutate(float range, float mutateRate) {
+                throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+            }
+
+            /**
+             * @see Layer#parametersToString()
+             */
+            @Override
+            public String parametersToString() {
+                throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+            }
+
+            /**
+             * @see Layer#clone()
+             */
+            @Override
+            public Layer clone() {
+                Conv copy = new Conv(filterNum, filterChannels, filterHeight, filterWidth, padding, stride, activation);
+                copy.updateStorageF = copy5d(updateStorageF);
+                copy.updateStorageB = copy3d(updateStorageB);
+                return copy;
+            }
+
+            /**
+             * @see Layer#toString()
+             */
+            @Override
+            public String toString() {
+                throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+            }
+        }
+
+        public static class Flatten extends Layer implements Serializable {
+
+            private final int channels;
+            private final int height;
+            private final int width;
+
+            public Flatten(int channelsIn, int heightIn, int widthIn) {
+                channels = channelsIn;
+                height = heightIn;
+                width = widthIn;
+            }
+
+            /**
+             * @see Layer#initialize(java.util.Random)
+             */
+            @Override
+            public void initialize(Random random) {
+            }
+
+            /**
+             * @see Layer#forward(java.lang.Object[])
+             */
+            @Override
+            public Object[] forward(Object[] in) {
+                final float[][][] convOut = (float[][][]) in;
+                print3d(convOut);
+                final float[][] flattened = new float[1][channels * height * width];
+                int index = 0;
+                for (int i = 0; i < channels; i++) {
+                    for (int j = 0; j < height; j++) {
+                        for (int k = 0; k < width; k++) {
+                            flattened[0][index] = convOut[i][j][k];
+                            index++;
+                        }
+                    }
+                }
+                print(flattened);
+                return flattened;
+            }
+
+            /**
+             * @see Layer#back(java.lang.Object[], float,
+             * neuralnetwork.NNLib.QuadFunction, int, boolean)
+             */
+            @Override
+            public Object[] back(Object[] dC_dA_uncasted, float lr, QuadFunction<Integer, Float, float[][], float[][][], Object[]> optimizer, int step, boolean update) {
+                final float[][] dC_dA = (float[][]) dC_dA_uncasted;
+                final float[][][] unflattened = new float[channels][height][width];
+                int index = 0;
+                for (int i = 0; i < channels; i++) {
+                    for (int j = 0; j < height; j++) {
+                        for (int k = 0; k < width; k++) {
+                            unflattened[i][j][k] = dC_dA[0][index];
+                            index++;
+                        }
+                    }
+                }
+                return unflattened;
+            }
+
+            /**
+             * @see Layer#randomize(float)
+             */
+            @Override
+            public void randomize(float range) {
+                throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+            }
+
+            /**
+             * @see Layer#mutate(float, float)
+             */
+            @Override
+            public void mutate(float range, float mutateRate) {
+                throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+            }
+
+            /**
+             * @see Layer#parametersToString()
+             */
+            @Override
+            public String parametersToString() {
+                return "Flatten Layer, no parameters";
+            }
+
+            /**
+             * @see Layer#clone()
+             */
+            @Override
+            public Layer clone() {
+                return new Flatten(channels, height, width);
+            }
+
+            /**
+             * @see Layer#toString()
+             */
+            @Override
+            public String toString() {
+                return "Flatten";
+            }
+
+        }
     }
 
     /**
@@ -672,13 +897,13 @@ public class NNLib extends Application {
      * is true, then the values are passed into the derivative of the desired
      * function.
      */
-    public static class ActivationFunction {
+    public static class Activation {
 
         public static final BiFunction<float[][], Boolean, float[][]> LINEAR = (matrix, derivative) -> {
             if (!derivative) {
                 return matrix;
             } else {
-                float[][] result = create(matrix.length, matrix[0].length, 1);
+                float[][] result = create2d(matrix.length, matrix[0].length, 1);
                 return result;
             }
         };
@@ -728,7 +953,7 @@ public class NNLib extends Application {
         public static final BiFunction<float[][], float[][], Object[]> QUADRATIC(double steepnessFactor) {
             final float steepness = (float) steepnessFactor;
             return (outputs, targets) -> {
-                double loss = sum(scale(steepness, square(subtract(outputs, targets)))) / outputs.length;//m(f(x) - y)^2 where f(x) is the output of the network and y is the target output
+                double loss = sum(scale(steepness, square(subtract(outputs, targets))));//m(f(x) - y)^2 where f(x) is the output of the network and y is the target output
                 return new Object[]{loss, scale(2 * steepness, subtract(outputs, targets))};//Derivative of the loss function for each sample, 2m(f(x) - y)
             };
         }
@@ -775,7 +1000,7 @@ public class NNLib extends Application {
             return (outputs, targets) -> {
                 int columns = outputs[0].length;
                 final float deltaSquared = steepness * steepness;
-                final float[][] ones = create(1, columns, 1);
+                final float[][] ones = create2d(1, columns, 1);
                 final float[][] a = subtract(outputs, targets);
                 final float[][] root = sqrt(add(ones, scale(square(a), 1 / deltaSquared)));
                 double loss = sum(scale(deltaSquared, subtract(root, ones)));
@@ -801,13 +1026,12 @@ public class NNLib extends Application {
      * QuadFunction are strictly for the time step, learning rate, and the
      * gradients respectively. The third parameter is an array of matrices to
      * store info such as previous updates, gradients, etc. The QuadFunction
-     * returns an array where its first element is a array with one element to
-     * hold the gradient update matrix and its second element is the storage
-     * array that is passed into the next call of the optimizer.
+     * returns an array where its first element is a matrix with the gradient
+     * update and its second element is the storage array(3 dimensional) that is
+     * passed into the next call of the optimizer.
      */
     public static class Optimizer {
 
-        //Should be final?
         public static final float beta = .9f;
         public static final float beta2 = .999f;
         public static final float e = .00000001f;
@@ -815,75 +1039,81 @@ public class NNLib extends Application {
         private static float[][] EWMA(float beta, float[][] prevStep, float[][] currentStep) {
             return add(scale(beta, prevStep), scale(1 - beta, currentStep));
         }
-        public static final QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> VANILLA = (step, lr, gradients, storage) -> {
-            return new float[][][][]{{scale(lr, gradients)}, null};
+        public static final QuadFunction<Integer, Float, float[][], float[][][], Object[]> VANILLA = (step, lr, gradients, storage) -> {
+            float[][] update = scale(lr, gradients);
+            return new Object[]{update, null};
         };
-        public static final QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> MOMENTUM = (step, lr, gradients, storage) -> {
+        public static final QuadFunction<Integer, Float, float[][], float[][][], Object[]> MOMENTUM = (step, lr, gradients, storage) -> {
             float[][] update = add(scale(beta, storage[0]), scale(lr, gradients));
-            return new float[][][][]{{update}, {update}};
+            float[][][] store = {update};
+            return new Object[]{update, store};
         };
-        public static final QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> NESTEROV = (step, lr, gradients, storage) -> {//Dozat's modification because calculating two gradients would take a lot of recoding
-            float[][] m = add(scale(beta, storage[0]), scale(lr, gradients));
-            float[][] update = add(scale(beta, m), scale(lr, gradients));
-            return new float[][][][]{{update}, {m}};
+        public static final QuadFunction<Integer, Float, float[][], float[][][], Object[]> NESTEROV = (step, lr, gradients, storage) -> {//Dozat's modification because calculating two gradients would take a lot of recoding
+//            float[][] m = add(scale(beta, storage[0]), scale(lr, gradients));
+//            float[][] update = add(scale(beta, m), scale(lr, gradients));
+            float[][] m = add(scale(beta, storage[0]), gradients);
+            float[][] update = scale(lr, add(gradients, scale(beta, m)));
+            float[][][] store = {m};
+            return new Object[]{update, store};
         };
-        public static final QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> ADAGRAD = (step, lr, gradients, storage) -> {
-            int rows = gradients.length;
-            float val = (1 / (float) Math.sqrt(sum(storage[0]) + e));
-            float[][] G = create(rows, rows, 0);
-            for (int i = 0; i < rows; i++) {
-                G[i][i] = val;
-            }
-            float[][] update = dotProduct.apply(scale(lr, G), gradients);
-            return new float[][][][]{{update}, {square(gradients)}};
+        public static final QuadFunction<Integer, Float, float[][], float[][][], Object[]> ADAGRAD = (step, lr, gradients, storage) -> {
+            float[][][] store = {add(storage[0], square(gradients))};
+            float[][] update = multiply(scale(lr, sqrt(add(store[0], create2d(gradients.length, gradients[0].length, e)))), gradients);
+            return new Object[]{update, store};
         };
-        public static final QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> ADADELTA = (step, lr, gradients, storage) -> {
-            float[][] epsilon = create(gradients.length, gradients[0].length, e);
+        public static final QuadFunction<Integer, Float, float[][], float[][][], Object[]> ADADELTA = (step, lr, gradients, storage) -> {
+            float[][] epsilon = create2d(gradients.length, gradients[0].length, e);
             float[][] gradientsE = EWMA(beta, storage[0], square(gradients));
             float[][] gradientsRMS = sqrt(add(gradientsE, epsilon));
             float[][] deltaRMS = sqrt(add(storage[1], epsilon));
             float[][] update = multiply(divide(deltaRMS, gradientsRMS), gradients);
             float[][] deltaE = EWMA(beta, storage[1], square(update));
-            return new float[][][][]{{update}, {gradientsE, deltaE}};
+            float[][][] store = {gradientsE, deltaE};
+            return new Object[]{update, store};
         };
-        public static final QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> RMSPROP = (step, lr, gradients, storage) -> {
+        public static final QuadFunction<Integer, Float, float[][], float[][][], Object[]> RMSPROP = (step, lr, gradients, storage) -> {
             float[][] s = EWMA(beta, storage[0], square(gradients));
             float[][] s_ = scale(1 / (1 - (float) Math.pow((double) beta, step)), s);//Bias correction
-            float[][] update = divide(scale(lr, gradients), add(sqrt(s_), create(s.length, s[0].length, e)));
-            return new float[][][][]{{update}, {s}};
+            float[][] update = divide(scale(lr, gradients), add(sqrt(s_), create2d(s.length, s[0].length, e)));
+            float[][][] store = {s};
+            return new Object[]{update, store};
         };
-        public static final QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> ADAM = (step, lr, gradients, storage) -> {
+        public static final QuadFunction<Integer, Float, float[][], float[][][], Object[]> ADAM = (step, lr, gradients, storage) -> {
             float[][] m = EWMA(beta, storage[0], gradients);
             float[][] v = EWMA(beta2, storage[1], square(gradients));
             float[][] m_ = scale(1 / (1 - (float) Math.pow((double) beta, step)), m);
             float[][] v_ = scale(1 / (1 - (float) Math.pow((double) beta2, step)), v);
-            float[][] update = divide(scale(lr, m_), add(sqrt(v_), create(v_.length, v_[0].length, e)));
-            return new float[][][][]{{update}, {m, v}};
+            float[][] update = divide(scale(lr, m_), add(sqrt(v_), create2d(v_.length, v_[0].length, e)));
+            float[][][] store = {m, v};
+            return new Object[]{update, store};
         };
-        public static final QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> ADAMAX = (step, lr, gradients, storage) -> {
+        public static final QuadFunction<Integer, Float, float[][], float[][][], Object[]> ADAMAX = (step, lr, gradients, storage) -> {
             float[][] m = EWMA(beta, storage[0], gradients);
             float[][] v = EWMA(beta2, storage[1], square(gradients));
             float[][] m_ = scale(m, 1 / (1 - (float) Math.pow((double) beta, step)));
             float[][] u = max(scale(beta2, storage[1]), abs(gradients));
-            float[][] update = divide(scale(lr, m_), add(u, create(u.length, u[0].length, e)));
-            return new float[][][][]{{update}, {m, v}};
+            float[][] update = divide(scale(lr, m_), add(u, create2d(u.length, u[0].length, e)));
+            float[][][] store = {m, v};
+            return new Object[]{update, store};
         };
-        public static final QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> NADAM = (step, lr, gradients, storage) -> {
+        public static final QuadFunction<Integer, Float, float[][], float[][][], Object[]> NADAM = (step, lr, gradients, storage) -> {
             int rows = gradients.length;
             int columns = gradients[0].length;
             float[][] m = EWMA(beta, storage[0], gradients);
             float[][] v = EWMA(beta2, storage[1], square(gradients));
             float[][] m_ = scale(1 / (1 - (float) Math.pow((double) beta, step)), m);
             float[][] v_ = scale(1 / (1 - (float) Math.pow((double) beta2, step)), v);
-            float[][] update = multiply(divide(create(rows, columns, lr), add(sqrt(v_), create(rows, columns, e))), add(scale(beta, m_), scale(scale(1 - beta, gradients), 1 / (1 - beta))));
-            return new float[][][][]{{update}, {m, v}};
+            float[][] update = multiply(divide(create2d(rows, columns, lr), add(sqrt(v_), create2d(rows, columns, e))), add(scale(beta, m_), scale(scale(1 - beta, gradients), 1 / (1 - beta))));
+            float[][][] store = {m, v};
+            return new Object[]{update, store};
         };
-        public static final QuadFunction<Integer, Float, float[][], float[][][], float[][][][]> AMSGRAD = (step, lr, gradients, storage) -> {
+        public static final QuadFunction<Integer, Float, float[][], float[][][], Object[]> AMSGRAD = (step, lr, gradients, storage) -> {
             float[][] m = EWMA(beta, storage[0], gradients);
             float[][] v = EWMA(beta2, storage[1], square(gradients));
             float[][] v_ = max(storage[1], v);
-            float[][] update = divide(scale(lr, m), add(sqrt(v_), create(v_.length, v_[0].length, e)));
-            return new float[][][][]{{update}, {m, v}};
+            float[][] update = divide(scale(lr, m), add(sqrt(v_), create2d(v_.length, v_[0].length, e)));
+            float[][][] store = {m, v};
+            return new Object[]{update, store};
         };
     }
 
@@ -901,15 +1131,15 @@ public class NNLib extends Application {
     public static float[][] normalizeZScore(float[][] oneRow) {
         int elements = oneRow[0].length;
         float mean = sum(oneRow) / elements;
-        float deviation = (float) (Math.sqrt(sum(square(subtract(oneRow, create(1, elements, mean)))) / (mean)));
-        return divide(subtract(oneRow, create(1, elements, mean)), create(1, elements, deviation));
+        float deviation = (float) (Math.sqrt(sum(square(subtract(oneRow, create2d(1, elements, mean)))) / (mean)));
+        return divide(subtract(oneRow, create2d(1, elements, mean)), create2d(1, elements, deviation));
     }
 
     public static float[][] normalizeTanh(float[][] oneRow) {
         int elements = oneRow[0].length;
         float[][] result = new float[1][elements];
         float mean = sum(oneRow) / elements;
-        float deviation = (float) (Math.sqrt(sum(square(subtract(oneRow, create(1, elements, mean)))) / mean));
+        float deviation = (float) (Math.sqrt(sum(square(subtract(oneRow, create2d(1, elements, mean)))) / mean));
         for (int i = 0; i < elements; i++) {
             result[0][i] = (.5f * (tanh((.01f * ((oneRow[0][i] - mean) / (deviation))), false) + 1));//Tanh estimator normalization
         }
@@ -985,7 +1215,7 @@ public class NNLib extends Application {
         float[][] result = matrix;
 //        float[][] result = functionMatrixVectors(matrix, vector -> subtract(vector, create(1, cols, max(vector))));//Stabilizing
         result = exp(result);
-        return functionMatrixVectors(result, vector -> divide(vector, create(1, cols, sum(vector))));
+        return functionMatrixVectors(result, vector -> divide(vector, create2d(1, cols, sum(vector))));
     }
 
     public static void setThreads(int numberOfThreads) {
@@ -1045,7 +1275,6 @@ public class NNLib extends Application {
             try {
                 threadArray[i].join();
             } catch (InterruptedException e) {
-
             }
         }
         return result;
@@ -1073,6 +1302,23 @@ public class NNLib extends Application {
         System.out.print(arr2dToString(matrix));
     }
 
+    public static void print3d(float[][][] arr3d) {
+        int depth = arr3d.length;
+        for (int i = 0; i < depth; i++) {
+            System.out.println("Depth " + i + ": ");
+            System.out.print(arr2dToString(arr3d[i]));
+        }
+    }
+
+    public static void print3d(float[][][] arr3d, String label) {
+        int depth = arr3d.length;
+        System.out.println(label + ":");
+        for (int i = 0; i < depth; i++) {
+            System.out.println("Depth " + i + ": ");
+            System.out.print(arr2dToString(arr3d[i]));
+        }
+    }
+
     public static void printDimensions(float[][] matrix) {
         System.out.println("Rows: " + matrix.length + " Columns: " + matrix[0].length);
     }
@@ -1089,12 +1335,34 @@ public class NNLib extends Application {
         return result;
     }
 
-    public static float[][] create(int rows, int columns, float valueToAllElements) {
+    public static float[] create1d(int columns, float valueToAllElements) {
+        float[] result = new float[columns];
+        for (int i = 0; i < columns; i++) {
+            result[i] = valueToAllElements;
+        }
+        return result;
+    }
+
+    public static float[][] create2d(int rows, int columns, float valueToAllElements) {
         float[][] result = new float[rows][columns];
         for (int i = 0; i < rows; i++) {
-            for (int j = 0; j < columns; j++) {
-                result[i][j] = valueToAllElements;
-            }
+            result[i] = create1d(columns, valueToAllElements);
+        }
+        return result;
+    }
+
+    public static float[][][] create3d(int depth, int rows, int columns, float valueToAllElements) {
+        float[][][] result = new float[depth][][];
+        for (int i = 0; i < depth; i++) {
+            result[i] = create2d(rows, columns, valueToAllElements);
+        }
+        return result;
+    }
+
+    public static float[][][][] create4d(int dim4d, int dim3d, int dim2d, int dim1d, float valueToAllElements) {
+        float[][][][] result = new float[dim4d][][][];
+        for (int i = 0; i < dim4d; i++) {
+            result[i] = create3d(dim3d, dim2d, dim1d, valueToAllElements);
         }
         return result;
     }
@@ -1233,7 +1501,7 @@ public class NNLib extends Application {
     public static float[][] oneHot(float[][] matrix) {
         int rows = matrix.length;
         int columns = matrix[0].length;
-        float[][] result = create(rows, columns, 0);
+        float[][] result = create2d(rows, columns, 0);
         float max = matrix[0][0];
         int x = 0;
         int y = 0;
@@ -1324,7 +1592,15 @@ public class NNLib extends Application {
     }
 
     public static float[][][] copy3d(float[][][] arr3d) {
-        return Arrays.stream(arr3d).map(m2d -> copy2d(m2d)).toArray(a -> arr3d.clone());
+        return Arrays.stream(arr3d).map(el -> copy2d(el)).toArray(a -> arr3d.clone());
+    }
+
+    public static float[][][][] copy4d(float[][][][] arr4d) {
+        return Arrays.stream(arr4d).map(el -> copy3d(el)).toArray(a -> arr4d.clone());
+    }
+
+    public static float[][][][][] copy5d(float[][][][][] arr5d) {
+        return Arrays.stream(arr5d).map(el -> copy4d(el)).toArray(a -> arr5d.clone());
     }
 
     /**
@@ -1352,6 +1628,203 @@ public class NNLib extends Application {
                 result[index] = array[j];
                 index++;
             }
+        }
+        return result;
+    }
+
+    public static int getDimensions(Object[] arr) {
+        int dimensions = 0;
+        Class type = arr.getClass();
+        while (type.isArray()) {
+            dimensions++;
+            type = type.getComponentType();
+        }
+        return dimensions;
+    }
+
+    public static Class getDeepType(Object[] arr) {
+        Class type = arr.getClass().getComponentType();
+        while (type.isArray()) {
+            type = type.getComponentType();
+        }
+        return type;
+    }
+
+    public static float[] flatten(float[][] matrix) {
+        int rows = matrix.length;
+        int cols = matrix[0].length;
+        float[] result = new float[rows * cols];
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < cols; j++) {
+                result[(i * cols) + j] = matrix[i][j];
+            }
+        }
+        return result;
+    }
+
+    public static float[][] unflatten(float[] flattened, int rows, int cols) {
+        float[][] result = new float[rows][cols];
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < cols; j++) {
+                result[i][j] = flattened[(i * cols) + j];
+            }
+        }
+        return result;
+    }
+
+    public static float[][] convolution2d(float[][] input, float[][] filter, float bias, int padding, int stride) {
+        int filterHeight = filter.length;
+        int filterWidth = filter[0].length;
+        int inputHeight = input.length;
+        int inputWidth = input[0].length;
+        int addedSize = padding + padding;
+        int paddedHeight = inputHeight + addedSize;
+        int paddedWidth = inputWidth + addedSize;
+        float[][] padded;
+        if (padding > 0) {
+            padded = new float[paddedHeight][paddedWidth];
+            int endRow = paddedHeight - padding;
+            int endCol = paddedWidth - padding;
+            for (int j = 0; j < padding; j++) {//Top
+                for (int k = 0; k < padding; k++) {
+                    padded[j][k] = 0;
+                }
+            }
+            for (int j = endRow; j < paddedHeight; j++) {//Bottom
+                for (int k = endCol; k < paddedWidth; k++) {
+                    padded[j][k] = 0;
+                }
+            }
+            for (int j = padding; j < paddedHeight; j++) {//Left
+                for (int k = 0; k < padding; k++) {
+                    padded[j][k] = 0;
+                }
+            }
+            for (int j = padding; j < paddedHeight; j++) {//Right
+                for (int k = endCol - 1; k < padding; k++) {
+                    padded[j][k] = 0;
+                }
+            }
+            for (int j = padding; j < endRow; j++) {//Matrix numbers
+                for (int k = padding; k < endCol; k++) {
+                    padded[j][k] = input[j - padding][k - padding];
+                }
+            }
+        } else {
+            padded = input;
+        }
+        int resultHeight = (paddedHeight - filterHeight) / stride + 1;
+        int resultWidth = (paddedWidth - filterWidth) / stride + 1;
+        float[][] result = new float[resultHeight][resultWidth];
+        for (int rRow = 0; rRow < resultHeight; rRow++) {
+            int startRow = rRow * stride;
+            int boundRow = startRow + filterHeight;
+            for (int rCol = 0; rCol < resultWidth; rCol++) {
+                int startCol = rCol * stride;
+                int boundCol = startCol + filterWidth;
+                float val = 0;
+                for (int iRow = startRow; iRow < boundRow; iRow++) {
+                    int filterRow = iRow - startRow;
+                    for (int iCol = startCol; iCol < boundCol; iCol++) {
+                        val += padded[iRow][iCol] * filter[filterRow][iCol - startCol];
+                    }
+                }
+                result[rRow][rCol] = val + bias;
+            }
+        }
+        return result;
+    }
+
+    public static float[][][] convolution3d(float[][][] input, float[][][][] filters, float[] biases, int padding, int stride) {
+        int resultDepth = filters.length;
+        int filterDepth = filters[0].length;
+        int filterHeight = filters[0][0].length;
+        int filterWidth = filters[0][0][0].length;
+        int inputHeight = input[0].length;
+        int inputWidth = input[0][0].length;
+        float[][][] padded;
+        int addedSize = padding + padding;
+        int paddedHeight = inputHeight + addedSize;
+        int paddedWidth = inputWidth + addedSize;
+        if (padding > 0) {
+            padded = new float[filterDepth][paddedHeight][paddedWidth];
+            int endRow = paddedHeight - padding;
+            int endCol = paddedWidth - padding;
+            for (int i = 0; i < filterDepth; i++) {
+                float[][] matrix = input[i];
+                float[][] result = padded[i];
+                for (int j = 0; j < padding; j++) {//Top
+                    for (int k = 0; k < padding; k++) {
+                        result[j][k] = 0;
+                    }
+                }
+                for (int j = endRow; j < paddedHeight; j++) {//Bottom
+                    for (int k = endCol; k < paddedWidth; k++) {
+                        result[j][k] = 0;
+                    }
+                }
+                for (int j = padding; j < paddedHeight; j++) {//Left
+                    for (int k = 0; k < padding; k++) {
+                        result[j][k] = 0;
+                    }
+                }
+                for (int j = padding; j < paddedHeight; j++) {//Right
+                    for (int k = endCol - 1; k < padding; k++) {
+                        result[j][k] = 0;
+                    }
+                }
+                for (int j = padding; j < endRow; j++) {//Matrix numbers
+                    for (int k = padding; k < endCol; k++) {
+                        result[j][k] = matrix[j - padding][k - padding];
+                    }
+                }
+            }
+        } else {
+            padded = input;
+        }
+        int resultHeight = (paddedHeight - filterHeight) / stride + 1;
+        int resultWidth = (paddedWidth - filterWidth) / stride + 1;
+        float[][][] result = new float[resultDepth][resultHeight][resultWidth];
+        for (int rDepth = 0; rDepth < resultDepth; rDepth++) {
+            float[][][] filter = filters[rDepth];
+            for (int rRow = 0; rRow < resultHeight; rRow++) {
+                int startRow = rRow * stride;
+                int boundRow = startRow + filterHeight;
+                for (int rCol = 0; rCol < resultWidth; rCol++) {
+                    int startCol = rCol * stride;
+                    int boundCol = startCol + filterWidth;
+                    float val = 0;
+                    for (int iDepth = 0; iDepth < filterDepth; iDepth++) {
+                        float[][] filterLayer = filter[iDepth];
+                        float[][] inputLayer = padded[iDepth];
+                        for (int iRow = startRow; iRow < boundRow; iRow++) {
+                            int filterRow = iRow - startRow;
+                            for (int iCol = startCol; iCol < boundCol; iCol++) {
+                                val += inputLayer[iRow][iCol] * filterLayer[filterRow][iCol - startCol];
+                            }
+                        }
+                    }
+                    result[rDepth][rRow][rCol] = val + biases[rDepth];
+                }
+            }
+        }
+        return result;
+    }
+
+    public static float[][][] function2dOn3d(float[][][] arr3d, Function<float[][], float[][]> function) {
+        int depth = arr3d.length;
+        float[][][] result = new float[depth][][];
+        for (int i = 0; i < depth; i++) {
+            result[i] = function.apply(arr3d[i]);
+        }
+        return result;
+    }
+
+    public static float[][][] bifunction2dOn3d(float[][][] arr3d1, float[][][] arr3d2, BiFunction<float[][], float[][], float[][]> bifunction) {
+        int depth = arr3d1.length;
+        float[][][] result = new float[depth][][];
+        for (int i = 0; i < depth; i++) {
+            result[i] = bifunction.apply(arr3d1[i], arr3d2[i]);
         }
         return result;
     }
@@ -1397,6 +1870,7 @@ public class NNLib extends Application {
         }
         return result;
     }
+
     private static final LinkedList<Function<NN, Stage>> INFOLIST = new LinkedList<>();
     private static final LinkedList<NN> NNLIST = new LinkedList<>();
     private static int updateRate = 50;
@@ -1430,7 +1904,7 @@ public class NNLib extends Application {
             NumberAxis xAxis = new NumberAxis();
             NumberAxis yAxis = new NumberAxis();
             xAxis.setAnimated(false);
-            xAxis.setLabel("Epochs");
+            xAxis.setLabel("Steps");
             yAxis.setAnimated(false);
             yAxis.setLabel(mode ? "Accuracy" : "Loss");
             if (mode) {
@@ -1442,9 +1916,9 @@ public class NNLib extends Application {
             chart.getData().add(series);
             updaterBuilder(handler -> {
                 if (mode) {
-                    series.getData().add(new XYChart.Data<>(nn.epochs, 1 / Math.pow(100 * Math.E, nn.loss)));
+                    series.getData().add(new XYChart.Data<>(nn.iterations, 1 / Math.pow(100 * Math.E, nn.loss)));
                 } else {
-                    series.getData().add(new XYChart.Data<>(nn.epochs, nn.loss));
+                    series.getData().add(new XYChart.Data<>(nn.iterations, nn.loss));
                 }
             });
             Stage stage = new Stage();

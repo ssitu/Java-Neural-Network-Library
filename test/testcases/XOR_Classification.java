@@ -1,7 +1,8 @@
-package neuralnetwork;
+package testcases;
 
+import nnlibrary.NNLib;
+import nnlibrary.NNLib.*;
 import java.util.Random;
-import neuralnetwork.NNLib.*;
 
 public class XOR_Classification {
 
@@ -31,38 +32,51 @@ public class XOR_Classification {
         NN nn = new NN(
                 "xor_classification",//Name for Saving & Graph Title
                 seed,//Seed For Reproducibility
-                .001f,//Learning Rate for Optimizer
+                0,//Learning Rate for Optimizer
                 LossFunction.CROSSENTROPY(1),//Loss/Cost/Error Function
-                Optimizer.NESTEROV,//Gradient Descent Optimizer
-                new Layer.Dense(2, 3, CUSTOM, Initializer.XAVIER),
-                new Layer.Dense(3, 2, ActivationFunction.SOFTMAX, Initializer.XAVIER)
+                Optimizer.ADADELTA,//Gradient Descent Optimizer
+                new Layer.Dense(2, 4, CUSTOM, Initializer.XAVIER),
+                new Layer.Dense(4, 2, Activation.SOFTMAX, Initializer.XAVIER)
         );
+        nn.setBatchSize(4);
         System.out.println("Seed: " + seed);
         System.out.println("NN Length: " + nn.length);
         System.out.println(nn);
-        float[][][] data = {
+        float[][][][] data = {
             {//Inputs
-                {0, 0},
-                {0, 1},
-                {1, 0},
-                {1, 1}
+                {{0, 0}},
+                {{0, 1}},
+                {{1, 0}},
+                {{1, 1}}
             },
             {//Labels: first output node = true, second output node = false;
-                {0, 1},
-                {1, 0},
-                {1, 0},
-                {0, 1}
+                {{0, 1}},
+                {{1, 0}},
+                {{1, 0}},
+                {{0, 1}}
             }
         };
         NNLib.showInfo(NNLib.infoLayers, nn);
         NNLib.showInfo(NNLib.infoGraph(false), nn);
         for (int i = 0; i < 100_000_000; i++) {
-            int index = nn.getRandom().nextInt(4);
-            nn.backpropagation(new float[][]{data[0][index]}, new float[][]{data[1][index]});
-//            nn.backpropagation(data[0], data[1]);
-            if (PRINT && i % 100_000 == 0) {
-                NNLib.print(data[0], "Dataset Inputs");
-                NNLib.print(nn.feedforward(data[0]), "Outputs");
+            if (i % 4 == 0) {
+                nn.backpropagation(data[0][0], data[1][0]);
+            } else if (i % 4 == 1) {
+                nn.backpropagation(data[0][1], data[1][1]);
+            } else if (i % 4 == 2) {
+                nn.backpropagation(data[0][2], data[1][2]);
+            } else if (i % 4 == 3) {
+                nn.backpropagation(data[0][3], data[1][3]);
+            }
+            if (PRINT && i % 100000 == 0) {
+                System.out.println("XOR Inputs:");
+                float[][] inputs = NNLib.append(data[0][0], data[0][1], data[0][2], data[0][3]);
+                NNLib.print(inputs);
+                System.out.println("Outputs:");
+                NNLib.print((float[][]) nn.feedforward(data[0][0]));
+                NNLib.print((float[][]) nn.feedforward(data[0][1]));
+                NNLib.print((float[][]) nn.feedforward(data[0][2]));
+                NNLib.print((float[][]) nn.feedforward(data[0][3]));
                 System.out.println("");
             }
         }
