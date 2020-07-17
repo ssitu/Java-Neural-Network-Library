@@ -11,8 +11,8 @@ public class ConvolutionalNeuralNetwork {
         long seed = new Random().nextLong();
         System.out.println("Seed: " + seed);
         NN nn = new NN("Conv", seed, .001f, LossFunction.QUADRATIC(.5), Optimizer.ADADELTA,
-                new Conv(2, 1, 2, 2, 1, a -> NNlib.pad(a, 1, 1), Activation.RELU),//1x3x3 + 1 pad = 1x5x5, 1x5x5 conv 2x1x2x2 = 2x4x4
-                new Conv(1, 2, 2, 2, 1, a -> NNlib.pad(a, 0, 0), Activation.RELU),//2x4x4 conv 1x2x2x2 = 1x3x3
+                new Conv(4, 1, 2, 2, 1, a -> NNlib.pad(a, 1, 1), Activation.RELU),//1x3x3 + 1 pad = 1x5x5, 1x5x5 conv 2x1x2x2 = 2x4x4
+                new Conv(1, 4, 2, 2, 1, a -> NNlib.pad(a, 0, 0), Activation.RELU),//2x4x4 conv 1x2x2x2 = 1x3x3
                 new Flatten(1, 3, 3),//1x3x3 = 9
                 new Dense(9, 1, Activation.SIGMOID, Initializer.XAVIER));
         NNlib.showInfo(NNlib.infoLayers, nn);
