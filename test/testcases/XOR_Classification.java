@@ -1,7 +1,7 @@
 package testcases;
 
-import nnlibrary.NNLib;
-import nnlibrary.NNLib.*;
+import nnlibrary.NNlib;
+import nnlibrary.NNlib.*;
 import java.util.Random;
 
 public class XOR_Classification {
@@ -12,14 +12,14 @@ public class XOR_Classification {
             int rows = matrix.length;
             int columns = matrix[0].length;
             if (!derivative) {
-                return NNLib.max(NNLib.function(matrix, val -> NNLib.tanh(val, false)), matrix);
+                return NNlib.max(NNlib.function(matrix, val -> NNlib.tanh(val, false)), matrix);
             } else {
                 float[][] result = new float[rows][columns];
                 for (int i = 0; i < rows; i++) {
                     for (int j = 0; j < columns; j++) {
                         float val = matrix[i][j];
-                        if (NNLib.tanh(val, false) > val) {
-                            result[i][j] = NNLib.tanh(val, true);
+                        if (NNlib.tanh(val, false) > val) {
+                            result[i][j] = NNlib.tanh(val, true);
                         } else {
                             result[i][j] = 1;
                         }
@@ -56,8 +56,8 @@ public class XOR_Classification {
                 {{0, 1}}
             }
         };
-        NNLib.showInfo(NNLib.infoLayers, nn);
-        NNLib.showInfo(NNLib.infoGraph(false), nn);
+        NNlib.showInfo(NNlib.infoLayers, nn);
+        NNlib.showInfo(NNlib.infoGraph(false), nn);
         for (int i = 0; i < 100_000_000; i++) {
             if (i % 4 == 0) {
                 nn.backpropagation(data[0][0], data[1][0]);
@@ -70,13 +70,13 @@ public class XOR_Classification {
             }
             if (PRINT && i % 100000 == 0) {
                 System.out.println("XOR Inputs:");
-                float[][] inputs = NNLib.append(data[0][0], data[0][1], data[0][2], data[0][3]);
-                NNLib.print(inputs);
+                float[][] inputs = NNlib.append(data[0][0], data[0][1], data[0][2], data[0][3]);
+                NNlib.print(inputs);
                 System.out.println("Outputs:");
-                NNLib.print((float[][]) nn.feedforward(data[0][0]));
-                NNLib.print((float[][]) nn.feedforward(data[0][1]));
-                NNLib.print((float[][]) nn.feedforward(data[0][2]));
-                NNLib.print((float[][]) nn.feedforward(data[0][3]));
+                NNlib.print((float[][]) nn.feedforward(data[0][0]));
+                NNlib.print((float[][]) nn.feedforward(data[0][1]));
+                NNlib.print((float[][]) nn.feedforward(data[0][2]));
+                NNlib.print((float[][]) nn.feedforward(data[0][3]));
                 System.out.println("");
             }
         }

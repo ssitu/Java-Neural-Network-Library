@@ -27,7 +27,7 @@ import javafx.stage.Screen;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 
-public class NNLib extends Application {
+public class NNlib extends Application {
 
     /**
      * A serializable version of java's Function class
@@ -492,8 +492,8 @@ public class NNLib extends Application {
              */
             @Override
             public void initialize(Random random) {
-                weights = NNLib.randomize(new float[nodesIn][nodesOut], 2, -1, random);//values on interval [-1,1]
-                biases = NNLib.randomize(new float[1][nodesOut], 2, -1, random);//values on interval [-1,1]
+                weights = NNlib.randomize(new float[nodesIn][nodesOut], 2, -1, random);//values on interval [-1,1]
+                biases = NNlib.randomize(new float[1][nodesOut], 2, -1, random);//values on interval [-1,1]
                 weights = initializer.apply(weights, nodesIn);
                 updateStorageW = new float[1][nodesIn][nodesOut];
                 updateStorageB = new float[1][1][nodesOut];
@@ -564,8 +564,8 @@ public class NNLib extends Application {
              */
             @Override
             public void randomize(float range) {
-                weights = NNLib.randomize(weights, range, -range / 2);
-                biases = NNLib.randomize(biases, range, -range / 2);
+                weights = NNlib.randomize(weights, range, -range / 2);
+                biases = NNlib.randomize(biases, range, -range / 2);
             }
 
             /**
@@ -661,7 +661,7 @@ public class NNLib extends Application {
                 biases = new float[filterNum];
                 for (int i = 0; i < filterNum; i++) {
                     for (int j = 0; j < filterChannels; j++) {
-                        filters[i][j] = NNLib.randomize(new float[filterHeight][filterWidth], 2, -1, random);
+                        filters[i][j] = NNlib.randomize(new float[filterHeight][filterWidth], 2, -1, random);
                     }
                     biases[i] = random.nextFloat();
                 }
@@ -675,7 +675,7 @@ public class NNLib extends Application {
             @Override
             public Object[] forward(Object[] in) {
                 prevA = function2dOn3d((float[][][]) in, modifier);
-                Z = NNLib.convolution3d(prevA, filters, biases, stride);
+                Z = NNlib.convolution3d(prevA, filters, biases, stride);
                 return function2dOn3d(Z, a -> activation.apply(a, false));
             }
 
@@ -714,7 +714,7 @@ public class NNLib extends Application {
                                 optimizedF = optimizer.apply(step, lr, dC_dW[i][j], updateStorageF[index]);
                                 break;
                             } catch (ArrayIndexOutOfBoundsException e) {
-                                e.printStackTrace();
+//                                e.printStackTrace();
                                 updateStorageF[index] = append(updateStorageF[index], new float[1][filterHeight][filterWidth]);
                                 updateStorageB = append(updateStorageB, new float[1][1][filterNum]);
                             }
@@ -2036,7 +2036,7 @@ public class NNLib extends Application {
             Thread launchThread = new Thread(() -> {
                 try {
                     running = true;
-                    launch(NNLib.class);
+                    launch(NNlib.class);
                 } catch (IllegalStateException e) {
                     infoUpdater.setCycleCount(-1);
                     infoUpdater.play();

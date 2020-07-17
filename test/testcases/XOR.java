@@ -1,7 +1,7 @@
 package testcases;
 
-import nnlibrary.NNLib;
-import nnlibrary.NNLib.*;
+import nnlibrary.NNlib;
+import nnlibrary.NNlib.*;
 import java.util.Random;
 
 public class XOR {
@@ -38,10 +38,10 @@ public class XOR {
                 {{0}}//F
             }
         };
-        NNLib.setInfoUpdateRate(10);//The info panels will update every 10 milliseconds
-        NNLib.showInfo(NNLib.infoLayers, nn);//Displays the weights and biases of each layer. Can be very intensive if used on a large network with a fast update rate
-        NNLib.showInfo(NNLib.infoGraph(true), nn);//Displays an accuracy over number of times backpropgated graph
-        NNLib.showInfo(NNLib.infoGraph(false), nn);//Displays a cost over number of times backpropagated graph
+        NNlib.setInfoUpdateRate(10);//The info panels will update every 10 milliseconds
+        NNlib.showInfo(NNlib.infoLayers, nn);//Displays the weights and biases of each layer. Can be very intensive if used on a large network with a fast update rate
+        NNlib.showInfo(NNlib.infoGraph(true), nn);//Displays an accuracy over number of times backpropgated graph
+        NNlib.showInfo(NNlib.infoGraph(false), nn);//Displays a cost over number of times backpropagated graph
         for (int i = 0; i < 100_000_000; i++) {
             if (BATCHSIZE == 1) {
 //                //Get a random data pair with the NN's seed
@@ -60,13 +60,13 @@ public class XOR {
             }
             if (PRINT && i % 100000 == 0) {
                 System.out.println("XOR Inputs:");
-                float[][] inputs = NNLib.append(dataset[0][0], dataset[0][1], dataset[0][2], dataset[0][3]);
-                NNLib.print(inputs);
+                float[][] inputs = NNlib.append(dataset[0][0], dataset[0][1], dataset[0][2], dataset[0][3]);
+                NNlib.print(inputs);
                 System.out.println("Outputs:");
-                NNLib.print((float[][]) nn.feedforward(dataset[0][0]));
-                NNLib.print((float[][]) nn.feedforward(dataset[0][1]));
-                NNLib.print((float[][]) nn.feedforward(dataset[0][2]));
-                NNLib.print((float[][]) nn.feedforward(dataset[0][3]));
+                NNlib.print((float[][]) nn.feedforward(dataset[0][0]));
+                NNlib.print((float[][]) nn.feedforward(dataset[0][1]));
+                NNlib.print((float[][]) nn.feedforward(dataset[0][2]));
+                NNlib.print((float[][]) nn.feedforward(dataset[0][3]));
                 System.out.println("");
             }
         }
