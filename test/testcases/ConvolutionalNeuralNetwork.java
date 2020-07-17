@@ -65,6 +65,7 @@ public class ConvolutionalNeuralNetwork {
                 print(label2);
                 print(label3);
                 print(label4);
+                System.out.println("Outputs:");
                 print((float[][]) nn.feedforward(input1));
                 print((float[][]) nn.feedforward(input2));
                 print((float[][]) nn.feedforward(input3));

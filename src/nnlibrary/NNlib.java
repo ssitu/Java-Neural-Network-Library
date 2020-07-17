@@ -695,9 +695,6 @@ public class NNlib extends Application {
                 }
                 float[][][][] dC_dW = new float[filterNum][filterChannels][][];
                 float[] dC_dB = new float[filterNum];
-//                System.out.println("dC_dW " + getDimensions(dC_dW));
-//                System.out.println("prevA " + getDimensions(prevA));
-//                System.out.println("dC_dZ " + getDimensions(dC_dZ));
                 for (int i = 0; i < filterNum; i++) {
                     for (int j = 0; j < filterChannels; j++) {
                         dC_dW[i][j] = convolution3d(new float[][][]{prevA[j]}, new float[][][][]{{dC_dZ[i]}}, new float[]{0}, stride)[0];
@@ -714,7 +711,6 @@ public class NNlib extends Application {
                                 optimizedF = optimizer.apply(step, lr, dC_dW[i][j], updateStorageF[index]);
                                 break;
                             } catch (ArrayIndexOutOfBoundsException e) {
-//                                e.printStackTrace();
                                 updateStorageF[index] = append(updateStorageF[index], new float[1][filterHeight][filterWidth]);
                                 updateStorageB = append(updateStorageB, new float[1][1][filterNum]);
                             }
@@ -741,17 +737,12 @@ public class NNlib extends Application {
                 }
                 float[][][] dC_dZ_dilated_padded = function2dOn3d(function2dOn3d(dC_dZ, a -> dilate(a, stride - 1, stride - 1)), a -> pad(a, filterHeight - 1, filterWidth - 1));
                 float[][][] dC_dZ_modified = dC_dZ_dilated_padded;
-//                System.out.println("dC_dZ_modified " + getDimensions(dC_dZ_modified));
-//                System.out.println("rotatedFilters " + getDimensions(rotatedFilters));
                 dC_dA = new float[filterChannels][prevA[0].length][prevA[0][0].length];
                 for (int i = 0; i < filterNum; i++) {
                     for (int j = 0; j < filterChannels; j++) {
-//                        System.out.println("rotatedFilters[i] " + getDimensions(rotatedFilters[i]));
-                        dC_dA[j] = add(dC_dA[j],convolution3d(new float[][][]{dC_dZ_modified[i]}, new float[][][][]{{rotatedFilters[i][j]}}, new float[filterNum], 1)[0]);
+                        dC_dA[j] = add(dC_dA[j], convolution3d(new float[][][]{dC_dZ_modified[i]}, new float[][][][]{{rotatedFilters[i][j]}}, new float[filterNum], 1)[0]);
                     }
                 }
-//                print3d(dC_dA);
-//                System.out.println("dC_dA " + getDimensions(dC_dA));
                 return dC_dA;
             }
 
@@ -760,7 +751,12 @@ public class NNlib extends Application {
              */
             @Override
             public void randomize(float range) {
-                throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+                for (int i = 0; i < filterNum; i++) {
+                    for (int j = 0; j < filterChannels; j++) {
+                        NNlib.randomize(filters[i][j], range, -range / 2);
+                    }
+                    biases[i] = (float) Math.random() * range + -range / 2;
+                }
             }
 
             /**
@@ -768,7 +764,20 @@ public class NNlib extends Application {
              */
             @Override
             public void mutate(float range, float mutateRate) {
-                throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+                for (int i = 0; i < filterNum; i++) {
+                    for (int j = 0; j < filterChannels; j++) {
+                        for (int k = 0; k < filterHeight; k++) {
+                            for (int l = 0; l < filterWidth; l++) {
+                                if (Math.random() < mutateRate) {
+                                    filters[i][j][k][l] = (float) Math.random() * range + -range / 2;
+                                }
+                            }
+                        }
+                    }
+                    if (Math.random() < mutateRate) {
+                        biases[i] = (float) Math.random() * range + -range / 2;
+                    }
+                }
             }
 
             /**
@@ -871,7 +880,6 @@ public class NNlib extends Application {
              */
             @Override
             public void randomize(float range) {
-                throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
             }
 
             /**
@@ -879,7 +887,6 @@ public class NNlib extends Application {
              */
             @Override
             public void mutate(float range, float mutateRate) {
-                throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
             }
 
             /**
@@ -1077,9 +1084,7 @@ public class NNlib extends Application {
             float[][][] store = {update};
             return new Object[]{update, store};
         };
-        public static final QuadFunction<Integer, Float, float[][], float[][][], Object[]> NESTEROV = (step, lr, gradients, storage) -> {//Dozat's modification because calculating two gradients would take a lot of recoding
-//            float[][] m = add(scale(beta, storage[0]), scale(lr, gradients));
-//            float[][] update = add(scale(beta, m), scale(lr, gradients));
+        public static final QuadFunction<Integer, Float, float[][], float[][][], Object[]> NESTEROV = (step, lr, gradients, storage) -> {//Dozat's modification because calculating gradients of different parameters
             float[][] m = add(scale(beta, storage[0]), gradients);
             float[][] update = scale(lr, add(gradients, scale(beta, m)));
             float[][][] store = {m};
@@ -1102,7 +1107,7 @@ public class NNlib extends Application {
         };
         public static final QuadFunction<Integer, Float, float[][], float[][][], Object[]> RMSPROP = (step, lr, gradients, storage) -> {
             float[][] s = EWMA(beta, storage[0], square(gradients));
-            float[][] s_ = scale(1 / (1 - (float) Math.pow((double) beta, step)), s);//Bias correction
+            float[][] s_ = scale(1 / (1 - (float) Math.pow((double) beta, step)), s);
             float[][] update = divide(scale(lr, gradients), add(sqrt(s_), create2d(s.length, s[0].length, e)));
             float[][][] store = {s};
             return new Object[]{update, store};
@@ -1170,7 +1175,7 @@ public class NNlib extends Application {
         float mean = sum(oneRow) / elements;
         float deviation = (float) (Math.sqrt(sum(square(subtract(oneRow, create2d(1, elements, mean)))) / mean));
         for (int i = 0; i < elements; i++) {
-            result[0][i] = (.5f * (tanh((.01f * ((oneRow[0][i] - mean) / (deviation))), false) + 1));//Tanh estimator normalization
+            result[0][i] = (.5f * (tanh((.01f * ((oneRow[0][i] - mean) / (deviation))), false) + 1));
         }
         return result;
     }
@@ -1241,8 +1246,7 @@ public class NNlib extends Application {
      */
     public static float[][] softmax(float[][] matrix) {
         int cols = matrix[0].length;
-        float[][] result = matrix;
-//        float[][] result = functionMatrixVectors(matrix, vector -> subtract(vector, create(1, cols, max(vector))));//Stabilizing
+        float[][] result = functionMatrixVectors(matrix, vector -> subtract(vector, create2d(1, cols, max(vector))));//Stabilizing
         result = exp(result);
         return functionMatrixVectors(result, vector -> divide(vector, create2d(1, cols, sum(vector))));
     }
@@ -1730,48 +1734,13 @@ public class NNlib extends Application {
         return result;
     }
 
-    public static float[][] convolution2d(float[][] input, float[][] filter, float bias, int paddingHeight, int paddingWidth, int stride) {
+    public static float[][] convolution2d(float[][] input, float[][] filter, float bias, int stride) {
         int filterHeight = filter.length;
         int filterWidth = filter[0].length;
         int inputHeight = input.length;
         int inputWidth = input[0].length;
-        int paddedHeight = inputHeight + paddingHeight + paddingHeight;
-        int paddedWidth = inputWidth + paddingWidth + paddingWidth;
-        float[][] padded;
-        if (paddingHeight > 0 && paddingWidth > 0) {
-            padded = new float[paddedHeight][paddedWidth];
-            int endRow = paddedHeight - paddingHeight;
-            int endCol = paddedWidth - paddingWidth;
-            for (int j = 0; j < paddingHeight; j++) {//Top
-                for (int k = 0; k < paddingWidth; k++) {
-                    padded[j][k] = 0;
-                }
-            }
-            for (int j = endRow; j < paddedHeight; j++) {//Bottom
-                for (int k = endCol; k < paddedWidth; k++) {
-                    padded[j][k] = 0;
-                }
-            }
-            for (int j = paddingHeight; j < paddedHeight; j++) {//Left
-                for (int k = 0; k < paddingWidth; k++) {
-                    padded[j][k] = 0;
-                }
-            }
-            for (int j = paddingHeight; j < paddedHeight; j++) {//Right
-                for (int k = endCol - 1; k < paddingWidth; k++) {
-                    padded[j][k] = 0;
-                }
-            }
-            for (int j = paddingHeight; j < endRow; j++) {//Matrix numbers
-                for (int k = paddingWidth; k < endCol; k++) {
-                    padded[j][k] = input[j - paddingHeight][k - paddingWidth];
-                }
-            }
-        } else {
-            padded = input;
-        }
-        int resultHeight = (paddedHeight - filterHeight) / stride + 1;
-        int resultWidth = (paddedWidth - filterWidth) / stride + 1;
+        int resultHeight = (inputHeight - filterHeight) / stride + 1;
+        int resultWidth = (inputWidth - filterWidth) / stride + 1;
         float[][] result = new float[resultHeight][resultWidth];
         for (int rRow = 0; rRow < resultHeight; rRow++) {
             int startRow = rRow * stride;
@@ -1783,7 +1752,7 @@ public class NNlib extends Application {
                 for (int iRow = startRow; iRow < boundRow; iRow++) {
                     int filterRow = iRow - startRow;
                     for (int iCol = startCol; iCol < boundCol; iCol++) {
-                        val += padded[iRow][iCol] * filter[filterRow][iCol - startCol];
+                        val += input[iRow][iCol] * filter[filterRow][iCol - startCol];
                     }
                 }
                 result[rRow][rCol] = val + bias;
