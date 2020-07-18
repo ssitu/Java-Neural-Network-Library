@@ -11,6 +11,7 @@ See the [test cases](https://github.com/SSithub/Neural-Network-Library-Class/tre
 * Dense/Fully-connected
 * Convolutional
 * Flatten
+* MaxPool
 ## Optimizers
 * Momentum
 * Nesterov (Dozat's rewrite without warmup)
