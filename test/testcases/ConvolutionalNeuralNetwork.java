@@ -11,10 +11,11 @@ public class ConvolutionalNeuralNetwork {
         long seed = new Random().nextLong();
         System.out.println("Seed: " + seed);
         NN nn = new NN("Conv", seed, .001f, LossFunction.QUADRATIC(.5), Optimizer.ADADELTA,
-                new Conv(4, 1, 2, 2, 1, a -> NNlib.pad(a, 1, 1), Activation.RELU),//1x3x3 + 1 pad = 1x5x5, 1x5x5 conv 2x1x2x2 = 2x4x4
-                new Conv(1, 4, 2, 2, 1, a -> NNlib.pad(a, 0, 0), Activation.RELU),//2x4x4 conv 1x2x2x2 = 1x3x3
-                new Flatten(1, 3, 3),//1x3x3 = 9
-                new Dense(9, 1, Activation.SIGMOID, Initializer.XAVIER));
+                new Conv(2, 1, 3, 3, 1, a -> NNlib.pad(a, 1, 1), Activation.TANH),//1x3x3 + 1x1 pad = 1x5x5, 1x5x5 conv(s=1) 2x1x3x3 = 2x3x3
+                new Maxpool(2, 3, 3, 2, 2, 1),//2x3x3 maxpool(s=1) 2x2 = 2x2x2
+                new Conv(1, 2, 1, 1, 1, a -> NNlib.pad(a, 0, 0), Activation.TANH),//2x2x2 conv(s=1) 1x2x1x1 = 1x2x2
+                new Flatten(1, 2, 2),//1x2x2 = 4
+                new Dense(4, 1, Activation.SIGMOID, Initializer.XAVIER));
         NNlib.showInfo(NNlib.infoLayers, nn);
         NNlib.showInfo(NNlib.infoGraph(false), nn);
         float[][][] input1 = {//Slash
