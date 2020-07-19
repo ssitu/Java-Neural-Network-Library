@@ -200,9 +200,9 @@ public class NNlib extends Application {
 
         @Override
         public String toString() {
-            String networkLayers = "Layer 1: " + network[0].toString() + "\n";
+            String networkLayers = network[0].toString();
             for (int i = 1; i < length; i++) {
-                networkLayers += "Layer " + (i + 1) + ": " + network[i].toString() + "\n";
+                networkLayers += network[i].toString();
             }
             return networkLayers;
         }
@@ -241,7 +241,7 @@ public class NNlib extends Application {
          */
         public void save() {
             try {
-                FileOutputStream fileOut = new FileOutputStream(System.getProperty("user.dir") + File.separator + label + "_neuralnetwork-" + toString());
+                FileOutputStream fileOut = new FileOutputStream(System.getProperty("user.dir") + File.separator + label + "-" + toString());
                 ObjectOutputStream out = new ObjectOutputStream(fileOut);
                 Object[] arr = {network, random, step};
                 out.writeObject(arr);
@@ -458,7 +458,9 @@ public class NNlib extends Application {
         public abstract Layer clone();
 
         /**
-         * Summarizes the details of this Layer into a String.
+         * Summarizes the details of this Layer into a String. Needed in the
+         * save method in the NN class, so it must leave out characters that
+         * cannot be used in a file name.
          *
          * @return A String with the important specifications of this Layer,
          * leaving out the parameters.
@@ -619,7 +621,7 @@ public class NNlib extends Application {
              */
             @Override
             public String toString() {
-                return "Dense(Nodes In: " + nodesIn + ", Nodes Out: " + nodesOut + ")";
+                return "Dense(" + nodesIn + "_" + nodesOut + ")";
             }
         }
 
@@ -690,22 +692,22 @@ public class NNlib extends Application {
             @Override
             public Object[] back(Object[] dC_dA_uncasted, float lr, QuadFunction<Integer, Float, float[][], float[][][], Object[]> optimizer, int step, boolean update) {
                 float[][][] dC_dA = (float[][][]) dC_dA_uncasted;
-                float[][][] dA_dZ = function2dOn3d(Z, a -> activation.apply(a, true));
-                float[][][] dC_dZ;
+                final float[][][] dA_dZ = function2dOn3d(Z, a -> activation.apply(a, true));
+                final float[][][] dC_dZ;
                 if (dC_dA[0].length == dA_dZ[0].length && dC_dA[0][0].length == dA_dZ[0][0].length) {
                     dC_dZ = bifunction2dOn3d(dC_dA, dA_dZ, (a, b) -> multiply(a, b));
                 } else {
                     dC_dZ = bifunction2dOn3d(dC_dA, dA_dZ, (a, b) -> dotProduct.apply(a, b));
                 }
-                float[][][][] dC_dW = new float[filterNum][filterChannels][][];
-                float[] dC_dB = new float[filterNum];
+                final float[][][][] dC_dW = new float[filterNum][filterChannels][][];
+                final float[] dC_dB = new float[filterNum];
                 for (int i = 0; i < filterNum; i++) {
                     for (int j = 0; j < filterChannels; j++) {
                         dC_dW[i][j] = convolution3d(new float[][][]{prevA[j]}, new float[][][][]{{dC_dZ[i]}}, new float[]{0}, stride)[0];
                     }
                     dC_dB[i] = sum(dC_dZ[i]);
                 }
-                float[][][][] updateF = new float[filterNum][filterChannels][][];
+                final float[][][][] updateF = new float[filterNum][filterChannels][][];
                 for (int i = 0; i < filterNum; i++) {
                     for (int j = 0; j < filterChannels; j++) {
                         Object[] optimizedF;
@@ -725,7 +727,7 @@ public class NNlib extends Application {
                 }
 
                 final Object[] optimizedB = optimizer.apply(step, lr, new float[][]{dC_dB}, updateStorageB);
-                float[][] updateB = (float[][]) optimizedB[0];
+                final float[][] updateB = (float[][]) optimizedB[0];
                 updateStorageB = (float[][][]) optimizedB[1];
                 for (int i = 0; i < filterNum; i++) {
                     for (int j = 0; j < filterChannels; j++) {
@@ -733,14 +735,14 @@ public class NNlib extends Application {
                     }
                     biases[i] -= updateB[0][i];
                 }
-                float[][][][] rotatedFilters = new float[filterNum][filterChannels][][];
+                final float[][][][] rotatedFilters = new float[filterNum][filterChannels][][];
                 for (int i = 0; i < filterNum; i++) {
                     for (int j = 0; j < filterChannels; j++) {
                         rotatedFilters[i][j] = rotate180(filters[i][j]);
                     }
                 }
-                float[][][] dC_dZ_dilated_padded = function2dOn3d(function2dOn3d(dC_dZ, a -> dilate(a, stride - 1, stride - 1)), a -> pad(a, filterHeight - 1, filterWidth - 1));
-                float[][][] dC_dZ_modified = dC_dZ_dilated_padded;
+                final float[][][] dC_dZ_dilated_padded = function2dOn3d(function2dOn3d(dC_dZ, a -> dilate(a, stride - 1, stride - 1)), a -> pad(a, filterHeight - 1, filterWidth - 1));
+                final float[][][] dC_dZ_modified = dC_dZ_dilated_padded;
                 dC_dA = new float[filterChannels][prevA[0].length][prevA[0][0].length];
                 for (int i = 0; i < filterNum; i++) {
                     for (int j = 0; j < filterChannels; j++) {
@@ -813,11 +815,7 @@ public class NNlib extends Application {
              */
             @Override
             public String toString() {
-                return "Conv(Filters: " + filterNum
-                        + ", Filter Channels: " + filterChannels
-                        + ", Filter Height: " + filterHeight
-                        + ", Filter Width: " + filterWidth
-                        + ", Stride: " + stride + ")";
+                return "Conv(" + filterNum + "_" + filterChannels + "_" + filterHeight + "_" + filterWidth + "_" + stride + ")";
             }
         }
 
@@ -914,7 +912,7 @@ public class NNlib extends Application {
              */
             @Override
             public String toString() {
-                return "Flatten";
+                return "Flat()";
             }
         }
 
@@ -1030,7 +1028,7 @@ public class NNlib extends Application {
              */
             @Override
             public String parametersToString() {
-                return "Pooling Layer";
+                return "Maxpool Layer";
             }
 
             /**
@@ -1046,7 +1044,7 @@ public class NNlib extends Application {
              */
             @Override
             public String toString() {
-                return "Pooling";
+                return "MPool()";
             }
         }
     }
@@ -1671,6 +1669,14 @@ public class NNlib extends Application {
         return function(matrix, val -> (float) Math.log(val));
     }
 
+    /**
+     * Replaces the maximum value in the given matrix with a 1 and replace the
+     * rest of the elements with 0s.
+     *
+     * @param matrix a matrix with a unique maximum, otherwise the first maximum
+     * value is chosen.
+     * @return The resulting matrix.
+     */
     public static float[][] oneHot(float[][] matrix) {
         int rows = matrix.length;
         int columns = matrix[0].length;
@@ -1688,6 +1694,22 @@ public class NNlib extends Application {
             }
         }
         result[x][y] = 1;
+        return result;
+    }
+
+    /**
+     * Creates a new matrix with the given dimensions and with a one in the
+     * given position and 0s in the rest.
+     *
+     * @param rows Height of the result.
+     * @param cols Width of the result.
+     * @param onehotRow The row of the 1 in the result.
+     * @param onehotCol The column of the 1 in the result.
+     * @return The resulting matrix.
+     */
+    public static float[][] oneHot(int rows, int cols, int onehotRow, int onehotCol) {
+        float[][] result = new float[rows][cols];
+        result[onehotRow][onehotCol] = 1;
         return result;
     }
 
@@ -1848,8 +1870,8 @@ public class NNlib extends Application {
     }
 
     public static float[] flatten(float[][] matrix) {
-        int rows = matrix.length;
-        int cols = matrix[0].length;
+        final int rows = matrix.length;
+        final int cols = matrix[0].length;
         float[] result = new float[rows * cols];
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < cols; j++) {
@@ -1860,7 +1882,7 @@ public class NNlib extends Application {
     }
 
     public static float[][] unflatten(float[] flattened, int rows, int cols) {
-        float[][] result = new float[rows][cols];
+        final float[][] result = new float[rows][cols];
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < cols; j++) {
                 result[i][j] = flattened[(i * cols) + j];
@@ -1897,27 +1919,27 @@ public class NNlib extends Application {
     }
 
     public static float[][][] convolution3d(float[][][] input, float[][][][] filters, float[] biases, int stride) {
-        int resultDepth = filters.length;
-        int filterDepth = filters[0].length;
-        int filterHeight = filters[0][0].length;
-        int filterWidth = filters[0][0][0].length;
-        int resultHeight = (input[0].length - filterHeight) / stride + 1;
-        int resultWidth = (input[0][0].length - filterWidth) / stride + 1;
-        float[][][] result = new float[resultDepth][resultHeight][resultWidth];
+        final int resultDepth = filters.length;
+        final int filterDepth = filters[0].length;
+        final int filterHeight = filters[0][0].length;
+        final int filterWidth = filters[0][0][0].length;
+        final int resultHeight = (input[0].length - filterHeight) / stride + 1;
+        final int resultWidth = (input[0][0].length - filterWidth) / stride + 1;
+        final float[][][] result = new float[resultDepth][resultHeight][resultWidth];
         for (int rDepth = 0; rDepth < resultDepth; rDepth++) {
             float[][][] filter = filters[rDepth];
             for (int rRow = 0; rRow < resultHeight; rRow++) {
-                int startRow = rRow * stride;
-                int boundRow = startRow + filterHeight;
+                final int startRow = rRow * stride;
+                final int boundRow = startRow + filterHeight;
                 for (int rCol = 0; rCol < resultWidth; rCol++) {
-                    int startCol = rCol * stride;
-                    int boundCol = startCol + filterWidth;
+                    final int startCol = rCol * stride;
+                    final int boundCol = startCol + filterWidth;
                     float val = 0;
                     for (int iDepth = 0; iDepth < filterDepth; iDepth++) {
-                        float[][] filterLayer = filter[iDepth];
-                        float[][] inputLayer = input[iDepth];
+                        final float[][] filterLayer = filter[iDepth];
+                        final float[][] inputLayer = input[iDepth];
                         for (int iRow = startRow; iRow < boundRow; iRow++) {
-                            int filterRow = iRow - startRow;
+                            final int filterRow = iRow - startRow;
                             for (int iCol = startCol; iCol < boundCol; iCol++) {
                                 val += inputLayer[iRow][iCol] * filterLayer[filterRow][iCol - startCol];
                             }
@@ -1931,11 +1953,11 @@ public class NNlib extends Application {
     }
 
     public static float[][] rotate180(float[][] arr2d) {
-        int rows = arr2d.length;
-        int cols = arr2d[0].length;
-        float[][] result = new float[rows][cols];
-        int maxrow = rows - 1;
-        int maxcol = cols - 1;
+        final int rows = arr2d.length;
+        final int cols = arr2d[0].length;
+        final float[][] result = new float[rows][cols];
+        final int maxrow = rows - 1;
+        final int maxcol = cols - 1;
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < cols; j++) {
                 result[maxrow - i][maxcol - j] = arr2d[i][j];
@@ -1945,12 +1967,12 @@ public class NNlib extends Application {
     }
 
     public static float[][] pad(float[][] arr2d, int paddingHeight, int paddingWidth) {
-        int paddedHeight = arr2d.length + paddingHeight + paddingHeight;
-        int paddedWidth = arr2d[0].length + paddingWidth + paddingWidth;
+        final int paddedHeight = arr2d.length + paddingHeight + paddingHeight;
+        final int paddedWidth = arr2d[0].length + paddingWidth + paddingWidth;
         if (!(paddingHeight < 0 || paddingWidth < 0)) {
-            float[][] padded = new float[paddedHeight][paddedWidth];
-            int endRow = paddedHeight - paddingHeight;
-            int endCol = paddedWidth - paddingWidth;
+            final float[][] padded = new float[paddedHeight][paddedWidth];
+            final int endRow = paddedHeight - paddingHeight;
+            final int endCol = paddedWidth - paddingWidth;
             for (int j = 0; j < paddingHeight; j++) {//Top
                 for (int k = 0; k < paddingWidth; k++) {
                     padded[j][k] = 0;
@@ -2001,8 +2023,8 @@ public class NNlib extends Application {
     }
 
     public static float[][][] function2dOn3d(float[][][] arr3d, Function<float[][], float[][]> function) {
-        int depth = arr3d.length;
-        float[][][] result = new float[depth][][];
+        final int depth = arr3d.length;
+        final float[][][] result = new float[depth][][];
         for (int i = 0; i < depth; i++) {
             result[i] = function.apply(arr3d[i]);
         }
@@ -2010,8 +2032,8 @@ public class NNlib extends Application {
     }
 
     public static float[][][] bifunction2dOn3d(float[][][] arr3d1, float[][][] arr3d2, BiFunction<float[][], float[][], float[][]> bifunction) {
-        int depth = arr3d1.length;
-        float[][][] result = new float[depth][][];
+        final int depth = arr3d1.length;
+        final float[][][] result = new float[depth][][];
         for (int i = 0; i < depth; i++) {
             result[i] = bifunction.apply(arr3d1[i], arr3d2[i]);
         }
@@ -2019,8 +2041,8 @@ public class NNlib extends Application {
     }
 
     public static float[][] functionMatrixVectors(float[][] matrix, Function<float[][], float[][]> operation) {
-        int rows = matrix.length;
-        float[][] result = new float[rows][];
+        final int rows = matrix.length;
+        final float[][] result = new float[rows][];
         for (int i = 0; i < rows; i++) {
             result[i] = operation.apply(new float[][]{matrix[i]})[0];
         }
@@ -2028,8 +2050,8 @@ public class NNlib extends Application {
     }
 
     public static float[][] bifunctionMatrixVectors(float[][] matrix, float[] vector, BiFunction<float[][], float[][], float[][]> operation) {
-        int rows = matrix.length;
-        float[][] result = new float[rows][];
+        final int rows = matrix.length;
+        final float[][] result = new float[rows][];
         for (int i = 0; i < rows; i++) {
             result[i] = operation.apply(new float[][]{matrix[i]}, new float[][]{vector})[0];
         }
@@ -2037,9 +2059,9 @@ public class NNlib extends Application {
     }
 
     public static float[][] function(float[][] matrix, Function<Float, Float> function) {
-        int rows = matrix.length;
-        int columns = matrix[0].length;
-        float[][] result = new float[rows][columns];
+        final int rows = matrix.length;
+        final int columns = matrix[0].length;
+        final float[][] result = new float[rows][columns];
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < columns; j++) {
                 result[i][j] = function.apply(matrix[i][j]);
@@ -2049,9 +2071,9 @@ public class NNlib extends Application {
     }
 
     public static float[][] bifunction(float[][] m1, float[][] m2, BiFunction<Float, Float, Float> bifunction) {
-        int rows = m1.length;
-        int columns = m1[0].length;
-        float[][] result = new float[rows][columns];
+        final int rows = m1.length;
+        final int columns = m1[0].length;
+        final float[][] result = new float[rows][columns];
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < columns; j++) {
                 result[i][j] = bifunction.apply(m1[i][j], m2[i][j]);
