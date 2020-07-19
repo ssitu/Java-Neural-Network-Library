@@ -259,7 +259,7 @@ public class NNlib extends Application {
         public boolean loadFromJar() {
             try {
                 String path = new File(this.getClass().getProtectionDomain().getCodeSource().getLocation().getPath()).getParentFile().getAbsolutePath();//For jar files
-                FileInputStream fileIn = new FileInputStream(path + File.separator + label + "_neuralnetwork-" + toString());
+                FileInputStream fileIn = new FileInputStream(path + File.separator + label + "-" + toString());
                 ObjectInputStream in = new ObjectInputStream(fileIn);
                 Object[] arr = (Object[]) in.readObject();
                 network = (Layer[]) arr[0];
@@ -283,7 +283,7 @@ public class NNlib extends Application {
          */
         public boolean load() {
             try {
-                FileInputStream fileIn = new FileInputStream(System.getProperty("user.dir") + File.separator + label + "_neuralnetwork-" + toString());
+                FileInputStream fileIn = new FileInputStream(System.getProperty("user.dir") + File.separator + label + "-" + toString());
                 ObjectInputStream in = new ObjectInputStream(fileIn);
                 Object[] arr = (Object[]) in.readObject();
                 network = (Layer[]) arr[0];
