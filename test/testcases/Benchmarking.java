@@ -1,6 +1,6 @@
 package testcases;
 
-import nnlibrary.NNlib.*;
+import nnlibrary.NNlib;
 import static nnlibrary.NNlib.*;
 import nnlibrary.NNlib.Layer.*;
 
@@ -15,9 +15,11 @@ public class Benchmarking {
                 new Flatten(1, 3, 3),//1x3x3 = 9
                 new Dense(9, 10, Activation.SOFTMAX, Initializer.XAVIER)
         );
+        nn.setBatchSize(100);
+        NNlib.showInfo(infoGraph(false), nn);
         float[][][] input = function2dOn3d(new float[1][28][28], a -> randomize(a, 2, -1, nn.getRandom()));
         float[][] label = {{1}};
-        System.out.println(benchmark(() -> nn.backpropagation(input, label), 1000000, false));
+        System.out.println("Seconds: " + benchmark(() -> nn.backpropagation(input, label), 1000000, false));
     }
 
     public static double benchmark(Runnable r, int iterations, boolean avg) {
