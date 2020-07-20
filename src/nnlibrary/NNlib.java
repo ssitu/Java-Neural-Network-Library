@@ -236,6 +236,21 @@ public class NNlib extends Application {
         }
 
         /**
+         * Get the total number of adjustable(through backpropagation)
+         * parameters in this NN.
+         *
+         * @return An integer representing the total amount of adjustable
+         * parameters.
+         */
+        public int getParameterCount() {
+            int count = network[0].getParameterCount();
+            for (int i = 1; i < length; i++) {
+                count += network[i].getParameterCount();
+            }
+            return count;
+        }
+
+        /**
          * Saves a serialized array of important information of this NN instance
          * into a new file inside the current directory.
          */
@@ -451,6 +466,13 @@ public class NNlib extends Application {
         public abstract String parametersToString();
 
         /**
+         * Get the number of learnable parameters in this Layer.
+         *
+         * @return An int representing the total learnable parameters.
+         */
+        public abstract int getParameterCount();
+
+        /**
          * Creates a deep copy of this Layer.
          *
          * @return A Layer with the same parameters and hyperparameters.
@@ -598,6 +620,14 @@ public class NNlib extends Application {
             }
 
             /**
+             * @see Layer#getParameterCount()
+             */
+            @Override
+            public int getParameterCount() {
+                return nodesIn * nodesOut + nodesOut;
+            }
+
+            /**
              * @see Layer#clone()
              */
             @Override
@@ -621,7 +651,7 @@ public class NNlib extends Application {
              */
             @Override
             public String toString() {
-                return "Dense(" + nodesIn + "_" + nodesOut + ")";
+                return "Dense[" + nodesIn + "_" + nodesOut + "]";
             }
         }
 
@@ -633,8 +663,11 @@ public class NNlib extends Application {
             private final int filterHeight;
             private final int filterWidth;
             private float[] biases;
-            private final Function<float[][], float[][]> modifier;
             private final int stride;
+            private final int paddingHeight;
+            private final int paddingWidth;
+            private final Function<float[][], float[][]> pad;
+            private final Function<float[][], float[][]> unpad;
             private BiFunction<float[][], Boolean, float[][]> activation;
             private float[][][][] updateStorageF;
             private float[][][] updateStorageB;
@@ -642,16 +675,18 @@ public class NNlib extends Application {
             private float[] accumulatedB;
             private float[][][] prevA;
             private float[][][] Z;
-            private float[][][] A;
 
-            public Conv(int numberOfFilters, int filterChannels, int filterHeight, int filterWidth, int stride, Function<float[][], float[][]> inputModifier, BiFunction<float[][], Boolean, float[][]> activation) {
+            public Conv(int numberOfFilters, int filterChannels, int filterHeight, int filterWidth, int stride, int paddingHeight, int paddingWidth, BiFunction<float[][], Boolean, float[][]> activation) {
                 filterNum = numberOfFilters;
                 this.filterChannels = filterChannels;
                 this.filterHeight = filterHeight;
                 this.filterWidth = filterWidth;
-                this.modifier = inputModifier;
                 this.stride = stride;
+                this.paddingHeight = paddingHeight;
+                this.paddingWidth = paddingWidth;
                 this.activation = activation;
+                pad = a -> NNlib.pad(a, paddingHeight, paddingWidth);
+                unpad = a -> NNlib.unpad(a, paddingHeight, paddingWidth);
             }
 
             /**
@@ -679,7 +714,7 @@ public class NNlib extends Application {
             @Override
             public Object[] forward(Object[] in) {
                 try {
-                    prevA = function2dOn3d((float[][][]) in, modifier);
+                    prevA = function2dOn3d((float[][][]) in, pad);
                     Z = NNlib.convolution3d(prevA, filters, biases, stride);
                     return function2dOn3d(Z, a -> activation.apply(a, false));
                 } catch (ArrayIndexOutOfBoundsException e) {
@@ -701,11 +736,12 @@ public class NNlib extends Application {
                 } else {
                     dC_dZ = bifunction2dOn3d(dC_dA, dA_dZ, (a, b) -> dotProduct.apply(a, b));
                 }
+                dC_dZ = function2dOn3d(dC_dZ, a -> dilate(a, stride - 1, stride - 1));//For strides > 1
                 float[][][][] dC_dW = new float[filterNum][filterChannels][][];
                 float[] dC_dB = new float[filterNum];
                 for (int i = 0; i < filterNum; i++) {
                     for (int j = 0; j < filterChannels; j++) {
-                        dC_dW[i][j] = convolution3d(new float[][][]{prevA[j]}, new float[][][][]{{dC_dZ[i]}}, new float[]{0}, stride)[0];
+                        dC_dW[i][j] = convolution3d(new float[][][]{prevA[j]}, new float[][][][]{{dC_dZ[i]}}, new float[]{0}, 1)[0];
                     }
                     dC_dB[i] = sum(dC_dZ[i]);
                 }
@@ -719,6 +755,7 @@ public class NNlib extends Application {
                                 optimizedF = optimizer.apply(step, lr, dC_dW[i][j], updateStorageF[index]);
                                 break;
                             } catch (ArrayIndexOutOfBoundsException e) {
+//                                e.printStackTrace();
                                 updateStorageF[index] = append(updateStorageF[index], new float[1][filterHeight][filterWidth]);
                                 updateStorageB = append(updateStorageB, new float[1][1][filterNum]);
                             }
@@ -752,15 +789,15 @@ public class NNlib extends Application {
                         rotatedFilters[i][j] = rotate180(filters[i][j]);
                     }
                 }
-                float[][][] dC_dZ_dilated_padded = function2dOn3d(function2dOn3d(dC_dZ, a -> dilate(a, stride - 1, stride - 1)), a -> pad(a, filterHeight - 1, filterWidth - 1));
-                float[][][] dC_dZ_modified = dC_dZ_dilated_padded;
-                dC_dA = new float[filterChannels][prevA[0].length][prevA[0][0].length];
+                float[][][] dC_dZ_dilated_padded = function2dOn3d(dC_dZ, a -> pad(a, filterHeight - 1, filterWidth - 1));//Full convolution
+                float[][][] dC_dA_ = new float[filterChannels][prevA[0].length][prevA[0][0].length];
                 for (int i = 0; i < filterNum; i++) {
                     for (int j = 0; j < filterChannels; j++) {
-                        dC_dA[j] = add(dC_dA[j], convolution3d(new float[][][]{dC_dZ_modified[i]}, new float[][][][]{{rotatedFilters[i][j]}}, new float[filterNum], 1)[0]);
+                        dC_dA_[j] = add(dC_dA_[j], convolution3d(new float[][][]{dC_dZ_dilated_padded[i]}, new float[][][][]{{rotatedFilters[i][j]}}, new float[filterNum], 1)[0]);
                     }
                 }
-                return dC_dA;
+                dC_dA_ = function2dOn3d(dC_dA_, unpad);
+                return dC_dA_;
             }
 
             /**
@@ -811,11 +848,19 @@ public class NNlib extends Application {
             }
 
             /**
+             * @see Layer#getParameterCount()
+             */
+            @Override
+            public int getParameterCount() {
+                return filterNum * filterChannels * filterHeight * filterWidth + filterNum;
+            }
+
+            /**
              * @see Layer#clone()
              */
             @Override
             public Layer clone() {
-                Conv copy = new Conv(filterNum, filterChannels, filterHeight, filterWidth, stride, modifier, activation);
+                Conv copy = new Conv(filterNum, filterChannels, filterHeight, filterWidth, stride, paddingHeight, paddingWidth, activation);
                 copy.updateStorageF = copy4d(updateStorageF);
                 copy.updateStorageB = copy3d(updateStorageB);
                 return copy;
@@ -826,7 +871,7 @@ public class NNlib extends Application {
              */
             @Override
             public String toString() {
-                return "Conv(" + filterNum + "_" + filterChannels + "_" + filterHeight + "_" + filterWidth + "_" + stride + ")";
+                return "Conv[" + filterNum + "_" + filterChannels + "_" + filterHeight + "_" + filterWidth + "_" + stride + "]";
             }
         }
 
@@ -911,6 +956,14 @@ public class NNlib extends Application {
             }
 
             /**
+             * @see Layer#getParameterCount()
+             */
+            @Override
+            public int getParameterCount() {
+                return 0;
+            }
+
+            /**
              * @see Layer#clone()
              */
             @Override
@@ -923,7 +976,7 @@ public class NNlib extends Application {
              */
             @Override
             public String toString() {
-                return "Flat()";
+                return "Flat[]";
             }
         }
 
@@ -1043,6 +1096,14 @@ public class NNlib extends Application {
             }
 
             /**
+             * @see Layer#getParameterCount()
+             */
+            @Override
+            public int getParameterCount() {
+                return 0;
+            }
+
+            /**
              * @see Layer#clone()
              */
             @Override
@@ -1055,7 +1116,7 @@ public class NNlib extends Application {
              */
             @Override
             public String toString() {
-                return "MPool()";
+                return "MPool[]";
             }
         }
     }
@@ -1978,9 +2039,9 @@ public class NNlib extends Application {
     }
 
     public static float[][] pad(float[][] arr2d, int paddingHeight, int paddingWidth) {
-        int paddedHeight = arr2d.length + paddingHeight + paddingHeight;
-        int paddedWidth = arr2d[0].length + paddingWidth + paddingWidth;
-        if (!(paddingHeight < 0 || paddingWidth < 0)) {
+        if (!(paddingHeight < 0 || paddingWidth < 0) || (paddingHeight == 0 && paddingWidth == 0)) {
+            int paddedHeight = arr2d.length + paddingHeight + paddingHeight;
+            int paddedWidth = arr2d[0].length + paddingWidth + paddingWidth;
             float[][] padded = new float[paddedHeight][paddedWidth];
             int endRow = paddedHeight - paddingHeight;
             int endCol = paddedWidth - paddingWidth;
@@ -2015,8 +2076,24 @@ public class NNlib extends Application {
         }
     }
 
+    public static float[][] unpad(float[][] arr2d, int unpaddingHeight, int unpaddingWidth) {
+        if (!(unpaddingHeight < 0 || unpaddingWidth < 0) || (unpaddingHeight == 0 || unpaddingWidth == 0)) {
+            int resultHeight = arr2d.length - unpaddingHeight - unpaddingHeight;
+            int resultWidth = arr2d[0].length - unpaddingWidth - unpaddingWidth;
+            float[][] result = new float[resultHeight][resultWidth];
+            for (int i = 0; i < resultHeight; i++) {
+                for (int j = 0; j < resultWidth; j++) {
+                    result[i][j] = arr2d[i + unpaddingHeight][j + unpaddingWidth];
+                }
+            }
+            return result;
+        } else {
+            return arr2d;
+        }
+    }
+
     public static float[][] dilate(float[][] arr2d, int dilationRows, int dilationCols) {
-        if (!(dilationRows < 0 || dilationCols < 0)) {
+        if (!(dilationRows < 0 || dilationCols < 0) || (dilationRows == 0 || dilationCols == 0)) {
             int rows = arr2d.length;
             int cols = arr2d[0].length;
             float[][] result = new float[rows * (dilationRows + 1) - dilationRows][cols * (dilationCols + 1) - dilationCols];
