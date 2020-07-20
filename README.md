@@ -39,7 +39,7 @@ See the [test cases](https://github.com/SSithub/Neural-Network-Library-Class/tre
 ## Weight Initializers
 * Xavier
 * He
-## Other Notable Operations
+## Other
 * Min Max Normalization
 * Z Score Normalization
 * Tanh Estimator Normalization
