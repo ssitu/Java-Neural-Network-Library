@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
@@ -266,12 +267,36 @@ public class NNlib extends Application {
         }
 
         /**
-         * Same as {@link #load()} method but instead will look outside of the
-         * .jar instead of inside.
+         * Loads a serialized NN instance created by {@link #save()}. Will
+         * search for the file with the same NN label and layer architecture in
+         * the name. Careful loading after changing the NN hyper parameters. The
+         * directory is in the current user folder if used as a jar executable
          *
          * @return True if the load was successful and false if unsuccessful.
          */
-        public boolean loadFromJar() {
+        public boolean load() {
+            try {
+                FileInputStream fileIn = new FileInputStream(System.getProperty("user.dir") + File.separator + label + "-" + toString());
+                ObjectInputStream in = new ObjectInputStream(fileIn);
+                Object[] arr = (Object[]) in.readObject();
+                network = (Layer[]) arr[0];
+                random = (Random) arr[1];
+                step = (Integer) arr[2];
+                return true;
+            } catch (IOException | ClassNotFoundException e) {
+                System.out.println("Could not load network settings for \"" + label + "\".");
+                e.printStackTrace();
+                return false;
+            }
+        }
+
+        /**
+         * Same as {@link #load()} method but instead will look outside of the
+         * .jar.
+         *
+         * @return True if the load was successful and false if unsuccessful.
+         */
+        public boolean loadOutsideJar() {
             try {
                 String path = new File(this.getClass().getProtectionDomain().getCodeSource().getLocation().getPath()).getParentFile().getAbsolutePath();//For jar files
                 FileInputStream fileIn = new FileInputStream(path + File.separator + label + "-" + toString());
@@ -289,17 +314,16 @@ public class NNlib extends Application {
         }
 
         /**
-         * Loads a serialized version of the NN instance created by
-         * {@link #save()}. Will search for the file with the same NN label and
-         * layer architecture in the name. Careful loading after changing the NN
-         * hyper parameters.
+         * Same as {@link #load()} method but instead will look inside of the
+         * .jar.
          *
          * @return True if the load was successful and false if unsuccessful.
          */
-        public boolean load() {
+        public boolean loadInsideJar() {
             try {
-                FileInputStream fileIn = new FileInputStream(System.getProperty("user.dir") + File.separator + label + "-" + toString());
-                ObjectInputStream in = new ObjectInputStream(fileIn);
+                System.out.println(this.getClass().getResource("/" + label + "-" + toString()));
+                InputStream stream = this.getClass().getResource("/" + label + "-" + toString()).openStream();
+                ObjectInputStream in = new ObjectInputStream(stream);
                 Object[] arr = (Object[]) in.readObject();
                 network = (Layer[]) arr[0];
                 random = (Random) arr[1];
