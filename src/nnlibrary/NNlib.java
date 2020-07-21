@@ -321,7 +321,6 @@ public class NNlib extends Application {
          */
         public boolean loadInsideJar() {
             try {
-                System.out.println(this.getClass().getResource("/" + label + "-" + toString()));
                 InputStream stream = this.getClass().getResource("/" + label + "-" + toString()).openStream();
                 ObjectInputStream in = new ObjectInputStream(stream);
                 Object[] arr = (Object[]) in.readObject();
