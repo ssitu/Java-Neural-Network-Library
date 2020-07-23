@@ -254,6 +254,31 @@ public class NNlib extends Application {
         }
 
         /**
+         * Saves a serialized array of important information of this NN instance
+         * into a new file inside the current directory. Works for both .jar and
+         * while uncompiled, will save in the .jar root or the src folder if
+         * uncompiled.
+         */
+        public void saveInsideJar() {
+            try {
+                String root = this.getClass().getProtectionDomain().getCodeSource().getLocation().getPath();
+                if (!root.substring(root.length() - 4).equals(".jar")) {
+                    FileOutputStream fileOut = new FileOutputStream(System.getProperty("user.dir") + File.separator + "src" + File.separator + label + "-" + toString());
+                    ObjectOutputStream out = new ObjectOutputStream(fileOut);
+                    Object[] arr = {network, random, step};
+                    out.writeObject(arr);
+                } else {
+                    FileOutputStream fileOut = new FileOutputStream(root);
+                    ObjectOutputStream out = new ObjectOutputStream(fileOut);
+                    Object[] arr = {network, random, step};
+                    out.writeObject(arr);
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        /**
          * Loads a serialized NN instance created by {@link #save()}. Will
          * search for the file with the same NN label and layer architecture in
          * the name. Careful loading after changing the NN hyper parameters. The
@@ -308,14 +333,25 @@ public class NNlib extends Application {
          */
         public boolean loadInsideJar() {
             try {
-                InputStream stream = this.getClass().getResource("/" + label + "-" + toString()).openStream();
-                ObjectInputStream in = new ObjectInputStream(stream);
-                Object[] arr = (Object[]) in.readObject();
-                network = (Layer[]) arr[0];
-                random = (Random) arr[1];
-                step = (Integer) arr[2];
-                return true;
-            } catch (IOException | ClassNotFoundException e) {
+                String root = this.getClass().getProtectionDomain().getCodeSource().getLocation().getPath();
+                if (root.substring(root.length() - 4).equals(".jar")) {
+                    InputStream stream = this.getClass().getResource("/" + label + "-" + toString()).openStream();
+                    ObjectInputStream in = new ObjectInputStream(stream);
+                    Object[] arr = (Object[]) in.readObject();
+                    network = (Layer[]) arr[0];
+                    random = (Random) arr[1];
+                    step = (Integer) arr[2];
+                    return true;
+                } else {
+                    FileInputStream fileIn = new FileInputStream(System.getProperty("user.dir") + File.separator + "src" + File.separator + label + "-" + toString());
+                    ObjectInputStream in = new ObjectInputStream(fileIn);
+                    Object[] arr = (Object[]) in.readObject();
+                    network = (Layer[]) arr[0];
+                    random = (Random) arr[1];
+                    step = (Integer) arr[2];
+                    return true;
+                }
+            } catch (IOException | ClassNotFoundException | NullPointerException e) {
                 System.out.println("Could not load network settings for \"" + label + "\".");
                 e.printStackTrace();
                 return false;
