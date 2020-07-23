@@ -1,31 +1,18 @@
 package nnlibrary;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.io.Serializable;
+import java.io.*;
 import java.lang.reflect.Array;
-import java.util.Arrays;
-import java.util.LinkedList;
-import java.util.Random;
-import javafx.animation.KeyFrame;
-import javafx.animation.Timeline;
+import java.util.*;
+import javafx.animation.*;
 import javafx.application.Application;
 import static javafx.application.Application.launch;
 import javafx.event.EventHandler;
 import javafx.scene.Scene;
-import javafx.scene.chart.NumberAxis;
-import javafx.scene.chart.ScatterChart;
-import javafx.scene.chart.XYChart;
+import javafx.scene.chart.*;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.text.Text;
-import javafx.stage.Screen;
-import javafx.stage.Stage;
+import javafx.stage.*;
 import javafx.util.Duration;
 
 public class NNlib extends Application {
