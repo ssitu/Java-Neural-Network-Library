@@ -1893,29 +1893,6 @@ public class NNlib extends Application {
         return index;
     }
 
-    public static float[] copy1d(float[] arr1d) {
-        int length = arr1d.length;
-        float[] result = new float[length];
-        System.arraycopy(arr1d, 0, result, 0, length);
-        return result;
-    }
-
-    public static float[][] copy2d(float[][] arr2d) {
-        return Arrays.stream(arr2d).map(el -> el.clone()).toArray(a -> arr2d.clone());
-    }
-
-    public static float[][][] copy3d(float[][][] arr3d) {
-        return Arrays.stream(arr3d).map(el -> copy2d(el)).toArray(a -> arr3d.clone());
-    }
-
-    public static float[][][][] copy4d(float[][][][] arr4d) {
-        return Arrays.stream(arr4d).map(el -> copy3d(el)).toArray(a -> arr4d.clone());
-    }
-
-    public static float[][][][][] copy5d(float[][][][][] arr5d) {
-        return Arrays.stream(arr5d).map(el -> copy4d(el)).toArray(a -> arr5d.clone());
-    }
-
     /**
      * Creates a new array with the elements inside the given arrays in their
      * order. Arrays must have at least 1 element because empty arrays give a
@@ -1985,6 +1962,37 @@ public class NNlib extends Application {
             type = type.getComponentType();
         }
         return type;
+    }
+
+    public static float[] copy1d(float[] arr1d) {
+        int length = arr1d.length;
+        float[] result = new float[length];
+        System.arraycopy(arr1d, 0, result, 0, length);
+        return result;
+    }
+
+    public static float[][] copy2d(float[][] arr2d) {
+        return Arrays.stream(arr2d).map(el -> el.clone()).toArray(a -> arr2d.clone());
+    }
+
+    public static float[][][] copy3d(float[][][] arr3d) {
+        return Arrays.stream(arr3d).map(el -> copy2d(el)).toArray(a -> arr3d.clone());
+    }
+
+    public static float[][][][] copy4d(float[][][][] arr4d) {
+        return Arrays.stream(arr4d).map(el -> copy3d(el)).toArray(a -> arr4d.clone());
+    }
+
+    public static float[][][][][] copy5d(float[][][][][] arr5d) {
+        return Arrays.stream(arr5d).map(el -> copy4d(el)).toArray(a -> arr5d.clone());
+    }
+
+    public static Object[] copy(Object[] nDimensionArr) {
+        try {
+            return Arrays.stream(nDimensionArr).map(el -> copy(Object[].class.cast(el))).toArray(a -> nDimensionArr.clone());
+        } catch (ClassCastException e) {
+            return Arrays.stream(nDimensionArr).map(el -> copy1d(float[].class.cast(el))).toArray(a -> nDimensionArr.clone());
+        }
     }
 
     public static float[] flatten(float[][] matrix) {
