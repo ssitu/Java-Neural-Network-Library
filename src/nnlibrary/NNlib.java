@@ -1816,6 +1816,26 @@ public class NNlib extends Application {
     }
 
     /**
+     * Samples from the given probabilities. Works properly when probabilities
+     * add up to 1
+     *
+     * @param probabilities Array of probabilities adding up to 1.
+     * @return The chosen index. Depending on the probabilities, will return -1
+     * if probabilities don't add up to 1.
+     */
+    public static int sampleProbabilities(float[] probabilities) {
+        float random = (float) Math.random();
+        int size = probabilities.length;
+        for (int i = 0; i < size; i++) {
+            random -= probabilities[i];
+            if (random < 0) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /**
      * Creates a new matrix with the given dimensions and with a one in the
      * given position and 0s in the rest.
      *
