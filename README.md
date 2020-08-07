@@ -14,7 +14,7 @@ See the [test cases](https://github.com/SSithub/Neural-Network-Library-Class/tre
 * MaxPool
 ## Optimizers
 * Momentum
-* Nesterov (Dozat's rewrite without warmup)
+* Nesterov (Dozat's rewrite)
 * Adagrad
 * Adadelta
 * RMSProp
