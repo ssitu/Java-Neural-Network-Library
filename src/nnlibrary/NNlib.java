@@ -907,6 +907,8 @@ public class NNlib extends Application {
             @Override
             public Layer clone() {
                 Conv copy = new Conv(filterNum, filterChannels, filterHeight, filterWidth, stride, paddingHeight, paddingWidth, activation);
+                copy.filters = copy4d(filters);
+                copy.biases = copy1d(biases);
                 copy.updateStorageF = copy4d(updateStorageF);
                 copy.updateStorageB = copy3d(updateStorageB);
                 return copy;
@@ -1825,6 +1827,21 @@ public class NNlib extends Application {
      */
     public static int sampleProbabilities(float[] probabilities) {
         float random = (float) Math.random();
+        int size = probabilities.length;
+        for (int i = 0; i < size; i++) {
+            random -= probabilities[i];
+            if (random < 0) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * @see #sampleProbabilities(float[])
+     */
+    public static int sampleProbabilities(float[] probabilities, Random rng) {
+        float random = rng.nextFloat();
         int size = probabilities.length;
         for (int i = 0; i < size; i++) {
             random -= probabilities[i];
