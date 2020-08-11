@@ -2,9 +2,9 @@
 
 An neural network class/library without dependencies outside of Java's API packages. It is coded with JDK 1.8 and it does use JavaFX that comes with the 1.8 version, but it is only used for tracking certain information of a neural network instance and is completely optional. I decided to use floats instead of doubles to trade precision for speed, but it can easily use doubles by replacing all occurances of float and Float with double and Double. The difference in performance is significant.
 
-Thought it would be easier to have the necessities of neural networks in one class, [the NNlib class](https://github.com/SSithub/Neural-Network-Library-Class/blob/master/src/nnlibrary/NNlib.java). I add features when I need to use them in my other projects.
+Thought it would be easier to have the necessities of neural networks in one class, [the NNlib class](https://github.com/ssitu/Neural-Network-Library-Class/blob/master/src/nnlibrary/NNlib.java). I add features when I need to use them in my other projects.
 
-See the [test cases](https://github.com/SSithub/Neural-Network-Library-Class/tree/master/test/testcases) for small examples of using the class. 
+See the [test cases](https://github.com/ssitu/Neural-Network-Library-Class/tree/master/test/testcases) for small examples of using the class. 
 
 # Features
 ## Layers
