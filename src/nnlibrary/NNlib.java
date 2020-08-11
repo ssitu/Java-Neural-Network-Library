@@ -476,6 +476,7 @@ public class NNlib extends Application {
      */
     public static abstract class Layer implements Serializable {
 
+        private static final long serialVersionUID = 1;
         private final boolean INFER;
         private int[] OUTSHAPE;
 
