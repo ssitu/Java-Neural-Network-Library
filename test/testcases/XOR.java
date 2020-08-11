@@ -17,7 +17,7 @@ public class XOR {
                 LossFunction.QUADRATIC(.5),//Loss/Cost/Error Function
                 Optimizer.VANILLA,//Gradient Descent Optimizer
                 new Layer.Dense(2, 3, Activation.SIGMOID, Initializer.VANILLA),//2 in, 3 out
-                new Layer.Dense(3, 1, Activation.SIGMOID, Initializer.VANILLA)//3 in from the previous layer, 1 out
+                new Layer.Dense(1, Activation.SIGMOID, Initializer.VANILLA)//3 in from the previous layer, 1 out
         );
         nn.setBatchSize(BATCHSIZE);
         System.out.println("Seed: " + seed);

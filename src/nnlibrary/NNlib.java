@@ -93,25 +93,43 @@ public class NNlib extends Application {
          * @param seed A seed for repeatable Layer initialization.
          * @param learningRate A value 0 to 1 for training layer parameters.
          * @param lossFunction Measures the error between two one row matrices.
-         * @param optimizer An algorithm that speeds up SGD.
-         * @param layers An array or list of layers to be used in the network.
+         * @param optimizer An algorithm that speeds up SGD, or use the VANILLA
+         * optimizer for regular SGD.
+         * @param inputLayer The Layer in which inputs first feeds into. Cannot
+         * infer input shape since it is the first Layer in the network so it
+         * must not be created with the constructor that leaves out the input
+         * shape.
+         * @param layers A list of Layers following the input Layer to be used
+         * in the network.
          * @see NNLib.LossFunction
          * @see NNLib.Optimizer
          * @see NNLib.Layer
          */
-        public NN(String label, long seed, float learningRate, BiFunction<float[][], float[][], Object[]> lossFunction, QuadFunction<Integer, Float, float[][], float[][][], Object[]> optimizer, Layer... layers) {
+        public NN(String label, long seed, float learningRate, BiFunction<float[][], float[][], Object[]> lossFunction, QuadFunction<Integer, Float, float[][], float[][][], Object[]> optimizer, Layer inputLayer, Layer... layers) {
+            init(label, seed, learningRate, lossFunction, optimizer);
+            length = 1 + layers.length;
+            lastIndex = length - 1;
+            network = new Layer[length];
+            network[0] = inputLayer;
+            inputLayer.initialize(random);
+            for (int i = 1; i < length; i++) {
+                Layer current = layers[i - 1];
+                if (current.INFER) {
+                    current.initialize(network[i - 1], random);
+                } else {
+                    current.initialize(random);
+                }
+                network[i] = current;
+            }
+        }
+
+        private void init(String label, long seed, float learningRate, BiFunction<float[][], float[][], Object[]> lossFunction, QuadFunction<Integer, Float, float[][], float[][][], Object[]> optimizer) {
             this.label = label;
             this.seed = seed;
             lr = learningRate;
             this.lossFunction = lossFunction;
             this.optimizer = optimizer;
-            network = layers;
-            length = network.length;
-            lastIndex = length - 1;
             random.setSeed(seed);
-            for (int i = 0; i < length; i++) {
-                network[i].initialize(random);
-            }
         }
 
         /**
@@ -202,11 +220,12 @@ public class NNlib extends Application {
          */
         @Override
         public NN clone() {
-            Layer[] layers = new Layer[length];
-            for (int i = 0; i < length; i++) {
-                layers[i] = network[i].clone();
+            Layer inputLayer = network[0].clone();
+            Layer[] layers = new Layer[lastIndex];
+            for (int i = 1; i < length; i++) {
+                layers[i - 1] = network[i].clone();
             }
-            NN clone = new NN(label, seed, lr, lossFunction, optimizer, layers);
+            NN clone = new NN(label, seed, lr, lossFunction, optimizer, inputLayer, layers);
             return clone;
         }
 
@@ -457,6 +476,13 @@ public class NNlib extends Application {
      */
     public static abstract class Layer implements Serializable {
 
+        private final boolean INFER;
+        private int[] OUTSHAPE;
+
+        private Layer(boolean infer) {
+            INFER = infer;
+        }
+
         /**
          * Initializes this Layer's parameters and storage of previous
          * gradients.
@@ -464,6 +490,15 @@ public class NNlib extends Application {
          * @param random A Random instance to create random values from.
          */
         public abstract void initialize(Random random);
+
+        /**
+         * Initializes this Layer's parameters and storage of previous
+         * gradients. With inference of input shape from the prior layer.
+         *
+         * @param previousLayer The prior layer to infer input shape from.
+         * @param random A Random instance to create random values from.
+         */
+        public abstract void initialize(Layer previousLayer, Random random);
 
         /**
          * Feeds values into this Layer and outputs values.
@@ -547,11 +582,19 @@ public class NNlib extends Application {
             private float[][][] accumulated;//First element are for weights, second element are for biases
             private BiFunction<float[][], Boolean, float[][]> activation;
             private BiFunction<float[][], Integer, float[][]> initializer;
-            public final int nodesIn;
-            public final int nodesOut;
+            private int nodesIn;
+            private final int nodesOut;
 
             public Dense(int nodesIn, int nodesOut, BiFunction<float[][], Boolean, float[][]> activation, BiFunction<float[][], Integer, float[][]> initializer) {
+                super(false);
                 this.nodesIn = nodesIn;
+                this.nodesOut = nodesOut;
+                this.activation = activation;
+                this.initializer = initializer;
+            }
+
+            public Dense(int nodesOut, BiFunction<float[][], Boolean, float[][]> activation, BiFunction<float[][], Integer, float[][]> initializer) {
+                super(true);
                 this.nodesOut = nodesOut;
                 this.activation = activation;
                 this.initializer = initializer;
@@ -568,6 +611,22 @@ public class NNlib extends Application {
                 updateStorageW = new float[1][nodesIn][nodesOut];
                 updateStorageB = new float[1][1][nodesOut];
                 accumulated = new float[2][][];
+                super.OUTSHAPE = new int[]{nodesOut};
+            }
+
+            /**
+             * @see Layer#initialize(nnlibrary.NNlib.Layer, java.util.Random)
+             */
+            @Override
+            public void initialize(Layer previousLayer, Random random) {
+                nodesIn = previousLayer.OUTSHAPE[0];
+                weights = NNlib.randomize(new float[nodesIn][nodesOut], 2, -1, random);//values on interval [-1,1]
+                biases = NNlib.randomize(new float[1][nodesOut], 2, -1, random);//values on interval [-1,1]
+                weights = initializer.apply(weights, nodesIn);
+                updateStorageW = new float[1][nodesIn][nodesOut];
+                updateStorageB = new float[1][1][nodesOut];
+                accumulated = new float[2][][];
+                super.OUTSHAPE = new int[]{nodesOut};
             }
 
             /**
@@ -703,9 +762,11 @@ public class NNlib extends Application {
 
         public static class Conv extends Layer implements Serializable {
 
+            private int inputHeight;
+            private int inputWidth;
             private float[][][][] filters;
             private final int filterNum;
-            private final int filterChannels;
+            private int filterChannels;
             private final int filterHeight;
             private final int filterWidth;
             private float[] biases;
@@ -722,9 +783,25 @@ public class NNlib extends Application {
             private float[][][] prevA;
             private float[][][] Z;
 
-            public Conv(int numberOfFilters, int filterChannels, int filterHeight, int filterWidth, int stride, int paddingHeight, int paddingWidth, BiFunction<float[][], Boolean, float[][]> activation) {
+            public Conv(int inputChannels, int inputHeight, int inputWidth, int numberOfFilters, int filterHeight, int filterWidth, int stride, int paddingHeight, int paddingWidth, BiFunction<float[][], Boolean, float[][]> activation) {
+                super(false);
+                this.inputHeight = inputHeight;
+                this.inputWidth = inputWidth;
                 filterNum = numberOfFilters;
-                this.filterChannels = filterChannels;
+                this.filterChannels = inputChannels;
+                this.filterHeight = filterHeight;
+                this.filterWidth = filterWidth;
+                this.stride = stride;
+                this.paddingHeight = paddingHeight;
+                this.paddingWidth = paddingWidth;
+                this.activation = activation;
+                pad = a -> NNlib.pad(a, paddingHeight, paddingWidth);
+                unpad = a -> NNlib.unpad(a, paddingHeight, paddingWidth);
+            }
+
+            public Conv(int numberOfFilters, int filterHeight, int filterWidth, int stride, int paddingHeight, int paddingWidth, BiFunction<float[][], Boolean, float[][]> activation) {
+                super(true);
+                filterNum = numberOfFilters;
                 this.filterHeight = filterHeight;
                 this.filterWidth = filterWidth;
                 this.stride = stride;
@@ -752,6 +829,31 @@ public class NNlib extends Application {
                 updateStorageB = new float[1][1][filterNum];
                 accumulatedF = new float[filterNum][filterChannels][filterHeight][filterWidth];
                 accumulatedB = new float[filterNum];
+                super.OUTSHAPE = new int[]{filterNum, (inputHeight + 2 * paddingHeight - filterHeight) / stride + 1, (inputWidth + 2 * paddingWidth - filterWidth) / stride + 1};
+            }
+
+            /**
+             * @see Layer#initialize(nnlibrary.NNlib.Layer, java.util.Random)
+             */
+            @Override
+            public void initialize(Layer previousLayer, Random random) {
+                int[] shapeIn = previousLayer.OUTSHAPE;
+                filterChannels = shapeIn[0];
+                inputHeight = shapeIn[1];
+                inputWidth = shapeIn[2];
+                filters = new float[filterNum][filterChannels][][];
+                biases = new float[filterNum];
+                for (int i = 0; i < filterNum; i++) {
+                    for (int j = 0; j < filterChannels; j++) {
+                        filters[i][j] = NNlib.randomize(new float[filterHeight][filterWidth], 2, -1, random);
+                    }
+                    biases[i] = random.nextFloat();
+                }
+                updateStorageF = new float[filterNum * filterChannels][1][filterHeight][filterWidth];
+                updateStorageB = new float[1][1][filterNum];
+                accumulatedF = new float[filterNum][filterChannels][filterHeight][filterWidth];
+                accumulatedB = new float[filterNum];
+                super.OUTSHAPE = new int[]{filterNum, (inputHeight + 2 * paddingHeight - filterHeight) / stride + 1, (inputWidth + 2 * paddingWidth - filterWidth) / stride + 1};
             }
 
             /**
@@ -906,7 +1008,7 @@ public class NNlib extends Application {
              */
             @Override
             public Layer clone() {
-                Conv copy = new Conv(filterNum, filterChannels, filterHeight, filterWidth, stride, paddingHeight, paddingWidth, activation);
+                Conv copy = new Conv(filterChannels, inputHeight, inputWidth, filterNum, filterHeight, filterWidth, stride, paddingHeight, paddingWidth, activation);
                 copy.filters = copy4d(filters);
                 copy.biases = copy1d(biases);
                 copy.updateStorageF = copy4d(updateStorageF);
@@ -925,14 +1027,19 @@ public class NNlib extends Application {
 
         public static class Flatten extends Layer implements Serializable {
 
-            private final int channels;
-            private final int height;
-            private final int width;
+            private int channels;
+            private int height;
+            private int width;
 
             public Flatten(int channelsIn, int heightIn, int widthIn) {
+                super(false);
                 channels = channelsIn;
                 height = heightIn;
                 width = widthIn;
+            }
+
+            public Flatten() {
+                super(true);
             }
 
             /**
@@ -940,6 +1047,19 @@ public class NNlib extends Application {
              */
             @Override
             public void initialize(Random random) {
+                super.OUTSHAPE = new int[]{channels * height * width};
+            }
+
+            /**
+             * @see Layer#initialize(nnlibrary.NNlib.Layer, java.util.Random)
+             */
+            @Override
+            public void initialize(Layer previousLayer, Random random) {
+                int[] shapeIn = previousLayer.OUTSHAPE;
+                channels = shapeIn[0];
+                height = shapeIn[1];
+                width = shapeIn[2];
+                super.OUTSHAPE = new int[]{channels * height * width};
             }
 
             /**
@@ -1030,26 +1150,34 @@ public class NNlib extends Application {
 
         public static class Maxpool extends Layer implements Serializable {
 
-            private final int inputChannels;
-            private final int inputHeight;
-            private final int inputWidth;
+            private int inputChannels;
+            private int inputHeight;
+            private int inputWidth;
             private final int poolingHeight;
             private final int poolingWidth;
             private final int stride;
-            private final int resultHeight;
-            private final int resultWidth;
-            private final int[][] positions;
+            private int resultHeight;
+            private int resultWidth;
+            private int[][] positions;
 
-            public Maxpool(int channelsIn, int heightIn, int widthIn, int poolingHeight, int poolingWidth, int stride) {
-                inputChannels = channelsIn;
-                inputHeight = heightIn;
-                inputWidth = widthIn;
+            public Maxpool(int inputChannels, int inputHeight, int inputWidth, int poolingHeight, int poolingWidth, int stride) {
+                super(false);
+                this.inputChannels = inputChannels;
+                this.inputHeight = inputHeight;
+                this.inputWidth = inputWidth;
                 this.poolingHeight = poolingHeight;
                 this.poolingWidth = poolingWidth;
                 this.stride = stride;
                 resultHeight = (inputHeight - poolingHeight) / stride + 1;
                 resultWidth = (inputWidth - poolingWidth) / stride + 1;
-                positions = new int[channelsIn * resultHeight * resultWidth][2];
+                positions = new int[inputChannels * resultHeight * resultWidth][2];
+            }
+
+            public Maxpool(int poolingHeight, int poolingWidth, int stride) {
+                super(true);
+                this.poolingHeight = poolingHeight;
+                this.poolingWidth = poolingWidth;
+                this.stride = stride;
             }
 
             /**
@@ -1057,6 +1185,22 @@ public class NNlib extends Application {
              */
             @Override
             public void initialize(Random random) {
+                super.OUTSHAPE = new int[]{inputChannels, resultHeight, resultWidth};
+            }
+
+            /**
+             * @see Layer#initialize(nnlibrary.NNlib.Layer, java.util.Random)
+             */
+            @Override
+            public void initialize(Layer previousLayer, Random random) {
+                int[] shapeIn = previousLayer.OUTSHAPE;
+                inputChannels = shapeIn[0];
+                inputHeight = shapeIn[1];
+                inputWidth = shapeIn[2];
+                resultHeight = (inputHeight - poolingHeight) / stride + 1;
+                resultWidth = (inputWidth - poolingWidth) / stride + 1;
+                positions = new int[inputChannels * resultHeight * resultWidth][2];
+                super.OUTSHAPE = new int[]{inputChannels, resultHeight, resultWidth};
             }
 
             /**
@@ -1850,6 +1994,15 @@ public class NNlib extends Application {
             }
         }
         return -1;
+    }
+
+    public static int[] includeElements(int[] array, int... indeces) {
+        int length = indeces.length;
+        int[] newArray = new int[length];
+        for (int i = 0; i < length; i++) {
+            newArray[i] = array[indeces[i]];
+        }
+        return newArray;
     }
 
     /**

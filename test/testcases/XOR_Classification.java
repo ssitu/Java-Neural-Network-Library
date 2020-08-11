@@ -36,7 +36,7 @@ public class XOR_Classification {
                 LossFunction.CROSSENTROPY(1),//Loss/Cost/Error Function
                 Optimizer.ADADELTA,//Gradient Descent Optimizer
                 new Layer.Dense(2, 4, CUSTOM, Initializer.XAVIER),
-                new Layer.Dense(4, 2, Activation.SOFTMAX, Initializer.XAVIER)
+                new Layer.Dense(2, Activation.SOFTMAX, Initializer.XAVIER)
         );
         nn.setBatchSize(4);
         System.out.println("Seed: " + seed);
