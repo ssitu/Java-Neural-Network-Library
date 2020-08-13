@@ -1300,7 +1300,7 @@ public class NNlib extends Application {
 
         public interface Initializer extends Serializable {
 
-            float[][] apply(float[][] parameters, Integer nodesIn);
+            float[][] apply(float[][] parameters, int nodesIn);
         }
         public static final Initializer VANILLA = (a, b) -> a;//No change
         public static final Initializer XAVIER = (a, b) -> scale(a, (float) Math.sqrt(1.0 / b));
