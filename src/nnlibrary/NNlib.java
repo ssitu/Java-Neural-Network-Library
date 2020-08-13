@@ -50,8 +50,9 @@ public class NNlib extends Application {
 
         R apply(T t, S s, U u, V v);
     }
+
     private static int threads;
-    private static BiFunction<float[][], float[][], float[][]> dotProduct = (a, b) -> dot(a, b);
+    public static java.util.function.BiFunction<float[][], float[][], float[][]> dotProduct = (a, b) -> dot(a, b);
 
     /**
      * The neural network class. This manages all the layers that are put inside
@@ -399,6 +400,15 @@ public class NNlib extends Application {
         }
 
         /**
+         * Get the seed of the Random class being used by this NN instance.
+         *
+         * @return A long representing the seed.
+         */
+        public long getSeed() {
+            return seed;
+        }
+
+        /**
          * Get the total amount of times the network has done backpropagation.
          * This number resets everytime the optimizer is changed.
          *
@@ -722,7 +732,7 @@ public class NNlib extends Application {
              */
             @Override
             public String parametersToString() {
-                return "Weights:\n" + arr2dToString(weights) + "\nBiases:\n" + arr2dToString(biases);
+                return "Weights:\n" + arrToString(weights) + "\nBiases:\n" + arrToString(biases);
             }
 
             /**
@@ -739,11 +749,11 @@ public class NNlib extends Application {
             @Override
             public Dense clone() {
                 Dense copy = new Dense(weights.length, weights[0].length, activation, Initializer.VANILLA);
-                copy.weights = copy2d(weights);
-                copy.biases = copy2d(biases);
+                copy.weights = copy(weights);
+                copy.biases = copy(biases);
                 try {
-                    copy.updateStorageW = copy3d(updateStorageW);
-                    copy.updateStorageB = copy3d(updateStorageB);
+                    copy.updateStorageW = copy(updateStorageW);
+                    copy.updateStorageB = copy(updateStorageB);
                 } catch (Exception e) {
                 }
                 return copy;
@@ -991,7 +1001,7 @@ public class NNlib extends Application {
                 String parameters = "";
                 for (int i = 0; i < filterNum; i++) {
                     String currentFilter = "Filter " + (i + 1);
-                    parameters += currentFilter + ": \n" + arr3dToString(filters[i]) + currentFilter + " Bias: [" + biases[i] + "]\n";
+                    parameters += currentFilter + ": \n" + arrToString(filters[i]) + currentFilter + " Bias: [" + biases[i] + "]\n";
                 }
                 return parameters;
             }
@@ -1010,10 +1020,10 @@ public class NNlib extends Application {
             @Override
             public Layer clone() {
                 Conv copy = new Conv(filterChannels, inputHeight, inputWidth, filterNum, filterHeight, filterWidth, stride, paddingHeight, paddingWidth, activation);
-                copy.filters = copy4d(filters);
-                copy.biases = copy1d(biases);
-                copy.updateStorageF = copy4d(updateStorageF);
-                copy.updateStorageB = copy3d(updateStorageB);
+                copy.filters = copy(filters);
+                copy.biases = copy(biases);
+                copy.updateStorageF = copy(updateStorageF);
+                copy.updateStorageB = copy(updateStorageB);
                 return copy;
             }
 
@@ -1337,7 +1347,7 @@ public class NNlib extends Application {
             if (!derivative) {
                 return matrix;
             } else {
-                float[][] result = create2d(matrix.length, matrix[0].length, 1);
+                float[][] result = create(matrix.length, matrix[0].length, 1);
                 return result;
             }
         };
@@ -1434,7 +1444,7 @@ public class NNlib extends Application {
             return (outputs, targets) -> {
                 int columns = outputs[0].length;
                 final float deltaSquared = steepness * steepness;
-                final float[][] ones = create2d(1, columns, 1);
+                final float[][] ones = create(1, columns, 1);
                 final float[][] a = subtract(outputs, targets);
                 final float[][] root = sqrt(add(ones, scale(square(a), 1 / deltaSquared)));
                 double loss = sum(scale(deltaSquared, subtract(root, ones)));
@@ -1482,7 +1492,7 @@ public class NNlib extends Application {
             float[][][] store = {update};
             return new Object[]{update, store};
         };
-        public static final QuadFunction<Integer, Float, float[][], float[][][], Object[]> NESTEROV = (step, lr, gradients, storage) -> {//Dozat's modification because calculating gradients of different parameters
+        public static final QuadFunction<Integer, Float, float[][], float[][][], Object[]> NESTEROV = (step, lr, gradients, storage) -> {//Dozat's modification because calculating gradients of different parameters would take a lot of reworking
             float[][] m = add(scale(beta, storage[0]), gradients);
             float[][] update = scale(lr, add(gradients, scale(beta, m)));
             float[][][] store = {m};
@@ -1490,11 +1500,11 @@ public class NNlib extends Application {
         };
         public static final QuadFunction<Integer, Float, float[][], float[][][], Object[]> ADAGRAD = (step, lr, gradients, storage) -> {
             float[][][] store = {add(storage[0], square(gradients))};
-            float[][] update = multiply(scale(lr, sqrt(add(store[0], create2d(gradients.length, gradients[0].length, e)))), gradients);
+            float[][] update = multiply(scale(lr, sqrt(add(store[0], create(gradients.length, gradients[0].length, e)))), gradients);
             return new Object[]{update, store};
         };
         public static final QuadFunction<Integer, Float, float[][], float[][][], Object[]> ADADELTA = (step, lr, gradients, storage) -> {
-            float[][] epsilon = create2d(gradients.length, gradients[0].length, e);
+            float[][] epsilon = create(gradients.length, gradients[0].length, e);
             float[][] gradientsE = EWMA(beta, storage[0], square(gradients));
             float[][] gradientsRMS = sqrt(add(gradientsE, epsilon));
             float[][] deltaRMS = sqrt(add(storage[1], epsilon));
@@ -1506,7 +1516,7 @@ public class NNlib extends Application {
         public static final QuadFunction<Integer, Float, float[][], float[][][], Object[]> RMSPROP = (step, lr, gradients, storage) -> {
             float[][] s = EWMA(beta, storage[0], square(gradients));
             float[][] s_ = scale(1 / (1 - (float) Math.pow((double) beta, step)), s);
-            float[][] update = divide(scale(lr, gradients), add(sqrt(s_), create2d(s.length, s[0].length, e)));
+            float[][] update = divide(scale(lr, gradients), add(sqrt(s_), create(s.length, s[0].length, e)));
             float[][][] store = {s};
             return new Object[]{update, store};
         };
@@ -1515,7 +1525,7 @@ public class NNlib extends Application {
             float[][] v = EWMA(beta2, storage[1], square(gradients));
             float[][] m_ = scale(1 / (1 - (float) Math.pow((double) beta, step)), m);
             float[][] v_ = scale(1 / (1 - (float) Math.pow((double) beta2, step)), v);
-            float[][] update = divide(scale(lr, m_), add(sqrt(v_), create2d(v_.length, v_[0].length, e)));
+            float[][] update = divide(scale(lr, m_), add(sqrt(v_), create(v_.length, v_[0].length, e)));
             float[][][] store = {m, v};
             return new Object[]{update, store};
         };
@@ -1524,7 +1534,7 @@ public class NNlib extends Application {
             float[][] v = EWMA(beta2, storage[1], square(gradients));
             float[][] m_ = scale(m, 1 / (1 - (float) Math.pow((double) beta, step)));
             float[][] u = max(scale(beta2, storage[1]), abs(gradients));
-            float[][] update = divide(scale(lr, m_), add(u, create2d(u.length, u[0].length, e)));
+            float[][] update = divide(scale(lr, m_), add(u, create(u.length, u[0].length, e)));
             float[][][] store = {m, v};
             return new Object[]{update, store};
         };
@@ -1535,7 +1545,7 @@ public class NNlib extends Application {
             float[][] v = EWMA(beta2, storage[1], square(gradients));
             float[][] m_ = scale(1 / (1 - (float) Math.pow((double) beta, step)), m);
             float[][] v_ = scale(1 / (1 - (float) Math.pow((double) beta2, step)), v);
-            float[][] update = multiply(divide(create2d(rows, columns, lr), add(sqrt(v_), create2d(rows, columns, e))), add(scale(beta, m_), scale(scale(1 - beta, gradients), 1 / (1 - beta))));
+            float[][] update = multiply(divide(create(rows, columns, lr), add(sqrt(v_), create(rows, columns, e))), add(scale(beta, m_), scale(scale(1 - beta, gradients), 1 / (1 - beta))));
             float[][][] store = {m, v};
             return new Object[]{update, store};
         };
@@ -1543,7 +1553,7 @@ public class NNlib extends Application {
             float[][] m = EWMA(beta, storage[0], gradients);
             float[][] v = EWMA(beta2, storage[1], square(gradients));
             float[][] v_ = max(storage[1], v);
-            float[][] update = divide(scale(lr, m), add(sqrt(v_), create2d(v_.length, v_[0].length, e)));
+            float[][] update = divide(scale(lr, m), add(sqrt(v_), create(v_.length, v_[0].length, e)));
             float[][][] store = {m, v};
             return new Object[]{update, store};
         };
@@ -1563,15 +1573,15 @@ public class NNlib extends Application {
     public static float[][] normalizeZScore(float[][] oneRow) {
         int elements = oneRow[0].length;
         float mean = sum(oneRow) / elements;
-        float deviation = (float) (Math.sqrt(sum(square(subtract(oneRow, create2d(1, elements, mean)))) / (mean)));
-        return divide(subtract(oneRow, create2d(1, elements, mean)), create2d(1, elements, deviation));
+        float deviation = (float) (Math.sqrt(sum(square(subtract(oneRow, create(1, elements, mean)))) / (mean)));
+        return divide(subtract(oneRow, create(1, elements, mean)), create(1, elements, deviation));
     }
 
     public static float[][] normalizeTanh(float[][] oneRow) {
         int elements = oneRow[0].length;
         float[][] result = new float[1][elements];
         float mean = sum(oneRow) / elements;
-        float deviation = (float) (Math.sqrt(sum(square(subtract(oneRow, create2d(1, elements, mean)))) / mean));
+        float deviation = (float) (Math.sqrt(sum(square(subtract(oneRow, create(1, elements, mean)))) / mean));
         for (int i = 0; i < elements; i++) {
             result[0][i] = (.5f * (tanh((.01f * ((oneRow[0][i] - mean) / (deviation))), false) + 1));
         }
@@ -1644,13 +1654,14 @@ public class NNlib extends Application {
      */
     public static float[][] softmax(float[][] matrix) {
         int cols = matrix[0].length;
-        float[][] result = functionMatrixVectors(matrix, vector -> subtract(vector, create2d(1, cols, max(vector))));//Stabilizing
+        float[][] result = functionMatrixVectors(matrix, vector -> subtract(vector, create(1, cols, max(vector))));//Stabilizing
         result = exp(result);
-        return functionMatrixVectors(result, vector -> divide(vector, create2d(1, cols, sum(vector))));
+        return functionMatrixVectors(result, vector -> divide(vector, create(1, cols, sum(vector))));
     }
 
     public static void setThreads(int numberOfThreads) {
         if (numberOfThreads <= 1) {
+            threads = 1;
             dotProduct = (a, b) -> dot(a, b);
         } else {
             threads = numberOfThreads;
@@ -1660,21 +1671,21 @@ public class NNlib extends Application {
 
     private static class MatrixThread extends Thread {
 
-        int num;
         int threadNum;
-        int rows;
-        int columns;
-        int columns2;
+        int totalThreads;
+        int rows1;
+        int cols1;
+        int cols2;
         float[][] m1;
         float[][] m2;
         float[][] result;
 
-        MatrixThread(int num, int threadNum, int rows, int columns, int columns2, float[][] m1, float[][] m2, float[][] result) {
-            this.num = num;
+        MatrixThread(int threadNum, int totalThreads, int rows1, int cols1, int cols2, float[][] m1, float[][] m2, float[][] result) {
             this.threadNum = threadNum;
-            this.rows = rows;
-            this.columns = columns;
-            this.columns2 = columns2;
+            this.totalThreads = totalThreads;
+            this.rows1 = rows1;
+            this.cols1 = cols1;
+            this.cols2 = cols2;
             this.m1 = m1;
             this.m2 = m2;
             this.result = result;
@@ -1682,10 +1693,43 @@ public class NNlib extends Application {
 
         @Override
         public void run() {
-            for (int i = num * rows / threadNum; i < (num + 1) * rows / threadNum; i++) {
-                for (int k = 0; k < columns2; k++) {
-                    for (int j = 0; j < columns; j++) {
-                        result[i][j] += m1[i][k] * m2[k][j];
+            int endRow = (threadNum + 1) * rows1 / totalThreads;
+            if (cols1 % 4 == 0) {//Loop unrolling increases speed
+                for (int i = threadNum * rows1 / totalThreads; i < endRow; i++) {
+                    for (int k = 0; k < cols1; k += 4) {
+                        for (int j = 0; j < cols2; j++) {
+                            result[i][j] += m1[i][k] * m2[k][j]
+                                    + m1[i][k + 1] * m2[k + 1][j]
+                                    + m1[i][k + 2] * m2[k + 2][j]
+                                    + m1[i][k + 3] * m2[k + 3][j];
+                        }
+                    }
+                }
+            } else if (cols1 % 3 == 0) {
+                for (int i = threadNum * rows1 / totalThreads; i < endRow; i++) {
+                    for (int k = 0; k < cols1; k += 3) {
+                        for (int j = 0; j < cols2; j++) {
+                            result[i][j] += m1[i][k] * m2[k][j]
+                                    + m1[i][k + 1] * m2[k + 1][j]
+                                    + m1[i][k + 2] * m2[k + 2][j];
+                        }
+                    }
+                }
+            } else if (cols1 % 2 == 0) {
+                for (int i = threadNum * rows1 / totalThreads; i < endRow; i++) {
+                    for (int k = 0; k < cols1; k += 2) {
+                        for (int j = 0; j < cols2; j++) {
+                            result[i][j] += m1[i][k] * m2[k][j]
+                                    + m1[i][k + 1] * m2[k + 1][j];
+                        }
+                    }
+                }
+            } else {
+                for (int i = threadNum * rows1 / totalThreads; i < endRow; i++) {
+                    for (int k = 0; k < cols1; k++) {
+                        for (int j = 0; j < cols2; j++) {
+                            result[i][j] += m1[i][k] * m2[k][j];
+                        }
                     }
                 }
             }
@@ -1694,12 +1738,12 @@ public class NNlib extends Application {
 
     public static float[][] dotThreads(float[][] m1, float[][] m2) {
         MatrixThread[] threadArray = new MatrixThread[threads];
-        int rows = m1.length;
-        int columns = m2[0].length;
-        int columns2 = m1[0].length;
-        float[][] result = new float[rows][columns];
+        int rows1 = m1.length;
+        int cols1 = m1[0].length;
+        int cols2 = m2[0].length;
+        float[][] result = new float[rows1][cols2];
         for (int t = 0; t < threads; t++) {
-            threadArray[t] = new MatrixThread(t, threads, rows, columns, columns2, m1, m2, result);
+            threadArray[t] = new MatrixThread(t, threads, rows1, cols1, cols2, m1, m2, result);
             threadArray[t].start();
         }
         for (int i = 0; i < threads; i++) {
@@ -1711,50 +1755,103 @@ public class NNlib extends Application {
         return result;
     }
 
-    public static String arr2dToString(float[][] matrix) {
-        int rows = matrix.length;
-        int columns = matrix[0].length;
-        String string = "";
-        for (int i = 0; i < rows; i++) {
-            for (int j = 0; j < columns; j++) {
-                string += "[" + matrix[i][j] + "] ";
+    public static float[][] dot(float[][] m1, float[][] m2) {
+        int rows1 = m1.length;
+        int cols1 = m1[0].length;
+        int cols2 = m2[0].length;
+        float[][] result = new float[rows1][cols2];
+        if (cols1 % 4 == 0) {//Loop unrolling increases speed
+            for (int i = 0; i < rows1; i++) {
+                for (int k = 0; k < cols1; k += 4) {
+                    for (int j = 0; j < cols2; j++) {
+                        result[i][j] += m1[i][k] * m2[k][j]
+                                + m1[i][k + 1] * m2[k + 1][j]
+                                + m1[i][k + 2] * m2[k + 2][j]
+                                + m1[i][k + 3] * m2[k + 3][j];
+                    }
+                }
             }
-            string += "\n";
+        } else if (cols1 % 3 == 0) {
+            for (int i = 0; i < rows1; i++) {
+                for (int k = 0; k < cols1; k += 3) {
+                    for (int j = 0; j < cols2; j++) {
+                        result[i][j] += m1[i][k] * m2[k][j]
+                                + m1[i][k + 1] * m2[k + 1][j]
+                                + m1[i][k + 2] * m2[k + 2][j];
+                    }
+                }
+            }
+        } else if (cols1 % 2 == 0) {
+            for (int i = 0; i < rows1; i++) {
+                for (int k = 0; k < cols1; k += 2) {
+                    for (int j = 0; j < cols2; j++) {
+                        result[i][j] += m1[i][k] * m2[k][j]
+                                + m1[i][k + 1] * m2[k + 1][j];
+                    }
+                }
+            }
+        } else {
+            for (int i = 0; i < rows1; i++) {
+                for (int k = 0; k < cols1; k++) {
+                    for (int j = 0; j < cols2; j++) {
+                        result[i][j] += m1[i][k] * m2[k][j];
+                    }
+                }
+            }
         }
+        return result;
+    }
+
+    public static String arrToString(float[][] arr2d) {
+        int rowLastIndex = arr2d.length - 1;
+        int columns = arr2d[0].length;
+        String string = "[";
+        for (int i = 0; i < rowLastIndex; i++) {
+            string += "[";
+            for (int j = 0; j < columns; j++) {
+                string += arr2d[i][j] + " ";
+            }
+            string += "\b]\n";
+        }
+        string += "[";
+        for (int j = 0; j < columns; j++) {
+            string += arr2d[rowLastIndex][j] + " ";
+        }
+        string += "\b]]\n";
         return string;
     }
 
-    public static String arr3dToString(float[][][] arr3d) {
+    public static String arrToString(float[][][] arr3d) {
         int depth = arr3d.length;
-        String string = "[\n" + arr2dToString(arr3d[0]);
+        String string = "[\n" + arrToString(arr3d[0]);
         for (int i = 1; i < depth; i++) {
-            string += "\n" + arr2dToString(arr3d[i]);
+            string += "\n" + arrToString(arr3d[i]);
         }
         return string + "]\n";
     }
 
-    public static void print(float[][] matrix) {
-        System.out.print(arr2dToString(matrix));
+    public static void print(float[][] arr2d) {
+        System.out.print(arrToString(arr2d));
     }
 
-    public static void print(float[][] matrix, String label) {
+    public static void print(float[][] arr2d, String label) {
         System.out.println(label + ":");
-        print(matrix);
+        print(arr2d);
     }
 
-    public static void print3d(float[][][] arr3d) {
+    public static void print(float[][][] arr3d) {
         int depth = arr3d.length;
         System.out.println("[");
-        System.out.print(arr2dToString(arr3d[0]));
+        System.out.print(arrToString(arr3d[0]));
         for (int i = 1; i < depth; i++) {
-            System.out.print("\n" + arr2dToString(arr3d[i]));
+            System.out.print("\n" + arrToString(arr3d[i]));
         }
         System.out.println("]");
     }
 
-    public static void print3d(float[][][] arr3d, String label) {
+    public static void print(float[][][] arr3d, String label) {
         System.out.println(label + ":");
-        print3d(arr3d);
+        print(arr3d);
     }
 
     public static void printDimensions(float[][] matrix) {
@@ -1773,7 +1870,7 @@ public class NNlib extends Application {
         return result;
     }
 
-    public static float[] create1d(int columns, float valueToAllElements) {
+    public static float[] create(int columns, float valueToAllElements) {
         float[] result = new float[columns];
         for (int i = 0; i < columns; i++) {
             result[i] = valueToAllElements;
@@ -1781,7 +1878,7 @@ public class NNlib extends Application {
         return result;
     }
 
-    public static float[][] create2d(int rows, int columns, float valueToAllElements) {
+    public static float[][] create(int rows, int columns, float valueToAllElements) {
         float[][] result = new float[rows][columns];
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < columns; j++) {
@@ -1791,7 +1888,7 @@ public class NNlib extends Application {
         return result;
     }
 
-    public static float[][][] create3d(int depth, int rows, int columns, float valueToAllElements) {
+    public static float[][][] create(int depth, int rows, int columns, float valueToAllElements) {
         float[][][] result = new float[depth][][];
         for (int i = 0; i < depth; i++) {
             for (int j = 0; j < rows; j++) {
@@ -1847,53 +1944,6 @@ public class NNlib extends Application {
         return bifunction(matrix1, matrix2, (val1, val2) -> val1 / val2);
     }
 
-    public static float[][] dot(float[][] m1, float[][] m2) {
-        int rows1 = m1.length;
-        int columns1 = m1[0].length;
-        int columns2 = m2[0].length;
-        float[][] result = new float[rows1][columns2];
-        if (columns1 % 4 == 0) {//Loop unrolling increases speed
-            for (int i = 0; i < rows1; i++) {
-                for (int k = 0; k < columns1; k += 4) {
-                    for (int j = 0; j < columns2; j++) {
-                        result[i][j] += m1[i][k] * m2[k][j]
-                                + m1[i][k + 1] * m2[k + 1][j]
-                                + m1[i][k + 2] * m2[k + 2][j]
-                                + m1[i][k + 3] * m2[k + 3][j];
-                    }
-                }
-            }
-        } else if (columns1 % 3 == 0) {
-            for (int i = 0; i < rows1; i++) {
-                for (int k = 0; k < columns1; k += 3) {
-                    for (int j = 0; j < columns2; j++) {
-                        result[i][j] += m1[i][k] * m2[k][j]
-                                + m1[i][k + 1] * m2[k + 1][j]
-                                + m1[i][k + 2] * m2[k + 2][j];
-                    }
-                }
-            }
-        } else if (columns1 % 2 == 0) {
-            for (int i = 0; i < rows1; i++) {
-                for (int k = 0; k < columns1; k += 2) {
-                    for (int j = 0; j < columns2; j++) {
-                        result[i][j] += m1[i][k] * m2[k][j]
-                                + m1[i][k + 1] * m2[k + 1][j];
-                    }
-                }
-            }
-        } else {
-            for (int i = 0; i < rows1; i++) {
-                for (int k = 0; k < columns1; k++) {
-                    for (int j = 0; j < columns2; j++) {
-                        result[i][j] += m1[i][k] * m2[k][j];
-                    }
-                }
-            }
-        }
-        return result;
-    }
-
     public static float[][] power(float[][] matrix, double power) {
         return function(matrix, val -> (float) Math.pow(val, power));
     }
@@ -1945,7 +1995,7 @@ public class NNlib extends Application {
     public static float[][] oneHot(float[][] matrix) {
         int rows = matrix.length;
         int columns = matrix[0].length;
-        float[][] result = create2d(rows, columns, 0);
+        float[][] result = create(rows, columns, 0);
         float max = matrix[0][0];
         int x = 0;
         int y = 0;
@@ -2155,34 +2205,34 @@ public class NNlib extends Application {
         return type;
     }
 
-    public static float[] copy1d(float[] arr1d) {
+    public static float[] copy(float[] arr1d) {
         int length = arr1d.length;
         float[] result = new float[length];
         System.arraycopy(arr1d, 0, result, 0, length);
         return result;
     }
 
-    public static float[][] copy2d(float[][] arr2d) {
+    public static float[][] copy(float[][] arr2d) {
         return Arrays.stream(arr2d).map(el -> el.clone()).toArray(a -> arr2d.clone());
     }
 
-    public static float[][][] copy3d(float[][][] arr3d) {
-        return Arrays.stream(arr3d).map(el -> copy2d(el)).toArray(a -> arr3d.clone());
+    public static float[][][] copy(float[][][] arr3d) {
+        return Arrays.stream(arr3d).map(el -> copy(el)).toArray(a -> arr3d.clone());
     }
 
-    public static float[][][][] copy4d(float[][][][] arr4d) {
-        return Arrays.stream(arr4d).map(el -> copy3d(el)).toArray(a -> arr4d.clone());
+    public static float[][][][] copy(float[][][][] arr4d) {
+        return Arrays.stream(arr4d).map(el -> copy(el)).toArray(a -> arr4d.clone());
     }
 
-    public static float[][][][][] copy5d(float[][][][][] arr5d) {
-        return Arrays.stream(arr5d).map(el -> copy4d(el)).toArray(a -> arr5d.clone());
+    public static float[][][][][] copy(float[][][][][] arr5d) {
+        return Arrays.stream(arr5d).map(el -> copy(el)).toArray(a -> arr5d.clone());
     }
 
     public static Object[] copy(Object[] nDimensionArr) {
         try {
             return Arrays.stream(nDimensionArr).map(el -> copy(Object[].class.cast(el))).toArray(a -> nDimensionArr.clone());
         } catch (ClassCastException e) {
-            return Arrays.stream(nDimensionArr).map(el -> copy1d(float[].class.cast(el))).toArray(a -> nDimensionArr.clone());
+            return Arrays.stream(nDimensionArr).map(el -> copy(float[].class.cast(el))).toArray(a -> nDimensionArr.clone());
         }
     }
 

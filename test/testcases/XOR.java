@@ -44,7 +44,7 @@ public class XOR {
         NNlib.showInfo(NNlib.infoGraph(false), nn);//Displays a cost over number of times backpropagated graph
         for (int i = 0; i < 100_000_000; i++) {
             if (BATCHSIZE == 1) {
-//                //Get a random data pair with the NN's seed
+//              //Get a random data pair with the NN's seed
                 int index = nn.getRandom().nextInt(4);
                 nn.backpropagation(dataset[0][index], dataset[1][index]);//Tunes network parameters to output values closer to the labels given the inputs.
             } else {
