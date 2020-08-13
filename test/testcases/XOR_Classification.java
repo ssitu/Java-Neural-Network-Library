@@ -8,7 +8,7 @@ public class XOR_Classification {
 
     public static void main(String[] args) {
         final boolean PRINT = true;
-        final BiFunction<float[][], Boolean, float[][]> CUSTOM = (matrix, derivative) -> {//Custom activation function -> max(tanh(x),x)
+        final Activations.Activation CUSTOM = (matrix, derivative) -> {//Custom activation function -> max(tanh(x),x)
             int rows = matrix.length;
             int columns = matrix[0].length;
             if (!derivative) {
@@ -33,10 +33,10 @@ public class XOR_Classification {
                 "xor_classification",//Name for Saving & Graph Title
                 seed,//Seed For Reproducibility
                 0,//Learning Rate for Optimizer
-                LossFunction.CROSSENTROPY(1),//Loss/Cost/Error Function
-                Optimizer.ADADELTA,//Gradient Descent Optimizer
-                new Layer.Dense(2, 4, CUSTOM, Initializer.XAVIER),
-                new Layer.Dense(2, Activation.SOFTMAX, Initializer.XAVIER)
+                LossFunctions.CROSSENTROPY(1),//Loss/Cost/Error Function
+                Optimizers.ADADELTA,//Gradient Descent Optimizer
+                new Layer.Dense(2, 4, CUSTOM, Initializers.XAVIER),
+                new Layer.Dense(2, Activations.SOFTMAX, Initializers.XAVIER)
         );
         nn.setBatchSize(4);
         System.out.println("Seed: " + seed);

@@ -10,12 +10,12 @@ public class ConvolutionalNeuralNetwork {
     public static void main(String[] args) {
         long seed = new Random().nextLong();
         System.out.println("Seed: " + seed);
-        NN nn = new NN("Conv", seed, 0, LossFunction.QUADRATIC(.5), Optimizer.ADADELTA,
-                new Conv(1, 3, 3, 2, 3, 3, 1, 1, 1, Activation.TANH),//1x3x3 + 1x1 pad = 1x5x5, 1x5x5 conv(s=1) 2x1x3x3 = 2x3x3
+        NN nn = new NN("Conv", seed, 0, LossFunctions.QUADRATIC(.5), Optimizers.ADADELTA,
+                new Conv(1, 3, 3, 2, 3, 3, 1, 1, 1, Activations.TANH),//1x3x3 + 1x1 pad = 1x5x5, 1x5x5 conv(s=1) 2x1x3x3 = 2x3x3
                 new Maxpool(2, 2, 1),//2x3x3 maxpool(s=1) 2x2 = 2x2x2
-                new Conv(1, 1, 1, 1, 0, 0, Activation.TANH),//2x2x2 conv(s=1) 1x2x1x1 = 1x2x2
+                new Conv(1, 1, 1, 1, 0, 0, Activations.TANH),//2x2x2 conv(s=1) 1x2x1x1 = 1x2x2
                 new Flatten(),//1x2x2 = 4
-                new Dense(1, Activation.SIGMOID, Initializer.XAVIER));
+                new Dense(1, Activations.SIGMOID, Initializers.XAVIER));
         NNlib.showInfo(NNlib.infoLayers, nn);
         NNlib.showInfo(NNlib.infoGraph(false), nn);
         float[][][] input1 = {//Slash
@@ -57,10 +57,10 @@ public class ConvolutionalNeuralNetwork {
             nn.backpropagation(input4, label4);
             if (i % 10000 == 0) {
                 System.out.println("Inputs:");
-                print3d(input1);
-                print3d(input2);
-                print3d(input3);
-                print3d(input4);
+                print(input1);
+                print(input2);
+                print(input3);
+                print(input4);
                 System.out.println("Labels:");
                 print(label1);
                 print(label2);

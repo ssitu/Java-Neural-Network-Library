@@ -3,6 +3,8 @@ package nnlibrary;
 import java.io.*;
 import java.lang.reflect.Array;
 import java.util.*;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 import javafx.animation.*;
 import javafx.application.Application;
 import static javafx.application.Application.launch;
@@ -17,42 +19,8 @@ import javafx.util.Duration;
 
 public class NNlib extends Application {
 
-    /**
-     * A serializable version of java's Function class
-     *
-     * @param <T> First type
-     * @param <R> Second type
-     */
-    public interface Function<T, R> extends java.util.function.Function<T, R>, Serializable {
-    }
-
-    /**
-     * A serializable version of java's BiFunction class
-     *
-     * @param <T> First type
-     * @param <S> Second type
-     * @param <R> Third type
-     */
-    public interface BiFunction<T, S, R> extends java.util.function.BiFunction<T, S, R>, Serializable {
-    }
-
-    /**
-     * Just like java's Function and BiFunction but only with the apply method
-     * and 4 parameters.
-     *
-     * @param <T> First type
-     * @param <S> Second type
-     * @param <U> Third type
-     * @param <V> Fourth type
-     * @param <R> Return type
-     */
-    public interface QuadFunction<T, S, U, V, R> extends Serializable {
-
-        R apply(T t, S s, U u, V v);
-    }
-
     private static int threads;
-    public static java.util.function.BiFunction<float[][], float[][], float[][]> dotProduct = (a, b) -> dot(a, b);
+    public static BiFunction<float[][], float[][], float[][]> dotProduct = (a, b) -> dot(a, b);
 
     /**
      * The neural network class. This manages all the layers that are put inside
@@ -71,8 +39,8 @@ public class NNlib extends Application {
         private double loss;
         private double summedLoss = 0;
         private long iterations = 0;
-        private BiFunction<float[][], float[][], Object[]> lossFunction;
-        private QuadFunction<Integer, Float, float[][], float[][][], Object[]> optimizer;
+        private LossFunctions.LossFunction lossFunction;
+        private Optimizers.Optimizer optimizer;
         private int step = 1;
         private int batchsize = 1;
         /**
@@ -102,19 +70,19 @@ public class NNlib extends Application {
          * shape.
          * @param layers A list of Layers following the input Layer to be used
          * in the network.
-         * @see NNLib.LossFunction
-         * @see NNLib.Optimizer
+         * @see NNLib.LossFunctions.LossFunction
+         * @see NNLib.Optimizers.Optimizer
          * @see NNLib.Layer
          */
-        public NN(String label, long seed, float learningRate, BiFunction<float[][], float[][], Object[]> lossFunction, QuadFunction<Integer, Float, float[][], float[][][], Object[]> optimizer, Layer inputLayer, Layer... layers) {
-            init(label, seed, learningRate, lossFunction, optimizer);
-            length = 1 + layers.length;
+        public NN(String label, long seed, float learningRate, LossFunctions.LossFunction LossFunctions, Optimizers.Optimizer Optimizers, Layer Layer, Layer... Layers) {
+            init(label, seed, learningRate, LossFunctions, Optimizers);
+            length = 1 + Layers.length;
             lastIndex = length - 1;
             network = new Layer[length];
-            network[0] = inputLayer;
-            inputLayer.initialize(random);
+            network[0] = Layer;
+            Layer.initialize(random);
             for (int i = 1; i < length; i++) {
-                Layer current = layers[i - 1];
+                Layer current = Layers[i - 1];
                 if (current.INFER) {
                     current.initialize(network[i - 1], random);
                 } else {
@@ -124,7 +92,7 @@ public class NNlib extends Application {
             }
         }
 
-        private void init(String label, long seed, float learningRate, BiFunction<float[][], float[][], Object[]> lossFunction, QuadFunction<Integer, Float, float[][], float[][][], Object[]> optimizer) {
+        private void init(String label, long seed, float learningRate, LossFunctions.LossFunction lossFunction, Optimizers.Optimizer optimizer) {
             this.label = label;
             this.seed = seed;
             lr = learningRate;
@@ -452,9 +420,9 @@ public class NNlib extends Application {
          * Change the loss function of this NN instance.
          *
          * @param lossFunction The loss/cost/error function
-         * @see NNLib.LossFunction
+         * @see NNLib.LossFunctions.LossFunction
          */
-        public void setLossFunction(BiFunction<float[][], float[][], Object[]> lossFunction) {
+        public void setLossFunction(LossFunctions.LossFunction lossFunction) {
             this.lossFunction = lossFunction;
         }
 
@@ -462,9 +430,9 @@ public class NNlib extends Application {
          * Change the optimizer of this NN instance.
          *
          * @param optimizer The SGD optimizer
-         * @see NNLib.Optimizer
+         * @see NNLib.Optimizers.Optimizer
          */
-        public void setOptimizer(QuadFunction<Integer, Float, float[][], float[][][], Object[]> optimizer) {
+        public void setOptimizer(Optimizers.Optimizer optimizer) {
             this.optimizer = optimizer;
         }
 
@@ -533,7 +501,7 @@ public class NNlib extends Application {
          * @return The partial derivatives of the loss with respect to the
          * values before the activation function.
          */
-        public abstract Object[] back(Object[] dC_dA_uncasted, float lr, QuadFunction<Integer, Float, float[][], float[][][], Object[]> optimizer, int step, boolean update);
+        public abstract Object[] back(Object[] dC_dA_uncasted, float lr, Optimizers.Optimizer optimizer, int step, boolean update);
 
         /**
          * Randomize parameters of this Layer.
@@ -591,12 +559,12 @@ public class NNlib extends Application {
             private float[][][] updateStorageW;
             private float[][][] updateStorageB;
             private float[][][] accumulated;//First element are for weights, second element are for biases
-            private BiFunction<float[][], Boolean, float[][]> activation;
-            private BiFunction<float[][], Integer, float[][]> initializer;
+            private Activations.Activation activation;
+            private Initializers.Initializer initializer;
             private int nodesIn;
             private final int nodesOut;
 
-            public Dense(int nodesIn, int nodesOut, BiFunction<float[][], Boolean, float[][]> activation, BiFunction<float[][], Integer, float[][]> initializer) {
+            public Dense(int nodesIn, int nodesOut, Activations.Activation activation, Initializers.Initializer initializer) {
                 super(false);
                 this.nodesIn = nodesIn;
                 this.nodesOut = nodesOut;
@@ -604,7 +572,7 @@ public class NNlib extends Application {
                 this.initializer = initializer;
             }
 
-            public Dense(int nodesOut, BiFunction<float[][], Boolean, float[][]> activation, BiFunction<float[][], Integer, float[][]> initializer) {
+            public Dense(int nodesOut, Activations.Activation activation, Initializers.Initializer initializer) {
                 super(true);
                 this.nodesOut = nodesOut;
                 this.activation = activation;
@@ -655,7 +623,7 @@ public class NNlib extends Application {
              * neuralnetwork.NNLib.QuadFunction, int, boolean)
              */
             @Override
-            public Object[] back(Object[] dC_dA_uncasted, float lr, QuadFunction<Integer, Float, float[][], float[][][], Object[]> optimizer, int step, boolean update) {
+            public Object[] back(Object[] dC_dA_uncasted, float lr, Optimizers.Optimizer optimizer, int step, boolean update) {
                 float[][] dC_dA = (float[][]) dC_dA_uncasted;
                 float[][] dA_dZ = activation.apply(Z, true);
                 float[][] dC_dZ;
@@ -748,7 +716,7 @@ public class NNlib extends Application {
              */
             @Override
             public Dense clone() {
-                Dense copy = new Dense(weights.length, weights[0].length, activation, Initializer.VANILLA);
+                Dense copy = new Dense(weights.length, weights[0].length, activation, null);
                 copy.weights = copy(weights);
                 copy.biases = copy(biases);
                 try {
@@ -786,7 +754,7 @@ public class NNlib extends Application {
             private final int paddingWidth;
             private final Function<float[][], float[][]> pad;
             private final Function<float[][], float[][]> unpad;
-            private BiFunction<float[][], Boolean, float[][]> activation;
+            private Activations.Activation activation;
             private float[][][][] updateStorageF;
             private float[][][] updateStorageB;
             private float[][][][] accumulatedF;
@@ -794,7 +762,7 @@ public class NNlib extends Application {
             private float[][][] prevA;
             private float[][][] Z;
 
-            public Conv(int inputChannels, int inputHeight, int inputWidth, int numberOfFilters, int filterHeight, int filterWidth, int stride, int paddingHeight, int paddingWidth, BiFunction<float[][], Boolean, float[][]> activation) {
+            public Conv(int inputChannels, int inputHeight, int inputWidth, int numberOfFilters, int filterHeight, int filterWidth, int stride, int paddingHeight, int paddingWidth, Activations.Activation activation) {
                 super(false);
                 this.inputHeight = inputHeight;
                 this.inputWidth = inputWidth;
@@ -810,7 +778,7 @@ public class NNlib extends Application {
                 unpad = a -> NNlib.unpad(a, paddingHeight, paddingWidth);
             }
 
-            public Conv(int numberOfFilters, int filterHeight, int filterWidth, int stride, int paddingHeight, int paddingWidth, BiFunction<float[][], Boolean, float[][]> activation) {
+            public Conv(int numberOfFilters, int filterHeight, int filterWidth, int stride, int paddingHeight, int paddingWidth, Activations.Activation activation) {
                 super(true);
                 filterNum = numberOfFilters;
                 this.filterHeight = filterHeight;
@@ -886,7 +854,7 @@ public class NNlib extends Application {
              * neuralnetwork.NNLib.QuadFunction, int, boolean)
              */
             @Override
-            public Object[] back(Object[] dC_dA_uncasted, float lr, QuadFunction<Integer, Float, float[][], float[][][], Object[]> optimizer, int step, boolean update) {
+            public Object[] back(Object[] dC_dA_uncasted, float lr, Optimizers.Optimizer optimizer, int step, boolean update) {
                 float[][][] dC_dA = (float[][][]) dC_dA_uncasted;
                 float[][][] dA_dZ = function2dOn3d(Z, a -> activation.apply(a, true));
                 float[][][] dC_dZ;
@@ -1097,7 +1065,7 @@ public class NNlib extends Application {
              * neuralnetwork.NNLib.QuadFunction, int, boolean)
              */
             @Override
-            public Object[] back(Object[] dC_dA_uncasted, float lr, QuadFunction<Integer, Float, float[][], float[][][], Object[]> optimizer, int step, boolean update) {
+            public Object[] back(Object[] dC_dA_uncasted, float lr, Optimizers.Optimizer optimizer, int step, boolean update) {
                 float[][] dC_dA = (float[][]) dC_dA_uncasted;
                 float[][][] unflattened = new float[channels][height][width];
                 int index = 0;
@@ -1262,7 +1230,7 @@ public class NNlib extends Application {
              * neuralnetwork.NNLib.QuadFunction, int, boolean)
              */
             @Override
-            public Object[] back(Object[] dC_dA_uncasted, float lr, QuadFunction<Integer, Float, float[][], float[][][], Object[]> optimizer, int step, boolean update) {
+            public Object[] back(Object[] dC_dA_uncasted, float lr, Optimizers.Optimizer optimizer, int step, boolean update) {
                 float[][][] dC_dA = (float[][][]) dC_dA_uncasted;
                 float[][][] unpooled = new float[inputChannels][inputHeight][inputWidth];
                 for (int i = 0; i < inputChannels; i++) {
@@ -1328,11 +1296,15 @@ public class NNlib extends Application {
      * A set of common weight initializers. Takes in weights of a layer and the
      * number of nodes going into the layer ()
      */
-    public static class Initializer {
+    public static class Initializers {
 
-        public static final BiFunction<float[][], Integer, float[][]> VANILLA = (a, b) -> a;//No change
-        public static final BiFunction<float[][], Integer, float[][]> XAVIER = (a, b) -> scale(a, (float) Math.sqrt(1.0 / b));
-        public static final BiFunction<float[][], Integer, float[][]> HE = (a, b) -> scale(a, (float) Math.sqrt(2.0 / b));
+        public interface Initializer extends Serializable {
+
+            float[][] apply(float[][] parameters, Integer nodesIn);
+        }
+        public static final Initializer VANILLA = (a, b) -> a;//No change
+        public static final Initializer XAVIER = (a, b) -> scale(a, (float) Math.sqrt(1.0 / b));
+        public static final Initializer HE = (a, b) -> scale(a, (float) Math.sqrt(2.0 / b));
     }
 
     /**
@@ -1341,9 +1313,14 @@ public class NNlib extends Application {
      * is true, then the values are passed into the derivative of the desired
      * function.
      */
-    public static class Activation {
+    public static class Activations {
 
-        public static final BiFunction<float[][], Boolean, float[][]> LINEAR = (matrix, derivative) -> {
+        public interface Activation extends Serializable {
+
+            float[][] apply(float[][] matrix, boolean derivative);
+        }
+
+        public static final Activation LINEAR = (matrix, derivative) -> {
             if (!derivative) {
                 return matrix;
             } else {
@@ -1351,13 +1328,13 @@ public class NNlib extends Application {
                 return result;
             }
         };
-        public static final BiFunction<float[][], Boolean, float[][]> SIGMOID = (matrix, derivative) -> function(matrix, val -> sigmoid(val, derivative));
-        public static final BiFunction<float[][], Boolean, float[][]> TANH = (matrix, derivative) -> function(matrix, val -> tanh(val, derivative));
-        public static final BiFunction<float[][], Boolean, float[][]> RELU = (matrix, derivative) -> function(matrix, val -> relu(val, derivative));
-        public static final BiFunction<float[][], Boolean, float[][]> LEAKYRELU = (matrix, derivative) -> function(matrix, val -> leakyrelu(val, derivative));
-        public static final BiFunction<float[][], Boolean, float[][]> SWISH = (matrix, derivative) -> function(matrix, val -> swish(val, derivative));
-        public static final BiFunction<float[][], Boolean, float[][]> MISH = (matrix, derivative) -> function(matrix, val -> mish(val, derivative));
-        public static final BiFunction<float[][], Boolean, float[][]> SOFTMAX = (matrix, derivative) -> {
+        public static final Activation SIGMOID = (matrix, derivative) -> function(matrix, val -> sigmoid(val, derivative));
+        public static final Activation TANH = (matrix, derivative) -> function(matrix, val -> tanh(val, derivative));
+        public static final Activation RELU = (matrix, derivative) -> function(matrix, val -> relu(val, derivative));
+        public static final Activation LEAKYRELU = (matrix, derivative) -> function(matrix, val -> leakyrelu(val, derivative));
+        public static final Activation SWISH = (matrix, derivative) -> function(matrix, val -> swish(val, derivative));
+        public static final Activation MISH = (matrix, derivative) -> function(matrix, val -> mish(val, derivative));
+        public static final Activation SOFTMAX = (matrix, derivative) -> {
             if (!derivative) {
                 return softmax(matrix);
             } else {
@@ -1388,15 +1365,20 @@ public class NNlib extends Application {
      * same shape as the outputs and targets with values from the derivative of
      * the loss function with the outputs as inputs.
      */
-    public static class LossFunction {
+    public static class LossFunctions {
+
+        public interface LossFunction extends Serializable {
+
+            Object[] apply(float[][] outputs, float[][] targets);
+        }
 
         /**
          * @param steepnessFactor Recommended value: .5
          * @return Quadratic loss function.
          */
-        public static final BiFunction<float[][], float[][], Object[]> QUADRATIC(double steepnessFactor) {
-            final float steepness = (float) steepnessFactor;
-            return (outputs, targets) -> {
+        public static LossFunction QUADRATIC(double steepnessFactor) {
+            float steepness = (float) steepnessFactor;
+            return (float[][] outputs, float[][] targets) -> {
                 double loss = sum(scale(steepness, square(subtract(outputs, targets))));//m(f(x) - y)^2 where f(x) is the output of the network and y is the target output
                 return new Object[]{loss, scale(2 * steepness, subtract(outputs, targets))};//Derivative of the loss function for each sample, 2m(f(x) - y)
             };
@@ -1406,7 +1388,7 @@ public class NNlib extends Application {
          * @param steepnessFactor Recommended value: 1
          * @return Huber loss function.
          */
-        public static final BiFunction<float[][], float[][], Object[]> HUBER(double steepnessFactor) {
+        public static LossFunction HUBER(double steepnessFactor) {
             final float steepness = (float) steepnessFactor;
             final float deltaHalf = steepness / 2;
             return (outputs, targets) -> {
@@ -1439,7 +1421,7 @@ public class NNlib extends Application {
          * @param steepnessFactor Recommended value: 1
          * @return Pseudo Huber loss function.
          */
-        public static final BiFunction<float[][], float[][], Object[]> HUBERPSEUDO(double steepnessFactor) {
+        public static LossFunction HUBERPSEUDO(double steepnessFactor) {
             final float steepness = (float) steepnessFactor;
             return (outputs, targets) -> {
                 int columns = outputs[0].length;
@@ -1456,7 +1438,7 @@ public class NNlib extends Application {
          * @param steepnessFactor Recommended value: 1
          * @return Cross entropy/log loss function.
          */
-        public static final BiFunction<float[][], float[][], Object[]> CROSSENTROPY(double steepnessFactor) {
+        public static LossFunction CROSSENTROPY(double steepnessFactor) {
             final float steepness = (float) steepnessFactor;
             return (outputs, targets) -> {
                 double loss = steepness * -sum(multiply(targets, ln(outputs)));
@@ -1474,86 +1456,89 @@ public class NNlib extends Application {
      * update and its second element is the storage array(3 dimensional) that is
      * passed into the next call of the optimizer.
      */
-    public static class Optimizer {
+    public static class Optimizers {
 
         public static final float beta = .9f;
         public static final float beta2 = .999f;
         public static final float e = .00000001f;
 
-        private static float[][] EWMA(float beta, float[][] prevStep, float[][] currentStep) {
-            return add(scale(beta, prevStep), scale(1 - beta, currentStep));
+        public interface Optimizer extends Serializable {
+
+            Object[] apply(int step, float learningRate, float[][] gradients, float[][][] storage);
         }
-        public static final QuadFunction<Integer, Float, float[][], float[][][], Object[]> VANILLA = (step, lr, gradients, storage) -> {
+        public static Optimizer VANILLA = (step, lr, gradients, storage) -> {
             float[][] update = scale(lr, gradients);
             return new Object[]{update, null};
         };
-        public static final QuadFunction<Integer, Float, float[][], float[][][], Object[]> MOMENTUM = (step, lr, gradients, storage) -> {
+        public static Optimizer MOMENTUM = (step, lr, gradients, storage) -> {
             float[][] update = add(scale(beta, storage[0]), scale(lr, gradients));
             float[][][] store = {update};
             return new Object[]{update, store};
         };
-        public static final QuadFunction<Integer, Float, float[][], float[][][], Object[]> NESTEROV = (step, lr, gradients, storage) -> {//Dozat's modification because calculating gradients of different parameters would take a lot of reworking
+        public static Optimizer NESTEROV = (step, lr, gradients, storage) -> {//Dozat's modification because calculating gradients of different parameters would take a lot of reworking
             float[][] m = add(scale(beta, storage[0]), gradients);
             float[][] update = scale(lr, add(gradients, scale(beta, m)));
             float[][][] store = {m};
             return new Object[]{update, store};
         };
-        public static final QuadFunction<Integer, Float, float[][], float[][][], Object[]> ADAGRAD = (step, lr, gradients, storage) -> {
+        public static Optimizer ADAGRAD = (step, lr, gradients, storage) -> {
             float[][][] store = {add(storage[0], square(gradients))};
             float[][] update = multiply(scale(lr, sqrt(add(store[0], create(gradients.length, gradients[0].length, e)))), gradients);
             return new Object[]{update, store};
         };
-        public static final QuadFunction<Integer, Float, float[][], float[][][], Object[]> ADADELTA = (step, lr, gradients, storage) -> {
+        public static Optimizer ADADELTA = (step, lr, gradients, storage) -> {
             float[][] epsilon = create(gradients.length, gradients[0].length, e);
-            float[][] gradientsE = EWMA(beta, storage[0], square(gradients));
+            float[][] gradientsE = ewma(beta, storage[0], square(gradients));
             float[][] gradientsRMS = sqrt(add(gradientsE, epsilon));
             float[][] deltaRMS = sqrt(add(storage[1], epsilon));
             float[][] update = multiply(divide(deltaRMS, gradientsRMS), gradients);
-            float[][] deltaE = EWMA(beta, storage[1], square(update));
+            float[][] deltaE = ewma(beta, storage[1], square(update));
             float[][][] store = {gradientsE, deltaE};
             return new Object[]{update, store};
         };
-        public static final QuadFunction<Integer, Float, float[][], float[][][], Object[]> RMSPROP = (step, lr, gradients, storage) -> {
-            float[][] s = EWMA(beta, storage[0], square(gradients));
+        public static Optimizer RMSPROP = (step, lr, gradients, storage) -> {
+            float[][] s = ewma(beta, storage[0], square(gradients));
             float[][] s_ = scale(1 / (1 - (float) Math.pow((double) beta, step)), s);
             float[][] update = divide(scale(lr, gradients), add(sqrt(s_), create(s.length, s[0].length, e)));
             float[][][] store = {s};
             return new Object[]{update, store};
         };
-        public static final QuadFunction<Integer, Float, float[][], float[][][], Object[]> ADAM = (step, lr, gradients, storage) -> {
-            float[][] m = EWMA(beta, storage[0], gradients);
-            float[][] v = EWMA(beta2, storage[1], square(gradients));
+        public static Optimizer ADAM = (step, lr, gradients, storage) -> {
+            float[][] m = ewma(beta, storage[0], gradients);
+            float[][] v = ewma(beta2, storage[1], square(gradients));
             float[][] m_ = scale(1 / (1 - (float) Math.pow((double) beta, step)), m);
             float[][] v_ = scale(1 / (1 - (float) Math.pow((double) beta2, step)), v);
             float[][] update = divide(scale(lr, m_), add(sqrt(v_), create(v_.length, v_[0].length, e)));
             float[][][] store = {m, v};
             return new Object[]{update, store};
         };
-        public static final QuadFunction<Integer, Float, float[][], float[][][], Object[]> ADAMAX = (step, lr, gradients, storage) -> {
-            float[][] m = EWMA(beta, storage[0], gradients);
-            float[][] v = EWMA(beta2, storage[1], square(gradients));
+        public static Optimizer ADAMAX = (step, lr, gradients, storage) -> {
+            float[][] m = ewma(beta, storage[0], gradients);
+            float[][] v = ewma(beta2, storage[1], square(gradients));
             float[][] m_ = scale(m, 1 / (1 - (float) Math.pow((double) beta, step)));
             float[][] u = max(scale(beta2, storage[1]), abs(gradients));
             float[][] update = divide(scale(lr, m_), add(u, create(u.length, u[0].length, e)));
             float[][][] store = {m, v};
             return new Object[]{update, store};
         };
-        public static final QuadFunction<Integer, Float, float[][], float[][][], Object[]> NADAM = (step, lr, gradients, storage) -> {
+        public static Optimizer NADAM = (step, lr, gradients, storage) -> {
             int rows = gradients.length;
             int columns = gradients[0].length;
-            float[][] m = EWMA(beta, storage[0], gradients);
-            float[][] v = EWMA(beta2, storage[1], square(gradients));
+            float[][] m = ewma(beta, storage[0], gradients);
+            float[][] v = ewma(beta2, storage[1], square(gradients));
             float[][] m_ = scale(1 / (1 - (float) Math.pow((double) beta, step)), m);
             float[][] v_ = scale(1 / (1 - (float) Math.pow((double) beta2, step)), v);
             float[][] update = multiply(divide(create(rows, columns, lr), add(sqrt(v_), create(rows, columns, e))), add(scale(beta, m_), scale(scale(1 - beta, gradients), 1 / (1 - beta))));
             float[][][] store = {m, v};
             return new Object[]{update, store};
         };
-        public static final QuadFunction<Integer, Float, float[][], float[][][], Object[]> AMSGRAD = (step, lr, gradients, storage) -> {
-            float[][] m = EWMA(beta, storage[0], gradients);
-            float[][] v = EWMA(beta2, storage[1], square(gradients));
-            float[][] v_ = max(storage[1], v);
-            float[][] update = divide(scale(lr, m), add(sqrt(v_), create(v_.length, v_[0].length, e)));
+        public static Optimizer AMSGRAD = (step, lr, gradients, storage) -> {
+            float[][] m = ewma(beta, storage[0], gradients);
+            float[][] v = ewma(beta2, storage[1], square(gradients));
+            float[][] m_ = scale(1 / (1 - (float) Math.pow((double) beta, step)), m);
+            float[][] v_ = scale(1 / (1 - (float) Math.pow((double) beta2, step)), v);
+            float[][] v__ = max(storage[1], v_);
+            float[][] update = divide(scale(lr, m_), add(sqrt(v__), create(v__.length, v__[0].length, e)));
             float[][][] store = {m, v};
             return new Object[]{update, store};
         };
@@ -1982,6 +1967,10 @@ public class NNlib extends Application {
 
     public static float[][] ln(float[][] matrix) {
         return function(matrix, val -> (float) Math.log(val));
+    }
+
+    public static float[][] ewma(float beta, float[][] prevStep, float[][] currentStep) {
+        return add(scale(beta, prevStep), scale(1 - beta, currentStep));
     }
 
     /**

@@ -14,10 +14,10 @@ public class XOR {
                 "XOR",//Name for Saving & Graph Title
                 seed,//Seed For Reproducibility
                 .1f,//Learning Rate for Optimizer
-                LossFunction.QUADRATIC(.5),//Loss/Cost/Error Function
-                Optimizer.VANILLA,//Gradient Descent Optimizer
-                new Layer.Dense(2, 3, Activation.SIGMOID, Initializer.VANILLA),//2 in, 3 out
-                new Layer.Dense(1, Activation.SIGMOID, Initializer.VANILLA)//3 in from the previous layer, 1 out
+                LossFunctions.QUADRATIC(.5),//Loss/Cost/Error Function
+                Optimizers.VANILLA,//Gradient Descent Optimizer
+                new Layer.Dense(2, 3, Activations.SIGMOID, Initializers.VANILLA),//2 in, 3 out
+                new Layer.Dense(1, Activations.SIGMOID, Initializers.VANILLA)//3 in from the previous layer, 1 out
         );
         nn.setBatchSize(BATCHSIZE);
         System.out.println("Seed: " + seed);
