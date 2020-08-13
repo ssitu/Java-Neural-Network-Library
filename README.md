@@ -43,7 +43,7 @@ See the [test cases](https://github.com/ssitu/Neural-Network-Library-Class/tree/
 * Min Max Normalization
 * Z Score Normalization
 * Tanh Estimator Normalization
-* Multithreaded Dot Product (not very practical)
+* Multithreaded Dot Product
 * Matrix Zero Padding
 * Matrix Dilation
 ## General Features
