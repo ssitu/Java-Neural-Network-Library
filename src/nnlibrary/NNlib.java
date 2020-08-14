@@ -19,8 +19,9 @@ import javafx.util.Duration;
 
 public class NNlib extends Application {
 
+    private static final long serial = 0;
     private static int threads;
-    public static BiFunction<float[][], float[][], float[][]> dotProduct = (a, b) -> dot(a, b);
+    private static BiFunction<float[][], float[][], float[][]> dotProduct = (a, b) -> dot(a, b);
 
     /**
      * The neural network class. This manages all the layers that are put inside
@@ -31,7 +32,7 @@ public class NNlib extends Application {
      */
     public static class NN implements Serializable {
 
-        private static final long serialVersionUID = 1;
+        private static final long serialVersionUID = serial;
         private Layer[] network;
         private float lr;
         private Random random = new Random();
@@ -454,7 +455,6 @@ public class NNlib extends Application {
      */
     public static abstract class Layer implements Serializable {
 
-        private static final long serialVersionUID = 1;
         private final boolean INFER;
         private int[] OUTSHAPE;
 
@@ -552,6 +552,7 @@ public class NNlib extends Application {
 
         public static class Dense extends Layer implements Serializable {
 
+            private static final long serialVersionUID = serial;
             private float[][] weights;
             private float[][] biases;
             private float[][] prevA;
@@ -741,6 +742,7 @@ public class NNlib extends Application {
 
         public static class Conv extends Layer implements Serializable {
 
+            private static final long serialVersionUID = serial;
             private int inputHeight;
             private int inputWidth;
             private float[][][][] filters;
@@ -1006,6 +1008,7 @@ public class NNlib extends Application {
 
         public static class Flatten extends Layer implements Serializable {
 
+            private static final long serialVersionUID = serial;
             private int channels;
             private int height;
             private int width;
@@ -1129,6 +1132,7 @@ public class NNlib extends Application {
 
         public static class Maxpool extends Layer implements Serializable {
 
+            private static final long serialVersionUID = serial;
             private int inputChannels;
             private int inputHeight;
             private int inputWidth;
