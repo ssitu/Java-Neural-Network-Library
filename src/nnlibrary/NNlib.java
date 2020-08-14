@@ -3,8 +3,6 @@ package nnlibrary;
 import java.io.*;
 import java.lang.reflect.Array;
 import java.util.*;
-import java.util.function.BiFunction;
-import java.util.function.Function;
 import javafx.animation.*;
 import javafx.application.Application;
 import static javafx.application.Application.launch;
@@ -18,6 +16,18 @@ import javafx.stage.*;
 import javafx.util.Duration;
 
 public class NNlib extends Application {
+
+    /**
+     * A serializable version of java's Function interface
+     */
+    public interface Function<T, R> extends java.util.function.Function<T, R>, Serializable {
+    }
+
+    /**
+     * A serializable version of java's BiFunction interface
+     */
+    public interface BiFunction<T, S, R> extends java.util.function.BiFunction<T, S, R>, Serializable {
+    }
 
     private static final long serial = 0;
     private static int threads;
