@@ -8,7 +8,6 @@ public class XOR {
 
     public static void main(String[] args) {
         final boolean PRINT = true;
-        final int BATCHSIZE = 4;
         long seed = new Random().nextLong();
         NN nn = new NN(
                 "XOR",//Name for Saving & Graph Title
@@ -19,10 +18,11 @@ public class XOR {
                 new Layer.Dense(2, 3, Activations.SIGMOID, Initializers.VANILLA),//2 in, 3 out
                 new Layer.Dense(1, Activations.SIGMOID, Initializers.VANILLA)//3 in from the previous layer, 1 out
         );
-        nn.setBatchSize(BATCHSIZE);
+        nn.setAccumulationSize(4);
         System.out.println("Seed: " + seed);
         System.out.println("Network Length: " + nn.length);
-        System.out.println("Network Architecture: \n" + nn);
+        System.out.println("Network Architecture: " + nn);
+        System.out.println("Network Parameters: " + nn.getParameterCount());
         //XOR truth table
         float[][][][] dataset = {
             {//Inputs
@@ -43,21 +43,8 @@ public class XOR {
         NNlib.showInfo(NNlib.infoGraph(true), nn);//Displays an accuracy over number of times backpropgated graph
         NNlib.showInfo(NNlib.infoGraph(false), nn);//Displays a cost over number of times backpropagated graph
         for (int i = 0; i < 100_000_000; i++) {
-            if (BATCHSIZE == 1) {
-//              //Get a random data pair with the NN's seed
-                int index = nn.getRandom().nextInt(4);
-                nn.backpropagation(dataset[0][index], dataset[1][index]);//Tunes network parameters to output values closer to the labels given the inputs.
-            } else {
-                if (i % 4 == 0) {
-                    nn.backpropagation(dataset[0][0], dataset[1][0]);
-                } else if (i % 4 == 1) {
-                    nn.backpropagation(dataset[0][1], dataset[1][1]);
-                } else if (i % 4 == 2) {
-                    nn.backpropagation(dataset[0][2], dataset[1][2]);
-                } else if (i % 4 == 3) {
-                    nn.backpropagation(dataset[0][3], dataset[1][3]);
-                }
-            }
+            int index = i % 4;
+            nn.backpropagation(dataset[0][index], dataset[1][index]);//Tunes network parameters to output values closer to the labels given the inputs.
             if (PRINT && i % 100000 == 0) {
                 System.out.println("XOR Inputs:");
                 float[][] inputs = NNlib.append(dataset[0][0], dataset[0][1], dataset[0][2], dataset[0][3]);

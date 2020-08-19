@@ -38,7 +38,7 @@ public class XOR_Classification {
                 new Layer.Dense(2, 4, CUSTOM, Initializers.XAVIER),
                 new Layer.Dense(2, Activations.SOFTMAX, Initializers.XAVIER)
         );
-        nn.setBatchSize(4);
+        nn.setAccumulationSize(4);
         System.out.println("Seed: " + seed);
         System.out.println("NN Length: " + nn.length);
         System.out.println(nn);

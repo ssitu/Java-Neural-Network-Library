@@ -16,7 +16,7 @@ public class Benchmarking {
                 new Dense(10, Activations.SOFTMAX, Initializers.XAVIER)
         );
         System.out.println(nn);
-        nn.setBatchSize(100);
+        nn.setAccumulationSize(100);
         NNlib.showInfo(infoGraph(false), nn);
         float[][][] input = function2dOn3d(new float[1][28][28], a -> randomize(a, 2, -1, nn.getRandom()));
         float[][] label = {{1}};

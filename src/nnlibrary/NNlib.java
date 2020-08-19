@@ -30,8 +30,16 @@ public class NNlib extends Application {
     }
 
     private static final long serial = 0;
-    private static int threads;
-    private static BiFunction<float[][], float[][], float[][]> dotProduct = (a, b) -> dot(a, b);
+    private static final int usableProcessors = Runtime.getRuntime().availableProcessors() / 4;
+    private static BiFunction<float[][], float[][], float[][]> dotProduct = (a, b) -> {
+        if (a.length == 1) {
+            return dotVector(a[0], b);
+        } else if (a.length / usableProcessors > 10) {
+            return dotThreads(a, b, usableProcessors);
+        } else {
+            return dot(a, b);
+        }
+    };
 
     /**
      * The neural network class. This manages all the layers that are put inside
@@ -53,7 +61,7 @@ public class NNlib extends Application {
         private LossFunctions.LossFunction lossFunction;
         private Optimizers.Optimizer optimizer;
         private int step = 1;
-        private int batchsize = 1;
+        private int accumulationSize = 1;
         /**
          * The name of this NN instance. Used in saving, loading, and info
          * panels.
@@ -64,26 +72,30 @@ public class NNlib extends Application {
          */
         public final int length;
         /**
-         * The index of the last layer in the network
+         * The index of the last layer in the network.
          */
         public final int lastIndex;
 
         /**
+         * Some variable names do not follow convention so that when the IDE
+         * lists out the variables when creating an NN instance you would only
+         * have to add a period followed by the name of the already implemented
+         * function e.g. Optimizers.ADAM.
+         *
          * @param label The name for the NN.
          * @param seed A seed for repeatable Layer initialization.
          * @param learningRate A value 0 to 1 for training layer parameters.
-         * @param lossFunction Measures the error between two one row matrices.
-         * @param optimizer An algorithm that speeds up SGD, or use the VANILLA
+         * @param LossFunctions Measures the error between two one row matrices.
+         * @param Optimizers An algorithm that speeds up SGD, or use the VANILLA
          * optimizer for regular SGD.
-         * @param inputLayer The Layer in which inputs first feeds into. Cannot
-         * infer input shape since it is the first Layer in the network so it
-         * must not be created with the constructor that leaves out the input
-         * shape.
-         * @param layers A list of Layers following the input Layer to be used
+         * @param Layer The Layer in which inputs first feeds into. Cannot infer
+         * input shape since it is the first Layer in the network so it must not
+         * be created with the constructor that leaves out the input shape.
+         * @param Layers A list of Layers following the input Layer to be used
          * in the network.
-         * @see NNLib.LossFunctions.LossFunction
-         * @see NNLib.Optimizers.Optimizer
-         * @see NNLib.Layer
+         * @see LossFunctions.LossFunction
+         * @see Optimizers.Optimizer
+         * @see Layer
          */
         public NN(String label, long seed, float learningRate, LossFunctions.LossFunction LossFunctions, Optimizers.Optimizer Optimizers, Layer Layer, Layer... Layers) {
             init(label, seed, learningRate, LossFunctions, Optimizers);
@@ -139,7 +151,7 @@ public class NNlib extends Application {
          */
         public void backpropagation(Object[] inputs, Object[] targets) {
             boolean update;
-            if (iterations % batchsize == 0) {
+            if (iterations % accumulationSize == 0) {
                 update = true;
             } else {
                 update = false;
@@ -154,7 +166,7 @@ public class NNlib extends Application {
             }
             if (update) {
                 step++;
-                loss = summedLoss / batchsize;
+                loss = summedLoss / accumulationSize;
                 summedLoss = 0;
             }
             iterations++;
@@ -431,7 +443,7 @@ public class NNlib extends Application {
          * Change the loss function of this NN instance.
          *
          * @param lossFunction The loss/cost/error function
-         * @see NNLib.LossFunctions.LossFunction
+         * @see LossFunctions.LossFunction
          */
         public void setLossFunction(LossFunctions.LossFunction lossFunction) {
             this.lossFunction = lossFunction;
@@ -441,7 +453,7 @@ public class NNlib extends Application {
          * Change the optimizer of this NN instance.
          *
          * @param optimizer The SGD optimizer
-         * @see NNLib.Optimizers.Optimizer
+         * @see Optimizers.Optimizer
          */
         public void setOptimizer(Optimizers.Optimizer optimizer) {
             this.optimizer = optimizer;
@@ -451,11 +463,11 @@ public class NNlib extends Application {
          * Set how many backpropagation steps for gradients to accumulate before
          * tuning parameters. Must be at least 1.
          *
-         * @param batchsize The desired amount of steps.
+         * @param size The desired amount of steps.
          */
-        public void setBatchSize(int batchsize) {
-            if (batchsize >= 1) {
-                this.batchsize = batchsize;
+        public void setAccumulationSize(int size) {
+            if (size >= 1) {
+                this.accumulationSize = size;
             }
         }
     }
@@ -569,7 +581,8 @@ public class NNlib extends Application {
             private float[][] Z;
             private float[][][] updateStorageW;
             private float[][][] updateStorageB;
-            private float[][][] accumulated;//First element are for weights, second element are for biases
+            private float[][] accumulatedW;
+            private float[][] accumulatedB;
             private Activations.Activation activation;
             private Initializers.Initializer initializer;
             private int nodesIn;
@@ -600,7 +613,8 @@ public class NNlib extends Application {
                 weights = initializer.apply(weights, nodesIn);
                 updateStorageW = new float[1][nodesIn][nodesOut];
                 updateStorageB = new float[1][1][nodesOut];
-                accumulated = new float[2][][];
+                accumulatedW = new float[nodesIn][nodesOut];
+                accumulatedB = new float[1][nodesOut];
                 super.OUTSHAPE = new int[]{nodesOut};
             }
 
@@ -615,7 +629,8 @@ public class NNlib extends Application {
                 weights = initializer.apply(weights, nodesIn);
                 updateStorageW = new float[1][nodesIn][nodesOut];
                 updateStorageB = new float[1][1][nodesOut];
-                accumulated = new float[2][][];
+                accumulatedW = new float[nodesIn][nodesOut];
+                accumulatedB = new float[1][nodesOut];
                 super.OUTSHAPE = new int[]{nodesOut};
             }
 
@@ -631,7 +646,7 @@ public class NNlib extends Application {
 
             /**
              * @see Layer#back(java.lang.Object[], float,
-             * neuralnetwork.NNLib.QuadFunction, int, boolean)
+             * nnlibrary.NNlib.Optimizers.Optimizer, int, boolean)
              */
             @Override
             public Object[] back(Object[] dC_dA_uncasted, float lr, Optimizers.Optimizer optimizer, int step, boolean update) {
@@ -664,17 +679,13 @@ public class NNlib extends Application {
 
             public void tuneParameters(float[][] gradientsW, float[][] gradientsB, boolean update) {
                 //Add to the accumulated gradients
-                if (accumulated[0] == null) {
-                    accumulated[0] = gradientsW;
-                    accumulated[1] = gradientsB;
-                } else {
-                    accumulated[0] = add(accumulated[0], gradientsW);
-                    accumulated[1] = add(accumulated[1], gradientsB);
-                }
+                accumulatedW = add(accumulatedW, gradientsW);
+                accumulatedB = add(accumulatedB, gradientsB);
                 if (update) {
-                    weights = subtract(weights, accumulated[0]);
-                    biases = subtract(biases, accumulated[1]);
-                    accumulated = new float[2][][];
+                    weights = subtract(weights, accumulatedW);
+                    biases = subtract(biases, accumulatedB);
+                    accumulatedW = new float[nodesIn][nodesOut];
+                    accumulatedB = new float[1][nodesOut];
                 }
             }
 
@@ -863,7 +874,7 @@ public class NNlib extends Application {
 
             /**
              * @see Layer#back(java.lang.Object[], float,
-             * neuralnetwork.NNLib.QuadFunction, int, boolean)
+             * nnlibrary.NNlib.Optimizers.Optimizer, int, boolean)
              */
             @Override
             public Object[] back(Object[] dC_dA_uncasted, float lr, Optimizers.Optimizer optimizer, int step, boolean update) {
@@ -1075,7 +1086,7 @@ public class NNlib extends Application {
 
             /**
              * @see Layer#back(java.lang.Object[], float,
-             * neuralnetwork.NNLib.QuadFunction, int, boolean)
+             * nnlibrary.NNlib.Optimizers.Optimizer, int, boolean)
              */
             @Override
             public Object[] back(Object[] dC_dA_uncasted, float lr, Optimizers.Optimizer optimizer, int step, boolean update) {
@@ -1241,7 +1252,7 @@ public class NNlib extends Application {
 
             /**
              * @see Layer#back(java.lang.Object[], float,
-             * neuralnetwork.NNLib.QuadFunction, int, boolean)
+             * nnlibrary.NNlib.Optimizers.Optimizer, int, boolean)
              */
             @Override
             public Object[] back(Object[] dC_dA_uncasted, float lr, Optimizers.Optimizer optimizer, int step, boolean update) {
@@ -1312,8 +1323,20 @@ public class NNlib extends Application {
      */
     public static class Initializers {
 
+        /**
+         * A functional interface for the initialization of parameters.
+         */
         public interface Initializer extends Serializable {
 
+            /**
+             * Applies the initializer to the given parameters.
+             *
+             * @param parameters A 2d array of parameters for the initializer to
+             * modify.
+             * @param nodesIn The nodes going into the Layer with the
+             * parameters.
+             * @return A 2d array with the new parameters.
+             */
             float[][] apply(float[][] parameters, int nodesIn);
         }
         public static final Initializer VANILLA = (a, b) -> a;//No change
@@ -1329,8 +1352,22 @@ public class NNlib extends Application {
      */
     public static class Activations {
 
+        /**
+         * A functional interface that is used for activation functions.
+         */
         public interface Activation extends Serializable {
 
+            /**
+             * Applies the activation function to a matrix of values. The
+             * derivative function determines if the derivative of the function
+             * is to be applied to the values instead.
+             *
+             * @param matrix A 2d array with values to be passed into the
+             * activation function.
+             * @param derivative Indicates for the derivative of the function.
+             * @return A 2d array with the function mapped to each value of the
+             * given array.
+             */
             float[][] apply(float[][] matrix, boolean derivative);
         }
 
@@ -1658,17 +1695,7 @@ public class NNlib extends Application {
         return functionMatrixVectors(result, vector -> divide(vector, create(1, cols, sum(vector))));
     }
 
-    public static void setThreads(int numberOfThreads) {
-        if (numberOfThreads <= 1) {
-            threads = 1;
-            dotProduct = (a, b) -> dot(a, b);
-        } else {
-            threads = numberOfThreads;
-            dotProduct = (a, b) -> dotThreads(a, b);
-        }
-    }
-
-    private static class MatrixThread extends Thread {
+    private static class DotWorker extends Thread {
 
         int threadNum;
         int totalThreads;
@@ -1679,7 +1706,7 @@ public class NNlib extends Application {
         float[][] m2;
         float[][] result;
 
-        MatrixThread(int threadNum, int totalThreads, int rows1, int cols1, int cols2, float[][] m1, float[][] m2, float[][] result) {
+        DotWorker(int threadNum, int totalThreads, int rows1, int cols1, int cols2, float[][] m1, float[][] m2, float[][] result) {
             this.threadNum = threadNum;
             this.totalThreads = totalThreads;
             this.rows1 = rows1;
@@ -1735,14 +1762,14 @@ public class NNlib extends Application {
         }
     }
 
-    public static float[][] dotThreads(float[][] m1, float[][] m2) {
-        MatrixThread[] threadArray = new MatrixThread[threads];
+    public static float[][] dotThreads(float[][] m1, float[][] m2, int threads) {
+        DotWorker[] threadArray = new DotWorker[threads];
         int rows1 = m1.length;
         int cols1 = m1[0].length;
         int cols2 = m2[0].length;
         float[][] result = new float[rows1][cols2];
         for (int t = 0; t < threads; t++) {
-            threadArray[t] = new MatrixThread(t, threads, rows1, cols1, cols2, m1, m2, result);
+            threadArray[t] = new DotWorker(t, threads, rows1, cols1, cols2, m1, m2, result);
             threadArray[t].start();
         }
         for (int i = 0; i < threads; i++) {
@@ -1801,22 +1828,60 @@ public class NNlib extends Application {
         return result;
     }
 
+    public static float[][] dotVector(float[] vector, float[][] matrix) {
+        int rows2 = matrix.length;
+        int cols2 = matrix[0].length;
+        float[][] result = new float[1][cols2];
+        if (rows2 % 4 == 0) {
+            for (int i = 0; i < rows2; i += 4) {
+                for (int j = 0; j < cols2; j++) {
+                    result[0][j] += vector[i] * matrix[i][j]
+                            + vector[i + 1] * matrix[i + 1][j]
+                            + vector[i + 2] * matrix[i + 2][j]
+                            + vector[i + 3] * matrix[i + 3][j];
+                }
+            }
+        } else if (rows2 % 3 == 0) {
+            for (int i = 0; i < rows2; i += 3) {
+                for (int j = 0; j < cols2; j++) {
+                    result[0][j] += vector[i] * matrix[i][j]
+                            + vector[i + 1] * matrix[i + 1][j]
+                            + vector[i + 2] * matrix[i + 2][j];
+                }
+            }
+        } else if (rows2 % 2 == 0) {
+            for (int i = 0; i < rows2; i += 2) {
+                for (int j = 0; j < cols2; j++) {
+                    result[0][j] += vector[i] * matrix[i][j]
+                            + vector[i + 1] * matrix[i + 1][j];
+                }
+            }
+        } else {
+            for (int i = 0; i < rows2; i++) {
+                for (int j = 0; j < cols2; j++) {
+                    result[0][j] += vector[i] * matrix[i][j];
+                }
+            }
+        }
+        return result;
+    }
+
     public static String arrToString(float[][] arr2d) {
         int rowLastIndex = arr2d.length - 1;
         int columns = arr2d[0].length;
         String string = "[";
         for (int i = 0; i < rowLastIndex; i++) {
-            string += "[";
-            for (int j = 0; j < columns; j++) {
-                string += arr2d[i][j] + " ";
+            string += "[" + arr2d[i][0];
+            for (int j = 1; j < columns; j++) {
+                string += " " + arr2d[i][j];
             }
-            string += "\b]\n";
+            string += "]\n";
         }
-        string += "[";
-        for (int j = 0; j < columns; j++) {
-            string += arr2d[rowLastIndex][j] + " ";
+        string += "[" + arr2d[rowLastIndex][0];
+        for (int j = 1; j < columns; j++) {
+            string += " " + arr2d[rowLastIndex][j];
         }
-        string += "\b]]\n";
+        string += "]]\n";
         return string;
     }
 
@@ -2021,7 +2086,8 @@ public class NNlib extends Application {
      *
      * @param probabilities Array of probabilities adding up to 1.
      * @return The chosen index. Depending on the probabilities, will return -1
-     * if probabilities don't add up to 1.
+     * if probabilities don't add up to 1 and it resulted in no determined
+     * index.
      */
     public static int sampleProbabilities(float[] probabilities) {
         float random = (float) Math.random();
@@ -2036,6 +2102,11 @@ public class NNlib extends Application {
     }
 
     /**
+     * @param probabilities Array of probabilities adding up to 1.
+     * @param rng Random class for seeded randomness
+     * @return The chosen index. Depending on the probabilities, will return -1
+     * if probabilities don't add up to 1 and it resulted in no determined
+     * index.
      * @see #sampleProbabilities(float[])
      */
     public static int sampleProbabilities(float[] probabilities, Random rng) {
