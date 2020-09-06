@@ -31,7 +31,7 @@ public class XOR_Classification {
         long seed = new Random().nextLong();
         NN nn = new NN(
                 "xor_classification",//Name for Saving & Graph Title
-                seed,//Seed For Reproducibility
+                0,//Seed For Reproducibility
                 0,//Learning Rate for Optimizer
                 LossFunctions.CROSSENTROPY(1),//Loss/Cost/Error Function
                 Optimizers.ADADELTA,//Gradient Descent Optimizer

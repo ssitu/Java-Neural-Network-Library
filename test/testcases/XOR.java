@@ -23,6 +23,13 @@ public class XOR {
         System.out.println("Network Length: " + nn.length);
         System.out.println("Network Architecture: " + nn);
         System.out.println("Network Parameters: " + nn.getParameterCount());
+        System.out.println("====================================================");
+        System.out.println("Network Starting Parameters: ");
+        for(int i = 0; i < nn.length; i++){
+            System.out.println("Layer " + i + ":");
+            System.out.println(nn.getLayer(i).parametersToString());
+        }
+        System.out.println("====================================================");
         //XOR truth table
         float[][][][] dataset = {
             {//Inputs

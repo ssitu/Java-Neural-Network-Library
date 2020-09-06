@@ -865,7 +865,7 @@ public class NNlib extends Application {
             public Object[] forward(Object[] in) {
                 try {
                     prevA = function2dOn3d((float[][][]) in, pad);
-                    Z = NNlib.convolution3d(prevA, filters, biases, stride);
+                    Z = NNlib.convolution(prevA, filters, biases, stride);
                     return function2dOn3d(Z, a -> activation.apply(a, false));
                 } catch (ArrayIndexOutOfBoundsException e) {
                     throw new IllegalArgumentException("Input dimensions are " + getDimensions(in) + " but the filter size is " + getDimensions(filters));
@@ -891,7 +891,7 @@ public class NNlib extends Application {
                 float[] dC_dB = new float[filterNum];
                 for (int i = 0; i < filterNum; i++) {
                     for (int j = 0; j < filterChannels; j++) {
-                        dC_dW[i][j] = convolution3d(new float[][][]{prevA[j]}, new float[][][][]{{dC_dZ[i]}}, new float[]{0}, 1)[0];
+                        dC_dW[i][j] = convolution(new float[][][]{prevA[j]}, new float[][][][]{{dC_dZ[i]}}, new float[]{0}, 1)[0];
                     }
                     dC_dB[i] = sum(dC_dZ[i]);
                 }
@@ -943,7 +943,7 @@ public class NNlib extends Application {
                 float[][][] dC_dA_ = new float[filterChannels][prevA[0].length][prevA[0][0].length];
                 for (int i = 0; i < filterNum; i++) {
                     for (int j = 0; j < filterChannels; j++) {
-                        dC_dA_[j] = add(dC_dA_[j], convolution3d(new float[][][]{dC_dZ_dilated_padded[i]}, new float[][][][]{{rotatedFilters[i][j]}}, new float[filterNum], 1)[0]);
+                        dC_dA_[j] = add(dC_dA_[j], convolution(new float[][][]{dC_dZ_dilated_padded[i]}, new float[][][][]{{rotatedFilters[i][j]}}, new float[filterNum], 1)[0]);
                     }
                 }
                 dC_dA_ = function2dOn3d(dC_dA_, unpad);
@@ -1340,8 +1340,8 @@ public class NNlib extends Application {
             float[][] apply(float[][] parameters, int nodesIn);
         }
         public static final Initializer VANILLA = (a, b) -> a;//No change
-        public static final Initializer XAVIER = (a, b) -> scale(a, (float) Math.sqrt(1.0 / b));
-        public static final Initializer HE = (a, b) -> scale(a, (float) Math.sqrt(2.0 / b));
+        public static final Initializer XAVIER = (a, b) -> multiply(a, (float) Math.sqrt(1.0 / b));
+        public static final Initializer HE = (a, b) -> multiply(a, (float) Math.sqrt(2.0 / b));
     }
 
     /**
@@ -1479,7 +1479,7 @@ public class NNlib extends Application {
                 final float deltaSquared = steepness * steepness;
                 final float[][] ones = create(1, columns, 1);
                 final float[][] a = subtract(outputs, targets);
-                final float[][] root = sqrt(add(ones, scale(square(a), 1 / deltaSquared)));
+                final float[][] root = sqrt(add(ones, multiply(square(a), 1 / deltaSquared)));
                 double loss = sum(scale(deltaSquared, subtract(root, ones)));
                 return new Object[]{loss, divide(a, root)};
             };
@@ -1493,7 +1493,7 @@ public class NNlib extends Application {
             final float steepness = (float) steepnessFactor;
             return (outputs, targets) -> {
                 double loss = steepness * -sum(multiply(targets, ln(outputs)));
-                return new Object[]{loss, scale(-steepness, divide(targets, outputs))};
+                return new Object[]{loss, scale(-steepness, divide(targets, add(outputs, create(outputs.length, outputs[0].length, 1e-7f))))};//Preventing NaNs
             };
         }
     }
@@ -1511,7 +1511,7 @@ public class NNlib extends Application {
 
         public static final float beta = .9f;
         public static final float beta2 = .999f;
-        public static final float e = .00000001f;
+        public static final float e = 1e-7f;
 
         public interface Optimizer extends Serializable {
 
@@ -1566,7 +1566,7 @@ public class NNlib extends Application {
         public static Optimizer ADAMAX = (step, lr, gradients, storage) -> {
             float[][] m = ewma(beta, storage[0], gradients);
             float[][] v = ewma(beta2, storage[1], square(gradients));
-            float[][] m_ = scale(m, 1 / (1 - (float) Math.pow((double) beta, step)));
+            float[][] m_ = multiply(m, 1 / (1 - (float) Math.pow((double) beta, step)));
             float[][] u = max(scale(beta2, storage[1]), abs(gradients));
             float[][] update = divide(scale(lr, m_), add(u, create(u.length, u[0].length, e)));
             float[][][] store = {m, v};
@@ -1579,7 +1579,7 @@ public class NNlib extends Application {
             float[][] v = ewma(beta2, storage[1], square(gradients));
             float[][] m_ = scale(1 / (1 - (float) Math.pow((double) beta, step)), m);
             float[][] v_ = scale(1 / (1 - (float) Math.pow((double) beta2, step)), v);
-            float[][] update = multiply(divide(create(rows, columns, lr), add(sqrt(v_), create(rows, columns, e))), add(scale(beta, m_), scale(scale(1 - beta, gradients), 1 / (1 - beta))));
+            float[][] update = multiply(divide(create(rows, columns, lr), add(sqrt(v_), create(rows, columns, e))), add(scale(beta, m_), multiply(scale(1 - beta, gradients), 1 / (1 - beta))));
             float[][][] store = {m, v};
             return new Object[]{update, store};
         };
@@ -1918,10 +1918,6 @@ public class NNlib extends Application {
         print(arr3d);
     }
 
-    public static void printDimensions(float[][] matrix) {
-        System.out.println("Rows: " + matrix.length + " Columns: " + matrix[0].length);
-    }
-
     public static float[][] doubleToFloat(double[][] matrix) {
         int rows = matrix.length;
         int columns = matrix[0].length;
@@ -1984,7 +1980,7 @@ public class NNlib extends Application {
         return result;
     }
 
-    public static float[][] scale(float[][] matrix, float factor) {
+    public static float[][] multiply(float[][] matrix, float factor) {
         return function(matrix, val -> factor * val);
     }
 
@@ -2081,6 +2077,22 @@ public class NNlib extends Application {
     }
 
     /**
+     * Creates a new matrix with the given dimensions and with a one in the
+     * given position and 0s in the rest.
+     *
+     * @param rows Height of the result.
+     * @param cols Width of the result.
+     * @param onehotRow The row of the 1 in the result.
+     * @param onehotCol The column of the 1 in the result.
+     * @return The resulting matrix.
+     */
+    public static float[][] oneHot(int rows, int cols, int onehotRow, int onehotCol) {
+        float[][] result = new float[rows][cols];
+        result[onehotRow][onehotCol] = 1;
+        return result;
+    }
+
+    /**
      * Samples from the given probabilities. Works properly when probabilities
      * add up to 1
      *
@@ -2128,22 +2140,6 @@ public class NNlib extends Application {
             newArray[i] = array[indeces[i]];
         }
         return newArray;
-    }
-
-    /**
-     * Creates a new matrix with the given dimensions and with a one in the
-     * given position and 0s in the rest.
-     *
-     * @param rows Height of the result.
-     * @param cols Width of the result.
-     * @param onehotRow The row of the 1 in the result.
-     * @param onehotCol The column of the 1 in the result.
-     * @return The resulting matrix.
-     */
-    public static float[][] oneHot(int rows, int cols, int onehotRow, int onehotCol) {
-        float[][] result = new float[rows][cols];
-        result[onehotRow][onehotCol] = 1;
-        return result;
     }
 
     public static float[][] min(float[][] matrix1, float[][] matrix2) {
@@ -2332,7 +2328,7 @@ public class NNlib extends Application {
         return result;
     }
 
-    public static float[][] convolution2d(float[][] input, float[][] filter, float bias, int stride) {
+    public static float[][] convolution(float[][] input, float[][] filter, float bias, int stride) {
         int filterHeight = filter.length;
         int filterWidth = filter[0].length;
         int inputHeight = input.length;
@@ -2359,7 +2355,7 @@ public class NNlib extends Application {
         return result;
     }
 
-    public static float[][][] convolution3d(float[][][] input, float[][][][] filters, float[] biases, int stride) {
+    public static float[][][] convolution(float[][][] input, float[][][][] filters, float[] biases, int stride) {
         int resultDepth = filters.length;
         int filterDepth = filters[0].length;
         int filterHeight = filters[0][0].length;
@@ -2573,6 +2569,7 @@ public class NNlib extends Application {
             NumberAxis yAxis = new NumberAxis();
             xAxis.setAnimated(false);
             xAxis.setLabel("Steps");
+            xAxis.setForceZeroInRange(false);
             yAxis.setAnimated(false);
             yAxis.setLabel(mode ? "Accuracy" : "Loss");
             if (mode) {
@@ -2587,6 +2584,9 @@ public class NNlib extends Application {
                     series.getData().add(new XYChart.Data<>(nn.iterations, 1 / Math.pow(100 * Math.E, nn.loss)));
                 } else {
                     series.getData().add(new XYChart.Data<>(nn.iterations, nn.loss));
+                }
+                if (series.getData().size() > 30000) {
+                    series.getData().remove(0);
                 }
             });
             Stage stage = new Stage();
