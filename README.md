@@ -43,9 +43,6 @@ See the [test cases](https://github.com/ssitu/Neural-Network-Library-Class/tree/
 * Min Max Normalization
 * Z Score Normalization
 * Tanh Estimator Normalization
-* Multithreaded Dot Product
-* Matrix Zero Padding
-* Matrix Dilation
 ## General Features
 * Built-in saving and loading of network parameters with both uncompiled and .jar support
 * Displaying information about a neural network instance with JavaFX
