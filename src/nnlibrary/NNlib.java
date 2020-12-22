@@ -1653,7 +1653,7 @@ public class NNlib extends Application {
     }
 
     public static float leakyrelu(float x, boolean derivative) {
-        if (derivative) {
+        if (!derivative) {
             return Math.max(.001f * x, x);
         } else {
             if (x < 0) {
