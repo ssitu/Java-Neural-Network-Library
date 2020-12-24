@@ -450,7 +450,7 @@ public class NNlib extends Application {
         }
 
         /**
-         * Change the optimizer of this NN instance.
+         * Change the optimizer of this NN instance. WIP
          *
          * @param optimizer The SGD optimizer
          * @see Optimizers.Optimizer
