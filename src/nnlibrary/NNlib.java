@@ -738,7 +738,7 @@ public class NNlib extends Application {
              */
             @Override
             public Dense clone() {
-                Dense copy = new Dense(weights.length, weights[0].length, activation, null);
+                Dense copy = new Dense(weights.length, weights[0].length, activation, initializer);
                 copy.weights = copy(weights);
                 copy.biases = copy(biases);
                 try {
