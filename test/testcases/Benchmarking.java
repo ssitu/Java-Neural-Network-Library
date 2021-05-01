@@ -1,8 +1,10 @@
 package testcases;
 
-import nnlibrary.NNlib;
-import static nnlibrary.NNlib.*;
-import nnlibrary.NNlib.Layer.*;
+import static nnlibrary.hyperparameters.Functions.*;
+import nnlibrary.*;
+import static nnlibrary.JavaFXTools.*;
+import nnlibrary.hyperparameters.*;
+import nnlibrary.layers.*;
 
 public class Benchmarking {
 
@@ -17,7 +19,7 @@ public class Benchmarking {
         );
         System.out.println(nn);
         nn.setAccumulationSize(100);
-        NNlib.showInfo(infoGraph(false), nn);
+        showInfo(infoGraph(false), nn);
         float[][][] input = function2dOn3d(new float[1][28][28], a -> randomize(a, 2, -1, nn.getRandom()));
         float[][] label = {{1}};
         System.out.println("Seconds: " + benchmark(() -> nn.backpropagation(input, label), 1000000, false));

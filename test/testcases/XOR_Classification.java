@@ -1,8 +1,12 @@
 package testcases;
 
-import nnlibrary.NNlib;
-import nnlibrary.NNlib.*;
 import java.util.Random;
+import nnlibrary.*;
+import static nnlibrary.JavaFXTools.*;
+import nnlibrary.hyperparameters.*;
+import static nnlibrary.hyperparameters.Functions.*;
+import nnlibrary.layers.*;
+
 
 public class XOR_Classification {
 
@@ -12,14 +16,14 @@ public class XOR_Classification {
             int rows = matrix.length;
             int columns = matrix[0].length;
             if (!derivative) {
-                return NNlib.max(NNlib.function(matrix, val -> NNlib.tanh(val, false)), matrix);
+                return max(Functions.function(matrix, val -> tanh(val, false)), matrix);
             } else {
                 float[][] result = new float[rows][columns];
                 for (int i = 0; i < rows; i++) {
                     for (int j = 0; j < columns; j++) {
                         float val = matrix[i][j];
-                        if (NNlib.tanh(val, false) > val) {
-                            result[i][j] = NNlib.tanh(val, true);
+                        if (Functions.tanh(val, false) > val) {
+                            result[i][j] = Functions.tanh(val, true);
                         } else {
                             result[i][j] = 1;
                         }
@@ -35,8 +39,8 @@ public class XOR_Classification {
                 0,//Learning Rate for Optimizer
                 LossFunctions.CROSSENTROPY(1),//Loss/Cost/Error Function
                 Optimizers.ADADELTA,//Gradient Descent Optimizer
-                new Layer.Dense(2, 4, CUSTOM, Initializers.XAVIER),
-                new Layer.Dense(2, Activations.SOFTMAX, Initializers.XAVIER)
+                new Dense(2, 4, CUSTOM, Initializers.XAVIER),
+                new Dense(2, Activations.SOFTMAX, Initializers.XAVIER)
         );
         nn.setAccumulationSize(4);
         System.out.println("Seed: " + seed);
@@ -56,8 +60,8 @@ public class XOR_Classification {
                 {{0, 1}}
             }
         };
-        NNlib.showInfo(NNlib.infoLayers, nn);
-        NNlib.showInfo(NNlib.infoGraph(false), nn);
+        showInfo(infoLayers, nn);
+        showInfo(infoGraph(false), nn);
         for (int i = 0; i < 100_000_000; i++) {
             if (i % 4 == 0) {
                 nn.backpropagation(data[0][0], data[1][0]);
@@ -70,13 +74,13 @@ public class XOR_Classification {
             }
             if (PRINT && i % 100000 == 0) {
                 System.out.println("XOR Inputs:");
-                float[][] inputs = NNlib.append(data[0][0], data[0][1], data[0][2], data[0][3]);
-                NNlib.print(inputs);
+                float[][] inputs = Functions.append(data[0][0], data[0][1], data[0][2], data[0][3]);
+                Functions.print(inputs);
                 System.out.println("Outputs:");
-                NNlib.print((float[][]) nn.feedforward(data[0][0]));
-                NNlib.print((float[][]) nn.feedforward(data[0][1]));
-                NNlib.print((float[][]) nn.feedforward(data[0][2]));
-                NNlib.print((float[][]) nn.feedforward(data[0][3]));
+                Functions.print((float[][]) nn.feedforward(data[0][0]));
+                Functions.print((float[][]) nn.feedforward(data[0][1]));
+                Functions.print((float[][]) nn.feedforward(data[0][2]));
+                Functions.print((float[][]) nn.feedforward(data[0][3]));
                 System.out.println("");
             }
         }

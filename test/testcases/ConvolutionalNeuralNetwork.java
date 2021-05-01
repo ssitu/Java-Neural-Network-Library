@@ -1,9 +1,9 @@
 package testcases;
 
 import java.util.Random;
-import nnlibrary.NNlib;
-import static nnlibrary.NNlib.*;
-import nnlibrary.NNlib.Layer.*;
+import nnlibrary.Init;
+import static nnlibrary.hyperparameters.Functions.*;
+import nnlibrary.Init.Layer.*;
 
 public class ConvolutionalNeuralNetwork {
 
@@ -16,8 +16,8 @@ public class ConvolutionalNeuralNetwork {
                 new Conv(1, 1, 1, 1, 0, 0, Activations.TANH),//2x2x2 conv(s=1) 1x2x1x1 = 1x2x2
                 new Flatten(),//1x2x2 = 4
                 new Dense(1, Activations.SIGMOID, Initializers.XAVIER));
-        NNlib.showInfo(NNlib.infoLayers, nn);
-        NNlib.showInfo(NNlib.infoGraph(false), nn);
+        Init.showInfo(Init.infoLayers, nn);
+        Init.showInfo(Init.infoGraph(false), nn);
         float[][][] input1 = {//Slash
             {
                 {0, 0, 1},

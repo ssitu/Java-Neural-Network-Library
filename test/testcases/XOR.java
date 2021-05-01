@@ -1,8 +1,10 @@
 package testcases;
 
-import nnlibrary.NNlib;
-import nnlibrary.NNlib.*;
 import java.util.Random;
+import nnlibrary.*;
+import static nnlibrary.JavaFXTools.*;
+import nnlibrary.hyperparameters.*;
+import nnlibrary.layers.*;
 
 public class XOR {
 
@@ -15,8 +17,8 @@ public class XOR {
                 .1f,//Learning Rate for Optimizer
                 LossFunctions.QUADRATIC(.5),//Loss/Cost/Error Function
                 Optimizers.VANILLA,//Gradient Descent Optimizer
-                new Layer.Dense(2, 3, Activations.SIGMOID, Initializers.VANILLA),//2 in, 3 out
-                new Layer.Dense(1, Activations.SIGMOID, Initializers.VANILLA)//3 in from the previous layer, 1 out
+                new Dense(2, 3, Activations.SIGMOID, Initializers.VANILLA),//2 in, 3 out
+                new Dense(1, Activations.SIGMOID, Initializers.VANILLA)//3 in from the previous layer, 1 out
         );
         nn.setAccumulationSize(4);
         System.out.println("Seed: " + seed);
@@ -45,22 +47,22 @@ public class XOR {
                 {{0}}//F
             }
         };
-        NNlib.setInfoUpdateRate(10);//The info panels will update every 10 milliseconds
-        NNlib.showInfo(NNlib.infoLayers, nn);//Displays the weights and biases of each layer. Can be very intensive if used on a large network with a fast update rate
-        NNlib.showInfo(NNlib.infoGraph(true), nn);//Displays an accuracy over number of times backpropgated graph
-        NNlib.showInfo(NNlib.infoGraph(false), nn);//Displays a cost over number of times backpropagated graph
+        setInfoUpdateRate(10);//The info panels will update every 10 milliseconds
+        showInfo(infoLayers, nn);//Displays the weights and biases of each layer. Can be very intensive if used on a large network with a fast update rate
+        showInfo(infoGraph(true), nn);//Displays an accuracy over number of times backpropgated graph
+        showInfo(infoGraph(false), nn);//Displays a cost over number of times backpropagated graph
         for (int i = 0; i < 100_000_000; i++) {
             int index = i % 4;
             nn.backpropagation(dataset[0][index], dataset[1][index]);//Tunes network parameters to output values closer to the labels given the inputs.
             if (PRINT && i % 100000 == 0) {
                 System.out.println("XOR Inputs:");
-                float[][] inputs = NNlib.append(dataset[0][0], dataset[0][1], dataset[0][2], dataset[0][3]);
-                NNlib.print(inputs);
+                float[][] inputs = Functions.append(dataset[0][0], dataset[0][1], dataset[0][2], dataset[0][3]);
+                Functions.print(inputs);
                 System.out.println("Outputs:");
-                NNlib.print((float[][]) nn.feedforward(dataset[0][0]));
-                NNlib.print((float[][]) nn.feedforward(dataset[0][1]));
-                NNlib.print((float[][]) nn.feedforward(dataset[0][2]));
-                NNlib.print((float[][]) nn.feedforward(dataset[0][3]));
+                Functions.print((float[][]) nn.feedforward(dataset[0][0]));
+                Functions.print((float[][]) nn.feedforward(dataset[0][1]));
+                Functions.print((float[][]) nn.feedforward(dataset[0][2]));
+                Functions.print((float[][]) nn.feedforward(dataset[0][3]));
                 System.out.println("");
             }
         }
