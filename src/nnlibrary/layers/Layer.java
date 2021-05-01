@@ -2,6 +2,8 @@ package nnlibrary.layers;
 
 import java.io.Serializable;
 import java.util.Random;
+import nnlibrary.hyperparameters.Activations;
+import nnlibrary.hyperparameters.Initializers;
 import nnlibrary.hyperparameters.Optimizers;
 
 /**
