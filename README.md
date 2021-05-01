@@ -1,4 +1,4 @@
-# Neural Network Class/Library For Java
+# Neural Network Library For Java
 
 An neural network library without dependencies outside of Java's API packages. It is coded with JDK 1.8 and it uses JavaFX that comes with JDK 1.8, but it is only used for tracking certain information of a neural network instance and is completely optional.
 
