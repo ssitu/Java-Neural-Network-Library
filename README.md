@@ -1,8 +1,8 @@
 # Neural Network Library For Java
 
-An neural network library without dependencies outside of Java's built-in packages. It is coded with JDK 1.8 and it uses JavaFX that comes with JDK 1.8, but it is only used for tracking certain information of a neural network instance and is completely optional.
+An neural network library without dependencies outside of Java's built-in packages. This was a project for learning both Java and neural networks. It was the largest project I've attempted at the time, so the code and design choices are not great. It uses JDK 1.8 and uses JavaFX that comes with JDK 1.8, but it is only used for data visualization in [JavaFXTools.java](src/nnlibrary/JavaFXTools.java) so the dependency can be easily removed.
 
-See the [test cases](https://github.com/ssitu/Neural-Network-Library-Class/tree/master/test/testcases) for small examples of using the library. 
+See the [test cases](test/testcases) for small examples of using the library. 
 
 # Features
 ## Layers
@@ -41,8 +41,10 @@ See the [test cases](https://github.com/ssitu/Neural-Network-Library-Class/tree/
 * Min Max Normalization
 * Z Score Normalization
 * Tanh Estimator Normalization
+## Customizable
+* All of the above categories can be extended to create new modules. An example can be found here: [XOR_Classification.java](test/testcases/XOR_Classification.java#L15-L34)
 ## General Features
-* Built-in saving and loading of network parameters with both uncompiled and .jar support
+* Built-in saving and loading of network parameters with both uncompiled and compiled .jar support
 * Displaying information about a neural network instance with JavaFX
     * A scrollable window with all parameters of each layer in the network
     * A graph that measures loss or accuracy of the network over each iteration of backpropagation
